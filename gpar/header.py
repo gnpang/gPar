@@ -8,12 +8,12 @@ import ctypes as C
 import os
 import numpy as np 
 
-# from gpar.libname import _load_cdll
+from gpar.util.libname import _load_cdll
 
-# clibarray = _load_cdll("array")
-libdir = os.path.join(os.path.dirname(__file__),'lib')
-libpath = os.path.join(libdir, 'libarray.so')
-clibarray = C.CDLL(str(libpath))
+clibarray = _load_cdll("array")
+#libdir = os.path.join(os.path.dirname(__file__),'lib')
+#libpath = os.path.join(libdir, 'libarray.so')
+#clibarray = C.CDLL(str(libpath))
 
 clibarray.slidebeam.argtypes = [ C.c_int, C.c_int, C.c_int, 
 				C.c_int, C.c_int, C.c_int, C.c_double,
