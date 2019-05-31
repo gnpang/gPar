@@ -5,15 +5,60 @@ import os
 import time
 import numpy as np 
 import pandas as pd 
+from obspy.core import UTCDateTime
+import obspy
 
 import gpar
+from gpar.util import util
 import scipy
+
+def createEqList(arrayList='array.list',
+				ndkfile='gcmt_1996_2017.ndk',
+				formats='ndk',
+				mindis=50.0, maxdis=75, mag=None,
+				model='ak135',
+				phase=['PKiKP'],
+				savefile='array.list.e'):
+	
+	ardf = util.readList(arrayList, list_type='array', sep='\s+')
+	msg = ('reading ndk file %s'%ndkfile)
+	gpar.log(__name__, msg, level='info', pri=True)
+	# ndk = obspy.read_events(ndkfile)
+	if formats == 'ndk':
+		ndk = util.readNDK(ndkfile)
+	elif formats == 'csv':
+		ndk = pd.read_csv(ndkfile, delimiter='\s+')
+	else:
+		msg = ('Not a right format for %s\nchoose from ndk or csv'%ndkfile)
+		gpar.log(__name__, msg, level='error', pri=True)
+	eqnum = ['']*len(ardf)
+	for ind, row in ardf.iterrows():
+		name = row.NAME
+		if not os.path.isdir(name):
+			os.mkdir(name)
+		msg = ('Generating Eq list for array %s'%name)
+		gpar.log(__name__, msg, level='info', pri=True)
+		evedf = gpar.getdata.makeEventList(ndk=ndk, array=name,
+						Olat=row.LAT, Olon=row.LON, 
+						mindis=mindis, maxdis=maxdis, minmag=mag,
+						model=model, phase=phase,
+						)
+		# evedf = evedf[evedf.time>= UTCDateTime(starttime)]
+		n = len(evedf)
+		eqnum[ind] = n
+
+	ardf['EQNUM'] = eqnum
+
+	ardf.to_csv(savefile, sep=str('\t'), index=False)
+
+	return ardf
+
 
 def createArray(arrayList='array.list',
 				savecarray=True,
 				fileName='array.pkl',
 				model='ak135',
-				phase='PKiKP',
+				phase=['PKiKP'],
 				coordsys='lonlat',
 				calTime=True,
 				save=True,
@@ -24,33 +69,38 @@ def createArray(arrayList='array.list',
 	Function to create the Array instance 
 	"""
 
-	arraydf = gpar.util.readList(arrayList, list_type='array', sep='\s+')
+	arraydf = util.readList(arrayList, list_type='array', sep='\s+')
 
 	arDF = pd.DataFrame(columns=['NAME','ARRAY'])
 	for ind, row in arraydf.iterrows():
-		eqlist = os.path.join(row.NAME,'eq.'+row.NAME+'.list')
-		if not os.path.exists(eqlist):
-			msg = ('Earthquake list for array %s is not exists, building from ndk file' % row.NAME)
-			gpar.log(__name__,msg,level='warning',pri=True)
-			if 'ndkfile' not in kwargs.keys():
-				msg = ('input the ndkfile and related parameters (see getdata.makeEventlist) for building earthquake list')
-				gpar.log(__name__, msg, level='error', pri=True)
-			if not os.path.isfile(ndkfile):
-				msg = ('ndk file does not exist')
-				gpar.log(__name__,msg, level='error', pri=True)
+		# eqlist = os.path.join(row.NAME,'eq.'+row.NAME+'.list')
+		# if not os.path.exists(eqlist):
+		# 	msg = ('Earthquake list for array %s is not exists, building from ndk file' % row.NAME)
+		# 	gpar.log(__name__,msg,level='warning',pri=True)
+		# 	if 'ndkfile' not in kwargs.keys():
+		# 		msg = ('input the ndkfile and related parameters (see getdata.makeEventList) for building earthquake list')
+		# 		gpar.log(__name__, msg, level='error', pri=True)
+		# 	if not os.path.isfile(ndkfile):
+		# 		msg = ('ndk file does not exist')
+		# 		gpar.log(__name__,msg, level='error', pri=True)
 
-			ndkfile = kwargs['ndkfile']
-			eqdf = gpar.getdata.makeEventList(ndkfile=ndkfile,array=row.NAME,Olat=row.LAT,Olon=row.LON,
-											  model=model,phase=phase)
-		else:
-			eqdf = gpar.util.readList(eqlist,list_type='event',sep='\s+')
+		# 	ndkfile = kwargs['ndkfile']
+		# 	eqdf = gpar.getdata.makeEventList(ndkfile=ndkfile,array=row.NAME,Olat=row.LAT,Olon=row.LON,
+		# 									  model=model,phase=phase)
+		# else:
+		# 	eqdf = util.readList(eqlist,list_type='event',sep='\s+')
 		refpoint = [row.LAT, row.LON]
 		fet = gpar.getdata.quickFetch(row.NAME)
-		streams = [''] * len(eqdf)
-		for num, eve in eqdf.iterrows():
-			st = fet.getStream(eve.DIR)
-			streams[num] = st
-		eqdf['Stream'] = streams
+		# streams = [''] * len(eqdf)
+		# for num, eve in eqdf.iterrows():
+		# 	st = fet.getStream(eve.DIR)
+		# 	streams[num] = st
+		# eqdf['Stream'] = streams
+		eqdf = fet.getEqData(row, phase=phase)
+		if eqdf is None:
+			msg = 'Earthquake list for array %s is not existed, skipping' %(row.NAME)
+			gpar.log(__name__, msg, level='warning', pri=True)
+			continue
 		array = gpar.arrayProcess.Array(row.NAME,refpoint,eqdf,coordsys,phase)
 
 		if calTime:
@@ -102,7 +152,7 @@ def upDateArray(array, beamtype='beam', filt=[1,2,4,True],
 	if isinstance(array, gpar.arrayProcess.Array):
 		ar = array
 	elif isinstance(array, str):
-		ar = gpar.util.loadArray(array)
+		ar = util.loadArray(array)
 	elif isinstance(array, pd.DataFrame):
 		tmp = array[array.NAME == kwargs['arrayName']].iloc[0]
 		ar = tmp.ARRAY

@@ -13,7 +13,10 @@ from obspy.taup import TauPyModel
 from obspy.signal.util import util_geo_km
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import cPickle
+try:
+	import cPickle
+except ImportError:
+	import pickle as cPickle
 
 
 PI = np.pi
@@ -129,7 +132,7 @@ class Earthquake(object):
 	Earthquake object
 	"""
 
-	def __init__(self, array, row, phase='PKiKP'):
+	def __init__(self, array, row, phase=['PKiKP']):
 		"""
 		Earthquake basic information including ray parameters for specific phase
 		defualt is for PKiKP
@@ -173,7 +176,7 @@ class Earthquake(object):
 			phase = phase
 		else:
 			phase = self.phase
-		arrival = model.get_travel_times(source_depth_in_km=self.dep,distance_in_degree=self.Del,phase_list=[phase])[0]
+		arrival = model.get_travel_times(source_depth_in_km=self.dep,distance_in_degree=self.Del,phase_list=phase)[0]
 		self.arrival = self.time + arrival.time
 		msg = ('Travel time for %s for earthquake %s in depth of %.2f in distance of %.2f is %s' % (phase, self.ID, self.dep, self.Del, self.arrival))
 		gpar.log(__name__,msg,level='info',pri=True)
@@ -232,7 +235,7 @@ class Earthquake(object):
 				data = scipy.signal.hilbert(data)
 			tr_npt = tr.stats.npts
 			tmp_tsDF = tsDF[tsDF.STA==sta].iloc[0]
-			sind = int(starttime - tr.stats.sac.b)/delta + tmp_tsDF.LAG
+			sind = int(int(starttime - tr.stats.sac.b)/delta + tmp_tsDF.LAG)
 
 			if sind < 0:
 				msg = ('Shift time is before start of records, padding %d points staion %s'%(sind,sta))

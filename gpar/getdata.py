@@ -2,7 +2,7 @@
 @author guanning
 """
 # python 2 and 3 compatibility imorts
-from __future__ import print_function, absolute_import, unicode_literals
+from __future__ import print_function, absolute_import
 from __future__ import with_statement, nested_scopes, division, generators
 from six import string_types
 
@@ -17,6 +17,7 @@ import itertools
 from six import string_types
 
 import gpar
+from gpar.util import util
 
 
 # client imports 
@@ -27,6 +28,7 @@ import obspy.clients.earthworm
 from obspy.core import UTCDateTime
 from obspy.core import AttribDict
 from obspy.taup import TauPyModel
+from obspy.core import AttribDict
 
 # default waveform directory
 eveDirDefault = 'Data'
@@ -52,7 +54,10 @@ def read(path):
 	return st
 
 
-def makeEventList(ndkfile='gcmt_1976_2017.ndk',array='ILAR',Olat=64.7714,Olon=-146.8861,model='ak135',phase='PKiKP'):
+def makeEventList(ndk='gcmt_1976_2017.ndk',array='ILAR',
+				Olat=64.7714,Olon=-146.8861,
+				mindis=50, maxdis=75, minmag=None,
+				model='ak135',phase=['PKiKP']):
 	"""
 	Function to generate a event list form gcmt.ndk
 	
@@ -77,78 +82,99 @@ def makeEventList(ndkfile='gcmt_1976_2017.ndk',array='ILAR',Olat=64.7714,Olon=-1
 	pd.set_option('precision',3)
 	model = TauPyModel(model)
 	infocolumn = ['TIME','LAT','LON','DEP','Mw','mxx','mxy','mzx','myy','myz','mzz','DIR']
-	eves = obspy.read_events(ndkfile)
-	evedf = pd.DataFrame(columns=infocolumn)
+	if isinstance(ndk, str):
+		evedf = util.readNDK(ndk)
+	elif isinstance(ndk, obspy.core.event.Catalog):
+		eves = ndk
+		msg = 'Building dataframe for array %s'%(array)
+		gpar.log(__name__, msg, level='info',pri=True)
+		for eve in eves:
+			origin = eve.origins[0]
+			focal = eve.focal_mechanisms[0]
+			tensor = focal.moment_tensor.tensor
+			mag = eve.magnitudes[0]
 
-	for eve in eves:
-		origin = eve.origins[0]
-		focal = eve.focal_mechanisms[0]
-		tensor = focal.moment_tensor.tensor
-		mag = eve.magnitudes[0]
+			#event origin information
+			time = origin.time
+			lat = origin.latitude
+			lon = origin.longitude
+			dep = origin.depth/1000.0
 
-		#event origin information
-		time = origin.time
-		lat = origin.latitude
-		lon = origin.longitude
-		dep = origin.depth/1000.0
+			Mw = mag.mag
 
-		Mw = mag.mag
+			# Event moment tensor
+			# original in RPT coordinate, transform to XYZ coordinate
+			mxx = tensor.m_tt
+			myy = tensor.m_pp
+			mxy = -tensor.m_tp
+			myz = -tensor.m_rp
+			mzx = tensor.m_rt 
+			mzz = tensor.m_rr
 
-		# Event moment tensor
-		# original in RPT coordinate, transform to XYZ coordinate
-		mxx = tensor.m_tt
-		myy = tensor.m_pp
-		mxy = -tensor.m_tp
-		myz = -tensor.m_rp
-		mzx = tensor.m_rt 
-		mzz = tensor.m_rr
+			newRow = {'TIME':time, 'LAT':lat,'LON':lon,'DEP':dep,
+					  'Mw':Mw,'DIR':str(time),
+					  'mxx':mxx,'mxy':mxy,'mzx':mzx,
+					  'myy':myy,'myz':myz,'mzz':mzz}
 
-		newRow = {'TIME':time, 'LAT':lat,'LON':lon,'DEP':dep,
-				  'Mw':Mw,'DIR':str(time),
-				  'mxx':mxx,'mxy':mxy,'mzx':mzx,
-				  'myy':myy,'myz':myz,'mzz':mzz}
-
-		evedf = evedf.append(newRow, ignore_index=True)
-
+			evedf = evedf.append(newRow, ignore_index=True)
+	elif isinstance(ndk, pd.DataFrame):
+		evedf = ndk.copy()
+	else:
+		msg = 'Not a valid type of ndk, must be a path to a ndk file or a obspy Catalog instance'%(ndk)
+		gpar.log(__name__,msg,level='error',pri=True)
+	
 	# Great circle distance from events to array
+	msg = 'Calculating distance for earthquakes to array %s'%(array)
+	gpar.log(__name__, msg, level='info',pri=True)
 	great_circle_distance_in_degree, azimuth, bakAzimuth = calc_Dist_Azi(evedf.LAT,evedf.LON,Olat,Olon)
 
-	evedf['Del'] = great_circle_distance_in_degree
-	evedf['Azi'] = azimuth 
-	evedf['Baz'] = bakAzimuth
+	evedf['Del'] = np.around(great_circle_distance_in_degree, decimals=2)
+	evedf['Az'] = np.around(azimuth, decimals=2) 
+	evedf['Baz'] = np.around(bakAzimuth, decimals=2)
+	msg = 'Selecting distance from %.2f to %.2f'%(mindis, maxdis)
+	gpar.log(__name__, msg, level='info',pri=True)
+	evedf = evedf[(evedf.Del >= mindis) & (evedf.Del <= maxdis)]
 
+	if minmag is not None:
+		msg = 'Selecting magnitude larger than %s'%(minmag)
+		gpar.log(__name__, msg, level='info',pri=True)
+		evedf = evedf[evedf.Mw > minmag]
 	# calculate ray parameters using obspy.taup
+	evedf.reset_index(drop=True, inplace=True)
 	ray = [' ']*len(evedf)
 	ray_radian = [' ']*len(evedf)
 	takeoff_angle = [' ']*len(evedf)
 	for ind, row in evedf.iterrows():
+		# print('getting travel time for %dth event in array %s'%(ind, array))
 		dep = row.DEP
 		dis = row.Del
 
 		arr = model.get_travel_times(source_depth_in_km=dep,distance_in_degree=dis,phase_list=phase)[0]
-		ray[ind] = arr.ray_param_sec_degree
-		ray_radian[ind] = arr.ray_param
-		takeoff_angle = arr.takeoff_angle
+		ray[ind] = float("{0:.3f}".format(arr.ray_param_sec_degree))
+		ray_radian[ind] = float("{0:.3f}".format(arr.ray_param))
+		takeoff_angle[ind] = float("{0:.3f}".format(arr.takeoff_angle))
 
 	evedf['Rayp'] = ray
 	evedf['Rayp_rad'] = ray_radian
 	evedf['Angle'] = takeoff_angle
 
 	# Calculater radiation pattern from moment tensor, ray parameter and takeoff angle
-	radiation_pattern = __calRadiation(evedf.mxx,evedf.myy,evedf.mzz,
+	radiation_pattern = _calRadiation(evedf.mxx,evedf.myy,evedf.mzz,
 										evedf.mxy,evedf.myz,evedf.mzx,
-										evedf.Angle,evedf.Rayp_rad)
+										evedf.Angle,evedf.Az)
 
-	evedf['BB'] = radiation_pattern
+	evedf['BB'] = np.around(radiation_pattern, decimals=2)
 
-	df = evedf.copy()
+	#df = evedf.copy()
 
-	df.drop(columns=['mxx','mxy','mzx','myy','myz','mzz','Rayp_rad'])
+	cols = ['TIME', 'LAT', 'LON', 'DEP', 'Mw', 'Del', 'Az', 'Baz','Rayp', 'BB', 'Angle','DIR']
+	evedf.drop(columns=['mxx','mxy','mzx','myy','myz','mzz','Rayp_rad','exp'], inplace=True)
+	#df.reset_index(inplace=True)
 	name = 'eq.'+array + '.list'
 	name = os.path.join(array,name)
-	df.to_csv(name, sep='\t',index=False)
+	evedf.to_csv(name, sep=str('\t'), index=False)
 
-	return evedf, df
+	return evedf
 
 
 	
@@ -177,6 +203,8 @@ def calc_Dist_Azi(source_latitude_in_deg, source_longitude_in_deg,
 	source_longitude = source_longitude_in_deg*PI/180.0
 	if isinstance(source_latitude,float):
 		n=1
+	else:
+		n = len(source_latitude)
 	receiver_latitude = receiver_latitude_in_deg*PI/180.0
 	receiver_longitude = receiver_longitude_in_deg*PI/180.0
 	# correct for ellipticity
@@ -247,15 +275,15 @@ def calc_Dist_Azi(source_latitude_in_deg, source_longitude_in_deg,
 	return great_circle_distance_in_degree,azimuth_in_degree,bakAzimuth_in_degree
 
 
-def __calRadiation(mxx,myy,mzz,mxy,myz,mzx,takeoff,azimuth):
+def _calRadiation(mxx,myy,mzz,mxy,myz,mzx,takeoff,azimuth):
 
 	takeoff = takeoff * PI / 180.0
 	azimuth = azimuth * PI / 180.0
 
 	val = np.sin(takeoff)**2*\
-		  (np.cos(azimuth)*mxx+np.sin(2*azimuth)*mxy+\
+		  (np.cos(azimuth)**2*mxx+np.sin(2*azimuth)*mxy+\
 		  np.sin(azimuth)**2*myy-mzz) +\
-		  mzz + 2.0*np.sin(takeoff)*cos(takeoff)*\
+		  mzz + 2.0*np.sin(takeoff)*np.cos(takeoff)*\
 		  (np.cos(azimuth)*mzx+np.sin(azimuth)*myz)
 
 	return val
@@ -266,12 +294,59 @@ def quickFetch(fetch_arg,**kwargs):
 
 	"""
 
-	if not isinstance(fetch_arg, string_types):
-		msg = 'Input must be a string, please try again'
-		gpar.log(__name__, msg, level='error',pri=True)
-	dat_fet = DataFetcher(fetch_arg,**kwargs)
+	if isinstance(fetch_arg, DataFetcher):
+		dat_fet = fetch_arg
+	elif isinstance(fetch_arg, string_types):
+		if fetch_arg in DataFetcher.subMethods:
+			if fetch_arg == 'dir':
+				msg = 'If using method dir, please pass a path to directory'
+				gpar.log(__name__, msg, level='error', pri=True)
+			dat_fet = DataFetcher(fetch_arg, **kwargs)
+		else:
+			if not os.path.exists(fetch_arg):
+				msg = 'Directory %s does not exist' % fetch_arg
+				gpar.log(__name__, msg, level='error', pri=True)
+			dat_fet = DataFetcher(method='dir', arrayName=fetch_arg, **kwargs)
+	else:
+		msg = 'Input not understand'
+		gpar.log(__name__, msg, level='error', pri=True)
 	return dat_fet
 
+def makeDataDirectory(arraylist='array.list', fetch='IRIS',
+					  timeBeforeOrigin=0, timeAfterOrigin=3600,
+					  buildArray=False, **kwargs):
+	ardf = util.readList(arraylist, list_type='array', sep='\s+')
+
+	if isinstance(fetch, gpar.getdata.DataFetcher):
+		fetcher = fetch
+	else:
+		fetcher = gpar.getdata.DataFetcher(fetch, timeBeforeOrigin=timeBeforeOrigin, timeAfterOrigin=timeAfterOrigin)
+
+	for ind, row in ardf.iterrows():
+		edf = fetcher.getEqData(row)
+		edf.dropna(inplace=True)
+		edf.reset_index(drop=True, inplace=True)
+		arDir = os.path.join(row.NAME, 'Data')
+		if not os.path.isdir(arDir):
+			os.mkdir(arDir)
+		for ind, eve in edf.iterrows():
+			eDir = os.path.join(arDir, eve.DIR)
+			if not os.path.isdir(eDir):
+				os.mkdir(eDir)
+			_id = eve.DIR[:-6] + '.' + row.NETWORK
+			st = eve.Stream
+			for tr in st:
+				sacname = _id + '.' + tr.stats.station + '.' + tr.stats.channel + '.sac'
+				sacname = os.path.join(eDir, sacname)
+				tr.write(sacname, format='SAC')
+		
+		if buildArray :
+			refpoint = [row.LAT, row.LON]
+			array = gpar.arrayProcess.Array(row.NAME, refpoint, edf, coordsys=kwargs['coordsys'], phase=kwargs['phase'])
+			msg = ('using default parameters sll_x=-15, sll_y=-15, sl_s=0.1,grdpts_x=301, grdpts_y=301, unit="deg" for time table')
+			gpar.log(__name__,msg,level='info',pri=True)
+			array.getTimeTable()
+			array.write()
 
 class DataFetcher(object):
 
@@ -279,62 +354,163 @@ class DataFetcher(object):
 	Class to hangle data acquisition
 	Support downloaded sac format data only in this version
 	"""
-
-	def __init__(self,arrayName):
-		self.arrayName = arrayName
+	subMethods = ['dir', 'iris']
+	def __init__(self, method, arrayName=None, client=None, removeResponse=False,
+		         prefilt=None, timeBeforeOrigin=0.0, timeAfterOrigin=3600.0,
+		         checkData=True):
+		# self.arrayName = arrayName
+		self.__dict__.update(locals())
 		self._checkInputs()
 
 	def _checkInputs(self):
-		if not isinstance(self.arrayName, string_types):
-			msg = 'arrayName must be a string. only data dir now'
+		if self.arrayName is not None and isinstance(self.arrayName, string_types):
+			self.arrayName = self.arrayName.upper()
+		if not isinstance(self.method, string_types):
+			msg = 'method must be a string. options:\n%s'%self.supMethods
 			gpar.log(__name__,msg,level='error',e=ValueError)
-		self.arrayName = self.arrayName.upper()
+		self.method = self.method.lower()
+		if not self.method in DataFetcher.subMethods:
+			msg = 'method %s not support. Options:\n%s'%(self.metho,self.supMethods)
+			gpar.log(__name__,msg,level='error',e=ValueError)
+		if self.method == 'dir':
 
-		dirPath = glob.glob(self.arrayName)
-		if len(dirPath) <1:
-			msg = ('directory %s not found make sure path is correct' % self.arrayName)
-			gpar.log(__name__,msg,level='error',e=IOError)
-		else:
-			self.directory = dirPath[0]
+			dirPath = glob.glob(self.arrayName)
+			if len(dirPath) <1:
+				msg = ('directory %s not found make sure path is correct' % self.arrayName)
+				gpar.log(__name__,msg,level='error',e=IOError)
+			else:
+				self.directory = dirPath[0]
+				self._getStream = _loadDirectoryData
+		elif self.method == 'iris':
+			self.client = obspy.clients.fdsn.Client('IRIS')
+			self._getStream = _loadFromFDSN
 
-	def getStream(self,eve):
-		"""
-		Function for loading data from directory, sac format only
-		"""
+	def getEqData(self, ar, timebefore=None, timeafter=None, phase=['PKiKP'], **kwargs):
+		if timebefore is None:
+			timebefore = self.timeBeforeOrigin
+		if timeafter is None:
+			timeafter = self.timeAfterOrigin
 
-		ID = eve[:-6]
-		datafile = os.path.join(self.arrayName,'Data',eve,ID+'*.sac')
-		if len(datafile) < 1:
-			msg = 'data from %s in array %s is not found' % (self.arrayName,eve)
+		net = ar.NETWORK
+		sta = ar.NAME[0:2]+'*'
+		chan = ar.Channel.split('-')
+		arDir = os.path.join(ar.NAME, 'Data')
+
+		eqlist = os.path.join(ar.NAME, 'eq.'+ar.NAME+'.list')
+		if not os.path.exists(eqlist):
+			msg = ('Earthquake list for array %s is not exists, building from ndk file first' % ar.NAME)
 			gpar.log(__name__,msg,level='warning',pri=True)
-			return None
-		st = read(datafile)
+			if 'ndkfile' not in kwargs.keys():
+				msg = ('input the ndkfile and related parameters (see getdata.makeEventList) for building earthquake list')
+				gpar.log(__name__, msg, level='warning', pri=True)
+				return None
+			if not os.path.isfile(ndkfile):
+				msg = ('ndk file does not exist')
+				gpar.log(__name__,msg, level='warning', pri=True)
+				return None
+		eqdf = util.readList(eqlist,list_type='event', sep='\s+')
+		ndf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, loc='??')
 
-		# check if contain neccesarry information
+		return ndf
 
+	def getStream(self, ar, df, stime, etime, net, staele, chan, loc='??'):
+		if not isinstance(chan, (list, tuple)):
+			if not isinstance(chan, string_types):
+				msg = 'chan must be a string or list of string'
+				gpar.log(__name__, msg, level=error, pri=True)
+			chan = [chan]
+		if self.method == 'dir':
+			df = self._getStream(ar.NAME, df)
+		else:
+			client = self.client
+			stream = [''] * len(df)
+			for ind, row in df.iterrows():
+				time = UTCDateTime(row.TIME)
+				start = time - stime
+				end = time + etime
+				st = self._getStream(self, start, end, net, staele, chan, loc)
+				if st is None or len(st) < 1:
+					stream[ind] = pd.NaT
+				else:
+					nst = obspy.Stream()
+					for tr in st:
+						sta = tr.stats.station
+						station = client.get_stations(network=net, station=sta).networks[0].stations[0]
+						latitude = station.latitude
+						longitude = station.longitude
+						sac = AttribDict({'b':-stime, 'e':etime, 'o':0,
+										  'evla':row.LAT, 'evlo': row.LON,
+										  'delta': tr.stats.delta, 'npts': tr.stats.npts,
+										  'stla': latitude, 'stlo':longitude,
+										  'iztype': 11, 'lcalda': True, 'knetwk': net,
+										  'kcmpnm':tr.stats.channel,'kstnm':sta,
+										  'nzyear':time.year, 'nzjday':time.julday,
+										  'nzhour':time.hour, 'nzmin':time.minute,
+										  'nzsec':time.second, 'nzmsec': time.microsecond/1000})
+						tr.stats.sac = sac
+						nst.append(tr)
+					stream[ind] = nst
+
+			df['Stream'] = stream
+
+		return df		
+
+
+# Functions to get stream data based on selected method
+
+def _loadDirectoryData(arrayName, df):
+
+	stream = [''] * len(df)
+	for ind, eve in df.iterrows():
+		_id = eve.DIR[:-6]
+		sacfiles = os.path.join(arrayName, 'Data', eve.DIR, _id+'*.sac')
+		try:
+			st = read(sacfiles)
+		except:
+			msg = 'data from %s in array %s is not found, skipping' % (fet.arrayName,eve.DIR)
+			gpar.log(__name__,msg,level='warning',pri=True)
+			stream[ind] = pd.NaT
+			continue
 		for tr in st:
-			try:
-				sac = tr.stats.sac
-			except ValueError:
+			if not hasattr(tr.stats, 'sac'):
 				msg = ("Trace for %s in station %s doesn's have SAC attributes, removing" % eve, tr.stats.station)
 				st.remove(tr)
 				gpar.log(__name__,msg,level='warning',e=ValueError)
 				continue
-			try:
-				stala = tr.stats.sac.stla 
-				stalo = tr.stats.sac.stlo 
-			except ValueError:
-				msg = ("Trace for %s in station %s doesn's have station information, removing" % eve, tr.stats.station)
+			if not hasattr(tr.stats.sac, 'stla') or not hasattr(tr.stats.sac, 'stlo'):
+				msg = ("Trace for %s in station %s doesn's have station information, removing" % eve.DIR, tr.stats.station)
 				st.remove(tr)
 				gpar.log(__name__,msg,level='warning',e=ValueError)
-
+				continue
 		if len(st) == 0:
-			msg = ("Waveforms for event %s have problem" % eve)
+			msg = ("Waveforms for event %s have problem" % eve.DIR)
 			gpar.log(__name__,msg,level='warning,e=ValueError')
-			return None
+			st = pd.NaT
+		stream[ind] = st
+	df['Stream'] = stream
+	df.dropna(inplace=True)
+	df.reset_index(drop=True, inplace=True)
 
-		return st
+	return df
 
+def _loadFromFDSN(fet, start, end, net, sta, chan, loc):
+
+	client = fet.client
+
+	if not isinstance(chan, string_types):
+		chan = ','.join(chan)
+	else:
+		if '-' in chan:
+			chan = ','.join(chan.split('-'))
+	try:
+		st = client.get_waveforms(net, sta, loc, chan, start, end)
+	except:
+		msg = ('Could not fetch data on %s from %s to %s' %
+				(net+'.'+sta, start, end))
+		gpar.log(__name__, msg, level='warning', pri=True)
+		st = None
+
+	return st
 
 
 

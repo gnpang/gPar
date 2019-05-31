@@ -4,6 +4,8 @@ GUI code modified based on https://github.com/miili/StreamPick
 Need updates:
 Need to reformat the strip dataframe, add in stripping information when previous stripping is loaded
 """
+from __future__ import print_function, absolute_import
+from __future__ import with_statement, nested_scopes, division, generators
 
 import os
 import pickle
@@ -11,12 +13,16 @@ import pandas as pd
 import numpy as np 
 
 # GUI import
-import PyQt4
-from PyQt4 import QtGui
+import PyQt5
+from PyQt5 import QtGui
+from PyQt5 import QtWidgets
+from PyQt5.QtWidgets import *
+from PyQt5.QtGui import *
 import sys
 import signal
 import scipy
 import gpar
+from gpar.util import util
 from itertools import cycle
 
 #figure plot import
@@ -24,6 +30,9 @@ import matplotlib
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.transforms import offset_copy
+from matplotlib.widgets import RectangleSelector
+import matplotlib.colors as mcolors
+import matplotlib.gridspec as gridspec
 
 from mpl_toolkits.basemap import Basemap 
 # from mpl_toolkits.axesgrid1 import make_axes_locatable
@@ -31,23 +40,28 @@ from mpl_toolkits.basemap import Basemap
 #obspy import
 from obspy.taup import TauPyModel 
 import obspy
+from obspy.core.trace import Trace
+from obspy.core.stream import Stream
+from obspy.core import read
+from obspy.core import AttribDict
 
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
+color = mcolors.cnames.values()
 
 #class for event first evaluation
-class glanceEQ(QtGui.QMainWindow):
+class glanceEQ(QtWidgets.QMainWindow):
 
 	def __init__(self, array=None, parent=None, ap=None):
 
 		if ap is None:
-			self.qApp = QtGui.QApplication(sys.argv)
+			self.qApp = QtWidgets.QApplication(sys.argv)
 		else:
 			self.qApp = ap
 		self.KeepGoing = False
 
 		if isinstance(array, str):
-			ar = gpar.util.loadArray(array)
+			ar = util.loadArray(array)
 		elif isinstance(array, gpar.arrayPropocess.Array):
 			ar = array
 		else:
@@ -82,24 +96,24 @@ class glanceEQ(QtGui.QMainWindow):
 		self._current_strip = False
 		self._eventCycle = cycle(self._eqlist)
 		self._eventInfo(self._eventCycle.next())
-		QtGui.QMainWindow.__init__(self)
+		QMainWindow.__init__(self)
 		self.setupUI()
 
 
 	def setupUI(self):
-		self.main_widget = QtGui.QWidget(self)
+		self.main_widget = QtWidgets.QWidget(self)
 		self._initMenu()
 		self._createStatusBar()
 		self._initPlots()
 
-		l = QtGui.QVBoxLayout(self.main_widget)
+		l = QVBoxLayout(self.main_widget)
 		l.addLayout(self.btnbar)
 		l.addLayout(self.btnbar2)
 		l.addWidget(self.canvas)
 
 		self.setCentralWidget(self.main_widget)
 		self.setGeometry(300, 300, 1200, 800)
-		self.setWindowTitle('Array Analysis')
+		self.setWindowTitle('Array Analysis: %s'%self.array.name)
 		self.show()
 	def _killLayout():
 		pass
@@ -114,7 +128,7 @@ class glanceEQ(QtGui.QMainWindow):
 	def _initPlots(self):
 		self.fig = Figure(facecolor='.86',dpi=100, frameon=True)
 		self.canvas = FigureCanvas(self.fig)
-		self.canvas.setFocusPolicy(PyQt4.QtCore.Qt.StrongFocus)
+		self.canvas.setFocusPolicy(PyQt5.QtCore.Qt.StrongFocus)
 		self._drawFig()
 
 		# connect the events
@@ -124,19 +138,19 @@ class glanceEQ(QtGui.QMainWindow):
 
 	def _initMenu(self):
 		# Next and Prev Earthquake
-		nxt = QtGui.QPushButton('Next >>',
+		nxt = QtWidgets.QPushButton('Next >>',
 			shortcut=self._shortcuts['eve_next'], parent=self.main_widget)
 		nxt.clicked.connect(self._pltNextEvent)
 		nxt.setToolTip('shortcut <b>n</d>')
 		nxt.setMaximumWidth(150)
-		prv = QtGui.QPushButton('Prev >>',
+		prv = QPushButton('Prev >>',
 			shortcut=self._shortcuts['eve_prev'], parent=self.main_widget)
 		prv.clicked.connect(self._pltPrevEvent)
 		prv.setToolTip('shortcut <b>p</d>')
 		prv.setMaximumWidth(150)
 
 		# Earthquake drop-down
-		self.evecb = QtGui.QComboBox(self)
+		self.evecb = QComboBox(self)
 		for eve in self._eqlist:
 			self.evecb.addItem(eve)
 		self.evecb.activated.connect(self._pltEvent)
@@ -144,57 +158,57 @@ class glanceEQ(QtGui.QMainWindow):
 		self.evecb.setMinimumWidth(80)
 
 		# coda strip button
-		self.codabtn = QtGui.QPushButton('Strip',
+		self.codabtn = QtWidgets.QPushButton('Strip',
 			shortcut=self._shortcuts['strip'],parent=self.main_widget)
 		self.codabtn.setToolTip('shortcut <b>s</b>')
 		self.codabtn.clicked.connect(self._appStrip)
 
-		self.codacb = QtGui.QComboBox(self)
+		self.codacb = QComboBox(self)
 		for med in ['all', 'coda','twoline']:
 			self.codacb.addItem(med)
 		self.codacb.activated.connect(self._selectMethod)
 		self.codacb.setMaximumWidth(100)
 		self.codacb.setMinimumWidth(80)
-		self.wincb = QtGui.QComboBox(self)
+		self.wincb = QComboBox(self)
 		self.wincb.activated.connect(self._changeStrip)
 		self._updateWinow()
 		
 		# edit/delete coda selected window
-		winEdit = QtGui.QPushButton('Coda Window')
+		winEdit = QtWidgets.QPushButton('Coda Window')
 		winEdit.resize(winEdit.sizeHint())
 		winEdit.clicked.connect(self._editTimeWindow)
 
-		winDelt = QtGui.QPushButton('Delete')
+		winDelt = QtWidgets.QPushButton('Delete')
 		winDelt.resize(winDelt.sizeHint())
 		winDelt.clicked.connect(self._deleteWin)
 
 		# Coda level
 		_radbtn = []
 		for _o in self.eve_type:
-			_radbtn.append(QtGui.QRadioButton(_o.upper(), shortcut=self._shortcuts[_o.upper()]))
+			_radbtn.append(QRadioButton(_o.upper(), shortcut=self._shortcuts[_o.upper()]))
 			_radbtn[-1].setToolTip('Level: '+_o)
-		self.levelGrp = QtGui.QButtonGroup()
+		self.levelGrp = QButtonGroup()
 		self.levelGrp.setExclusive(True)
-		levelbtn = QtGui.QHBoxLayout()
+		levelbtn = QHBoxLayout()
 
 		for _i, _btn in enumerate(_radbtn):
 			self.levelGrp.addButton(_btn, _i)
 			levelbtn.addWidget(_btn)
 
 		# plot slide beam figure button
-		self.sbcb = QtGui.QComboBox(self)
+		self.sbcb = QComboBox(self)
 		for btype in ['beam', 'slide', 'vespetrum','strip']:
 			self.sbcb.addItem(btype)
 		self.sbcb.activated.connect(self._updatePlot)
 		self.codacb.setMaximumWidth(100)
 		self.codacb.setMinimumWidth(80)
 		# Arrange buttons
-		vline = QtGui.QFrame()
-		vline.setFrameStyle(QtGui.QFrame.VLine | QtGui.QFrame.Raised)
-		self.btnbar = QtGui.QHBoxLayout()
+		vline = QFrame()
+		vline.setFrameStyle(QFrame.VLine | QFrame.Raised)
+		self.btnbar = QHBoxLayout()
 		self.btnbar.addWidget(prv)
 		self.btnbar.addWidget(nxt)
-		self.btnbar.addWidget(QtGui.QLabel('Event'))
+		self.btnbar.addWidget(QLabel('Event'))
 		self.btnbar.addWidget(self.evecb)
 		##
 		self.btnbar.addWidget(vline)
@@ -205,32 +219,35 @@ class glanceEQ(QtGui.QMainWindow):
 		self.btnbar.addWidget(winDelt)
 		self.btnbar.addStretch(1)
 
-		self.btnbar2 = QtGui.QHBoxLayout()
-		self.btnbar2.addWidget(QtGui.QLabel('Level: '))
+		self.btnbar2 = QHBoxLayout()
+		self.btnbar2.addWidget(QLabel('Level: '))
 		self.btnbar2.addLayout(levelbtn)
 		
 
 		self.btnbar2.addWidget(vline)
-		self.btnbar2.addWidget(QtGui.QLabel('TYPE'))
+		self.btnbar2.addWidget(QLabel('TYPE'))
 		self.btnbar2.addWidget(self.sbcb)
 		self.btnbar2.addStretch(3)
 
 		#Menubar
 		menubar = self.menuBar()
 		fileMenu = menubar.addMenu('&File')
-		fileMenu.addAction(QtGui.QIcon.fromTheme('document-save'),
+		fileMenu.addAction(QtGui.QIcon().fromTheme('document-save'),
 						   'Save', self._saveFile)
 		fileMenu.addAction(QtGui.QIcon().fromTheme('document-save'),
 						   'Save as', self._saveFileFormat)
+		fileMenu.addSeparator()
+		fileMenu.addAction(QIcon().fromTheme('document-open'),
+						   'Load array', self._openArray)
 		fileMenu.addAction(QtGui.QIcon().fromTheme('document-open'),
-						   'Load Pickle File', self._openFile)
+						   'Load Strip Pickle File', self._openFile)
 		fileMenu.addSeparator()
 		fileMenu.addAction(QtGui.QIcon().fromTheme('document-save'),
 						   'Save Plot', self._savePlot)
 		fileMenu.addSeparator()
-		quit = QtGui.QAction("Quit", self)
+		quit = QAction(QIcon().fromTheme('application-exit')," &Exit", self)
 		fileMenu.addAction(quit)
-		fileMenu.triggered[QtGui.QAction].connect(self.closeArray)
+		fileMenu.triggered[QAction].connect(self.closeArray)
 
 	def _hardExist(self):
 		self.deleteLater()
@@ -239,7 +256,7 @@ class glanceEQ(QtGui.QMainWindow):
 		"""
 		Creates the status bar
 		"""
-		sb =QtGui.QStatusBar()
+		sb =QStatusBar()
 		sb.setFixedHeight(18)
 		self.setStatusBar(sb)
 		self.statusBar().showMessage('Ready')
@@ -386,10 +403,10 @@ class glanceEQ(QtGui.QMainWindow):
 		if len(self._stripDF) != 0:
 			existDF = self._stripDF[(self._stripDF.ID == self._current_event.ID) & (self._stripDF.winName == win['name'])]
 			if len(existDF) !=0:
-				choice = QtGui.QMessageBox.question(self, 'Replace stripping',
+				choice = QMessageBox.question(self, 'Replace stripping',
 							"Do you want to replace existed stripping?",
-							QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
-				if choice == QtGui.QMessageBox.Yes:
+							QMessageBox.Yes | QMessageBox.No)
+				if choice == QMessageBox.Yes:
 					index = existDF.index
 					self._stripDF.drop(index,axis=0,inplace=True)
 					self._stripDF.reset_index()
@@ -488,10 +505,10 @@ class glanceEQ(QtGui.QMainWindow):
 		elif self._btype == 'strip':
 			existDF = self._stripDF[(self._stripDF.ID == self._current_event.ID)]
 			if len(existDF) == 0:
-				choice = QtGui.QMessageBox.question(self, 'Stripping?',
+				choice = QMessageBox.question(self, 'Stripping?',
 						"Haven't stripping yet, want to do it?",
-						QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
-				if choice == QtGui.QMessageBox.Yes:
+						QMessageBox.Yes | QMessageBox.No)
+				if choice == QMessageBox.Yes:
 					self._appStrip()
 				else:
 					self._btype = 'beam'
@@ -509,6 +526,8 @@ class glanceEQ(QtGui.QMainWindow):
 				eind = int(etime / delta)
 				data = data[sind:sind+npts]
 				if self._method == 'all':
+					codemode = existDF.crms.iloc[0]
+					twomode = existDF.trms.iloc[0]
 					ax1 = self.fig.add_subplot(2,2,1)
 					ax1.plot(time, np.log10(data), 'k')
 					codaTr = existDF.codaTr.iloc[0]
@@ -533,18 +552,23 @@ class glanceEQ(QtGui.QMainWindow):
 					ax3 = self.fig.add_subplot(2,2,3)
 					cRes = existDF.codaResTr.iloc[0]
 					timeR = np.arange(cRes.stats.npts)*cRes.stats.delta - trinwin['noise']
-					ax3.plot(timeR, cRes.data)
+					label = "Mean RMS= %s"%(codemode['RMS'])
+					ax3.plot(timeR, cRes.data, label=label)
 					ax3.set_xlim([-trinwin['noise'], trinwin['noise']+trinwin['coda']])
 					ax3.hlines(0,ax3.get_xlim()[0],ax3.get_xlim()[1])
+					ax3.legend()
 					ax3.set_xlabel('Seconds')
 
 					ax4 = self.fig.add_subplot(2,2,4)
 					tRes = existDF.twoResTr.iloc[0]
-					ax4.plot(timeR, tRes.data)
+					label = "Mean RMS = %s"%(twomode['RMS'])
+					ax4.plot(timeR, tRes.data, label=label)
 					ax4.set_xlim([-trinwin['noise'], trinwin['noise']+trinwin['coda']])
 					ax4.hlines(0,ax3.get_xlim()[0],ax3.get_xlim()[1])
+					ax4.legend()
 					ax4.set_xlabel('Seconds')
 				elif self._method == 'coda':
+					codemode = existDF.crms.iloc[0]
 					ax1 = self.fig.add_subplot(2,1,1)
 					ax1.plot(time, np.log10(data), 'k')
 					data_coda = self._current_event.codaTr.data
@@ -556,11 +580,14 @@ class glanceEQ(QtGui.QMainWindow):
 					ax3 = self.fig.add_subplot(2,1,2)
 					cRes = self._current_event.codaResTr
 					timeR = np.arange(cRes.stats.npts)*cRes.stats.delta - trinwin['noise']
-					ax3.plot(timeR, cRes.data)
+					label = "Mean RMS= %s"%(codemode['RMS'])
+					ax3.plot(timeR, cRes.data, label=label)
 					ax3.set_xlim([-trinwin['noise'], trinwin['noise']+trinwin['coda']])
 					ax3.hlines(0,ax3.get_xlim()[0],ax3.get_xlim()[1])
+					ax3.legend()
 					ax3.set_xlabel('Seconds')
 				elif self._method == 'twoline':
+					twomode = existDF.trms.iloc[0]
 					ax1 = self.fig.add_subplot(2,1,1)
 					ax1.plot(time, np.log10(data), 'k')
 					twoTr = self._current_event.twoTr
@@ -575,7 +602,9 @@ class glanceEQ(QtGui.QMainWindow):
 					ax4 = self.fig.add_subplot(2,1,2)
 					tRes = self._current_event.twoResTr
 					timeR = np.arange(tRes.stats.npts)*tRes.stats.delta - trinwin['noise']
-					ax4.plot(timeR, tRes.data)
+					label = "Mean RMS = %s"%(twomode['RMS'])
+					ax4.plot(timeR, tRes.data,label=label)
+					ax4.legend()
 					ax4.set_xlim([-trinwin['noise'], trinwin['noise']+trinwin['coda']])
 					ax4.hlines(0,ax4.get_xlim()[0],ax4.get_xlim()[1])
 					ax4.set_xlabel('Seconds')
@@ -694,7 +723,7 @@ class glanceEQ(QtGui.QMainWindow):
 			self._saveCSV(savefile)
 	def _saveFileFormat(self):
 		files_types = "Pickle (*.pkl);; CSV (*.csv)"
-		self.savefile = QtGui.QFileDialog.getSaveFileName(self,
+		self.savefile = QFileDialog.getSaveFileName(self,
 										'Save as', os.getcwd(), files_types)
 		self.savefile = str(self.savefile)
 		if os.path.splitext(self.savefile)[1].lower() == '.pkl':
@@ -711,17 +740,51 @@ class glanceEQ(QtGui.QMainWindow):
 		_stripDF.to_csv(filename,index=False,sep=',')
 
 	def _openFile(self):
-		filename = QtGui.QFileDialog.getOpenFileName(self,'Load Pickle File',
-													os.getcwd(), 'Pickl Format (*.pkl)', '20')
+		filename,_ = QFileDialog.getOpenFileName(self,'Load Pickle File',
+													os.getcwd(), 'Pickle Format (*.pkl)', '20')
 		if filename:
-			self._stripDF = pd.read_pickle(str(filename))
+			filename = str(filename)
+			self._stripDF = pd.read_pickle(filename)
 			self.savefile = str(filename)
+
+	def _openArray(self):
+		filename,_ = QFileDialog.getOpenFileName(self, 'Load array',
+											os.getcwd(), 'Pickle Format (*.pkl)', '20')
+		if filename:
+			filename = str(filename)
+			ar = util.loadArray(filename)
+			self._refreshArray(ar)
+
+	def _refreshArray(self, ar):
+
+		self.array = ar
+		self._plt_drag = None
+
+		# init events in the array
+		self._events = ar.events #defines list self._events
+		self.savefile = ar.name+'.strip.pkl'
+		self._initEqList()
+		self._stripDF = pd.DataFrame()
+		self._badDF = pd.DataFrame()
+		self._btype = 'beam'
+		self._method = 'all'
+		self.trinWin = [{'name':'N200-C200','noise':200.0,'coda':200.0,
+						 'stime':400.0,'etime':1800,'model':'ak135'}]
+		self._current_win = None
+		self._current_strip = False
+		self._eventCycle = cycle(self._eqlist)
+		self._eventInfo(self._eventCycle.next())
+		self.setWindowTitle('Array Analysis: %s'%self.array.name)
+		self.evecb.clear()
+		for eve in self._eqlist:
+			self.evecb.addItem(eve)
+		self._drawFig()
 
 	def _savePlot(self):
 		# path = os.getcwd()
 		# path = os.path.join(path,self.array.name,self._current_event.ID)
 		file_types = "Image Format (*.png *.pdf *.ps *.eps);; ALL (*)"
-		filename = QtGui.QFileDialog.getSaveFileName(self, 'Save Plot',
+		filename = QFileDialog.getSaveFileName(self, 'Save Plot',
 													 os.getcwd(), file_types)
 		if not filename:
 			return
@@ -734,59 +797,60 @@ class glanceEQ(QtGui.QMainWindow):
 	def closeArray(self,event):
 
 		if len(self._stripDF) > 0 and self.savefile is None:
-			ask = QtGui.QMessageBox.question(self, 'Save stripping?',
+			ask = QMessageBox.question(self, 'Save stripping?',
 				'Do you want to save your coda data?',
-				QtGui.QMessageBox.Save |
-				QtGui.QMessageBox.Discard |
-				QtGui.QMessageBox.Cancel, QtGui.QMessageBox.Save)
-			if ask == QtGui.QMessageBox.Save:
+				QMessageBox.Save |
+				QMessageBox.Discard |
+				QMessageBox.Cancel, QMessageBox.Save)
+			if ask == QMessageBox.Save:
 				self._saveFileFormat()
-			elif ask == QtGui.QMessageBox.Cancel:
+				self.close()
+			elif ask == QMessageBox.Cancel:
 				event.ignore()
 
 
-	class defWindow(QtGui.QDialog):
+	class defWindow(QDialog):
 		def __init__(self, parent=None, windowvalue=None):
 			"""
 			Coda strip window dialog
 			"""
 
-			QtGui.QDialog.__init__(self, parent)
+			QDialog.__init__(self, parent)
 			self.setWindowTitle('Create new coda strip window')
-			self.noisewin = QtGui.QDoubleSpinBox(decimals=1, maximum=400, minimum=20, singleStep=10, value=10)
-			self.codawin = QtGui.QDoubleSpinBox(decimals=1, maximum=400, minimum=20, singleStep=10, value=10)
-			self.stime = QtGui.QDoubleSpinBox(decimals=1, maximum=600, minimum=0, singleStep=50, value=50)
-			self.etime = QtGui.QDoubleSpinBox(decimals=1, maximum=2400, minimum=1600, singleStep=50, value=50)
+			self.noisewin = QDoubleSpinBox(decimals=1, maximum=400, minimum=20, singleStep=10, value=10)
+			self.codawin = QDoubleSpinBox(decimals=1, maximum=400, minimum=20, singleStep=10, value=10)
+			self.stime = QDoubleSpinBox(decimals=1, maximum=600, minimum=0, singleStep=50, value=50)
+			self.etime = QDoubleSpinBox(decimals=1, maximum=2400, minimum=1600, singleStep=50, value=50)
 
-			self.winName = QtGui.QLineEdit('Window Name')
+			self.winName = QLineEdit('Window Name')
 			self.winName.selectAll()
 
-			self.model = QtGui.QLineEdit('ak135')
+			self.model = QLineEdit('ak135')
 			self.model.selectAll()
 
-			grid = QtGui.QGridLayout()
-			grid.addWidget(QtGui.QLabel('Window Name'), 0, 0)
+			grid = QGridLayout()
+			grid.addWidget(QLabel('Window Name'), 0, 0)
 			grid.addWidget(self.winName, 0, 1)
-			grid.addWidget(QtGui.QLabel('Noise Win.'), 1, 0)
+			grid.addWidget(QLabel('Noise Win.'), 1, 0)
 			grid.addWidget(self.noisewin, 1, 1)
-			grid.addWidget(QtGui.QLabel('Coda Win.'), 2, 0)
+			grid.addWidget(QLabel('Coda Win.'), 2, 0)
 			grid.addWidget(self.codawin, 2, 1)
-			grid.addWidget(QtGui.QLabel('Start Time.'), 3, 0)
+			grid.addWidget(QLabel('Start Time.'), 3, 0)
 			grid.addWidget(self.stime, 3, 1)
-			grid.addWidget(QtGui.QLabel('Start Time.'), 4, 0)
+			grid.addWidget(QLabel('End Time.'), 4, 0)
 			grid.addWidget(self.etime, 4, 1)
-			grid.addWidget(QtGui.QLabel('Model.'), 5, 0)
+			grid.addWidget(QLabel('Model.'), 5, 0)
 			grid.addWidget(self.model, 5, 1)
 			grid.setVerticalSpacing(10)
 
-			btnbox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok |
-											QtGui.QDialogButtonBox.Cancel)
+			btnbox = QDialogButtonBox(QDialogButtonBox.Ok |
+											QDialogButtonBox.Cancel)
 
 			btnbox.accepted.connect(self.accept)
 			btnbox.rejected.connect(self.reject)
 
-			layout = QtGui.QVBoxLayout()
-			layout.addWidget(QtGui.QLabel('Define noise window and coda window for stripping'))
+			layout = QVBoxLayout()
+			layout.addWidget(QLabel('Define noise window and coda window for stripping'))
 			layout.addLayout(grid)
 			layout.addWidget(btnbox)
 
@@ -807,11 +871,11 @@ class glanceEQ(QtGui.QMainWindow):
 						coda=float(self.coda.cleanText()))	
 
 # class for event stacking in arrays
-class stackArray(QtGui.QMainWindow):
+class stackArray(QtWidgets.QMainWindow):
 
 	def __init__(self, arraylist=None, parent=None, ap=None):
 		if ap is None:
-			self.qApp = QtGui.QApplication(sys.argv)
+			self.qApp = QApplication(sys.argv)
 		else:
 			self.qApp = ap
 		if isinstance(arraylist, str):
@@ -824,25 +888,34 @@ class stackArray(QtGui.QMainWindow):
 
 		self._shortcuts = {'arr_next': 'n',
 						   'arr_prev': 'p',
+						   'cancel': 'c',
+						   'accept': 'a',
 						   'stack': 's'}
 
 		self._list = arlist
 		self._initArrayList()
 		self._arrayCycle = cycle(self._namelist)
-		self.dis = []
+		self.dis = [{'name':'All-Dis',
+					 'mindis': 50.0,
+					 'maxdis': 75.0,
+					 'step':25.0,
+					 'overlap':0,
+					 'write':False}]
 		self._arrayInfo(self._arrayCycle.next())
-		QtGui.QMainWindow.__init__(self)
+		self._initReg()
+		QMainWindow.__init__(self)
 		self.setupUI()
 
 	def setupUI(self):
-		self.main_widget = QtGui.QWidget(self)
+		self.main_widget = QWidget(self)
 		self._initMenu()
 		self._createStatusBar()
 		self._initPlots()
 
-		l = QtGui.QVBoxLayout(self.main_widget)
+		l = QVBoxLayout(self.main_widget)
 
 		l.addLayout(self.btnbar)
+		l.addLayout(self.btnbar2)
 		l.addWidget(self.canvas)
 		self.setCentralWidget(self.main_widget)
 		self.setGeometry(300, 300, 1200, 800)
@@ -852,28 +925,28 @@ class stackArray(QtGui.QMainWindow):
 	def _killLayout():
 		pass
 	def _initPlots(self):
-		self.fig = Figure(dpi=100)
+		self.fig = Figure(dpi=100, constrained_layout=True)
 		self.canvas = FigureCanvas(self.fig)
-		self.canvas.setFocusPolicy(PyQt4.QtCore.Qt.StrongFocus)
+		self.canvas.setFocusPolicy(PyQt5.QtCore.Qt.StrongFocus)
 		self._drawFig()
 
-		# self.fig.canvas.mpl_connect()
+		self.fig.canvas.mpl_connect('key_press_event', self._selectRegOnPress)
 
 	def _initMenu(self):
 		# Next and Prev array
-		nxt = QtGui.QPushButton('Next >>',
+		nxt = QtWidgets.QPushButton('Next >>',
 			shortcut=self._shortcuts['arr_next'], parent=self.main_widget)
 		nxt.clicked.connect(self._pltNextArray)
 		nxt.setToolTip('shortcut <b>n</d>')
 		nxt.setMaximumWidth(150)
-		prv = QtGui.QPushButton('Prev >>',
+		prv = QtWidgets.QPushButton('Prev >>',
 			shortcut=self._shortcuts['arr_prev'], parent=self.main_widget)
 		prv.clicked.connect(self._pltPrevArray)
 		prv.setToolTip('shortcut <b>p</d>')
 		prv.setMaximumWidth(150)
 
 		# Array drop-down
-		self.arcb = QtGui.QComboBox(self)
+		self.arcb = QComboBox(self)
 		for arr in self._namelist:
 			self.arcb.addItem(arr)
 		self.arcb.activated.connect(self._pltArray)
@@ -883,37 +956,69 @@ class stackArray(QtGui.QMainWindow):
 		# Select region
 
 		# Stacking earthquakes in array
-		self.stbtn = QtGui.QPushButton('Stack',
+		self.stbtn = QtWidgets.QPushButton('Stack',
 					shortcut=self._shortcuts['stack'], parent=self.main_widget)
+		self.stbtn.setCheckable(True)
+		self.stbtn.setStyleSheet('QPushButton:checked {background-color: lightgreen;}')
 		self.stbtn.setToolTip('shortcut <b>s</b>')
-		self.stbtn.clicked.connect(self._appStack)
-
-		self.discb = QtGui.QComboBox(self)
+		self.stbtn.clicked.connect(self._drawStack)
+		# Select distance
+		self.discb = QComboBox(self)
 		self.discb.activated.connect(self._changeStack)
 		self._updateWindow()
 
-		disEdit = QtGui.QPushButton('Edit')
+		disEdit = QtWidgets.QPushButton('Edit')
 		disEdit.resize(disEdit.sizeHint())
 		disEdit.clicked.connect(self._editDis)
 
-		disDelt = QtGui.QPushButton('Delete')
+		disDelt = QtWidgets.QPushButton('Delete')
 		disDelt.resize(disEdit.sizeHint())
 		disDelt.clicked.connect(self._deleteDis)
-		# Select distance
-		self.btnbar = QtGui.QHBoxLayout()
+		# Select region
+		self.regcb = QComboBox(self)
+		self.regcb.activated.connect(self._changeRegion)
+		self._updateRegion()
+		regEdit = QtWidgets.QPushButton('Edit')
+		regEdit.resize(regEdit.sizeHint())
+		regEdit.clicked.connect(self._editRegion)
+		regDelt = QtWidgets.QPushButton('Delete')
+		regDelt.resize(regDelt.sizeHint())
+		regDelt.clicked.connect(self._deleteRegion)
+		#button to plot all regin in one plot
+		self.allbtn = QPushButton('All Region')
+		self.allbtn.setCheckable(True)
+		self.allbtn.setStyleSheet('QPushButton:checked {background-color: lightgreen;}')
+		self.allbtn.clicked.connect(self._stackAll)
+		#reset region button
+		self.rsbtn = QtWidgets.QPushButton('Reset')
+		self.rsbtn.clicked.connect(self._resetReg)
+
+		self.btnbar = QHBoxLayout()
 		self.btnbar.addWidget(prv)
 		self.btnbar.addWidget(nxt)
-		self.btnbar.addWidget(QtGui.QLabel('Array'))
+		self.btnbar.addWidget(QLabel('Array'))
 		self.btnbar.addWidget(self.arcb)
 
-		vline = QtGui.QFrame()
-		vline.setFrameStyle(QtGui.QFrame.VLine | QtGui.QFrame.Raised)
+		vline = QFrame()
+		vline.setFrameStyle(QFrame.VLine | QFrame.Raised)
 		self.btnbar.addWidget(vline)
 		self.btnbar.addWidget(self.stbtn)
+		self.btnbar.addWidget(QLabel('Step'))
 		self.btnbar.addWidget(self.discb)
 		self.btnbar.addWidget(disEdit)
 		self.btnbar.addWidget(disDelt)
 		self.btnbar.addStretch(1)
+
+		self.btnbar2 = QHBoxLayout()
+		self.btnbar2.addWidget(QLabel('Region'))
+		self.btnbar2.addWidget(self.regcb)
+		self.btnbar2.addWidget(regEdit)
+		self.btnbar2.addWidget(regDelt)
+		self.btnbar2.addWidget(self.allbtn)
+		self.btnbar2.addWidget(vline)
+		self.btnbar2.addWidget(self.rsbtn)
+		self.btnbar2.addStretch(1)
+
 
 
 	def _initArrayList(self):
@@ -927,6 +1032,26 @@ class stackArray(QtGui.QMainWindow):
 			self._arlist = self._arlist.append(newRow, ignore_index=True)
 		self._namelist = self._list.NAME.tolist()
 
+	def _initReg(self):
+		self._region = [{'name':'global', 
+						 'latmin':-90.0, 'latmax':90.0,
+						 'lonmin': -180.0, 'lonmax': 180.0}]
+		self.stackSt = {}
+		self.stdSt = {}
+		win = self._current_array_df['win'].iloc[0]
+		window = [win['noise'], win['coda']]
+		self.regDf = {'global':self._current_array_df}
+		_stackSt, _stdSt = stackTR(self._current_array_df,
+								  sacname=None,win=window,
+								  mindis=self.dis[0]['mindis'],
+								  maxdis=self.dis[0]['maxdis'],
+								  step=self.dis[0]['step'],
+								  overlap=self.dis[0]['overlap'],
+								  write=self.dis[0]['write'])
+		self.stackSt = {'global': _stackSt}
+		self.stdSt = {'global': _stdSt}
+
+
 	def _arrayInfo(self, name):
 		ardf = self._arlist[self._arlist.NAME == name].iloc[0]
 		array = {'name':ardf.NAME,'lat':ardf.LAT,'lon':ardf.LON}
@@ -934,7 +1059,7 @@ class stackArray(QtGui.QMainWindow):
 		self._current_array_df = ardf.DF
 
 	def _createStatusBar(self):
-		sb = QtGui.QStatusBar()
+		sb = QStatusBar()
 		sb.setFixedHeight(18)
 		self.setStatusBar(sb)
 		self.statusBar().showMessage('Ready')
@@ -947,7 +1072,7 @@ class stackArray(QtGui.QMainWindow):
 		m = Basemap(projection='cyl', lon_0=-180.0, lat_0=0.0,
 					area_thresh=10000,ax=_ax[0])
 		x0, y0 = m(self._current_array['lon'], self._current_array['lat'])
-		x, y = m(self._current_array_df.lon.tolist(), self._current_array_df.lat.tolist())
+		
 		m.drawcoastlines(ax=_ax[0])
 		m.drawmapboundary(ax=_ax[0])
 		m.fillcontinents(color='lightgray',lake_color='white',ax=_ax[0])
@@ -955,11 +1080,42 @@ class stackArray(QtGui.QMainWindow):
 		m.drawparallels(parallels,ax=_ax[0])
 		meridians = np.arange(-180.0, 180.0, 60.0)
 		m.drawmeridians(meridians,ax=_ax[0])
-		m.scatter(x0, y0, marker='*',c='y',s=100,alpha=0.7,ax=_ax[0],zorder=10)
-		m.scatter(x, y, marker='o', c='lightblue', s=50, alpha=0.7,ax=_ax[0],zorder=10)
+		m.scatter(x0, y0, marker='*',c='r',s=100,alpha=0.7,ax=_ax[0],zorder=10)
+		if self.allbtn.isChecked() and len(self._region) < 2:
+			x, y = m(self._current_array_df.lon.tolist(), self._current_array_df.lat.tolist())
+			m.scatter(x, y, marker='o', c='blue', s=50, alpha=0.7,ax=_ax[0],zorder=10)
+		elif self.allbtn.isChecked() and len(self._region) >= 2:
+			_region = self._region[1:,]
+			_current_df = self._current_array_df
+			_rest_df = _current_df.copy()
+			for _j, _reg in enumerate(_region):
+				_name = _region['name']
+				_df = self.regDf[_name]
+				_rest_df = _rest_df[~((_rest_df['lat']>_reg['latmin']) & 
+						  			(_rest_df['lat']<_reg['latmax']) &
+						  			(_rest_df['lon']>_reg['lonmin']) &
+						  			(_rest_df['lon']<_reg['lonmax']))]
+				x, y = m(_df.lon.tolist(), _df.lat.tolist())
+				m.scatter(x, y, marker='o', c=color[_i], s=50, alpha=0.7,ax=_ax[0],zorder=10)
+			x, y = m(_rest_df.lon.tolist(), _rest_df.lat.tolist())
+			m.scatter(x, y, marker='o', c='k', s=50, alpha=0.7,ax=_ax[0],zorder=10)
+		elif self.allbtn.isChecked() is False:
+			_i = self.regcb.currentIndex()
+			if _i == 0:
+				x, y = m(self._current_array_df.lon.tolist(), self._current_array_df.lat.tolist())
+				m.scatter(x, y, marker='o', c='blue', s=50, alpha=0.7,ax=_ax[0],zorder=10)
+				self._pltRectangle()
+			else:
+				_reg = self._region[_i]
+				_name = _reg['name']
+				_df = self.regDf[_name]
+				x, y = m(_df.lon.tolist(), _df.lat.tolist())
+				m.scatter(x, y, marker='o', c=color[_i-1], s=50, alpha=0.7,ax=_ax[0],zorder=10)
+
 
 		self.fig.suptitle('Earthquakes in array %s'%self._current_array['name'])
 		self._canvasDraw()
+		
 
 	def _canvasDraw(self):
 
@@ -973,7 +1129,7 @@ class stackArray(QtGui.QMainWindow):
 		while self._arrayCycle.next() != self._namelist[_i]:
 			pass
 		self._arrayInfo(self._namelist[_i])
-		self._drawFig()
+		self._resetReg()
 
 	def _pltPrevArray(self):
 		_j = self.arcb.currentIndex()
@@ -981,66 +1137,255 @@ class stackArray(QtGui.QMainWindow):
 			prevarray = self._arrayCycle.next()
 		self._arrayInfo(prevarray)
 		self.arcb.setCurrentIndex(_j-1)
-		self._drawFig()
+		self._resetReg()
 
 	def _pltNextArray(self):
 		_i = self.arcb.currentIndex()
 		self._arrayInfo(self._arrayCycle.next())
 		self.arcb.setCurrentIndex(_i+1)
-		self._drawFig()
+		self._resetReg()
 
-	def _appStack(self):
+	def _calStack(self):
 		_i = self.discb.currentIndex()
 		self._arrayInfo(self._current_array['name'])
 		savefile = None
-		if self.dis[_i]['write']:
-			savefile = self.dis[_i]['name'] + '.sac'
+		
 		win = self._current_array_df['win'].iloc[0]
 		window = [win['noise'], win['coda']]
-		self.stackTr, self.stdTr = stackTR(self._current_array_df,
-										   sacname=savefile,win=window,
-										   step=self.dis[_i]['step'],
-										   overlap=self.dis[_i]['overlap'],
-										   write=self.dis[_i]['write'])
 
-		self._drawStack(self)
+		_j = self.regcb.currentIndex()
+		_reg = self._region[_j]
+		if self.dis[_i]['write']:
+			savefile = _reg['name'] + '.'+self.dis[_i]['name'] + '.sac'
+		_current_df = self._current_array_df
+		_df = _current_df[(_current_df['lat']>_reg['latmin']) & 
+						  (_current_df['lat']<_reg['latmax']) &
+						  (_current_df['lon']>_reg['lonmin']) &
+						  (_current_df['lon']<_reg['lonmax'])]
+		_df.reset_index()
+		self.regDf[_reg['name']] = _df
+		
+		_stackSt, _stdSt = stackTR(_df,
+								  sacname=savefile,win=window,
+								  mindis=self.dis[_i]['mindis'],
+								  maxdis=self.dis[_i]['maxdis'],
+								  step=self.dis[_i]['step'],
+								  overlap=self.dis[_i]['overlap'],
+								  write=self.dis[_i]['write'])
+		self.stackSt[_reg['name']] = _stackSt
+		self.stdSt[_reg['name']] = _stdSt
+		# if self.stbtn.isChecked():
+		# 	self._drawStack()
+		# else:
+		# 	self._drawFig()
 
 	def _drawStack(self):
 		self.fig.clear()
-		self.fig.add_subplot(121)
-		_ax = self.fig.get_axes()[0]
-		m = Basemap(projection='cyl', lon_0=-180.0, lat_0=0.0,
-					area_thresh=10000,ax=_ax[0])
-		x0, y0 = m(self._current_array['lon'], self._current_array['lat'])
-		x, y = m(self._current_array_df.lon.tolist(), self._current_array_df.lat.tolist())
-		m.drawcoastlines(ax=_ax[0])
-		m.drawmapboundary(ax=_ax[0])
-		m.fillcontinents(color='lightgray',lake_color='white',ax=_ax[0])
-		parallels = np.arange(-90.0, 90.0, 60)
-		m.drawparallels(parallels,ax=_ax[0])
-		meridians = np.arange(-180.0, 180.0, 60.0)
-		m.drawmeridians(meridians,ax=_ax[0])
-		m.scatter(x0, y0, marker='*',c='y',s=100,alpha=0.7,ax=_ax[0],zorder=10)
-		m.scatter(x, y, marker='o', c='lightblue', s=50, alpha=0.7,ax=_ax[0],zorder=10)
+		if self.stbtn.isChecked() is False:
+			self._drawFig()
+		# self.fig.add_subplot(121)
+		# _i = self.discb.currentIndex()
+		# this_dis = self.dis[_i]
+		# step_forward = this_dis['step'] * (1 - this_dis['overlap'])
+		# n = int((this_dis['maxdis'] - this_dis['mindis'])/step_forward) + 1
+		if self.allbtn.isChecked() is False or len(self._region) < 2:
+			_i = self.regcb.currentIndex()
+			_name = self._region[_i]['name']
+			_stackSt = self.stackSt[_name]
+			_stdSt = self.stdSt[_name]
+			n = len(_stackSt)
+			# gs = self.fig.add_gridspec(n,2)
+			gs = gridspec.GridSpec(ncols=2, nrows=n, figure=self.fig)
+			_ax = self.fig.add_subplot(gs[:,0])
+			m = Basemap(projection='cyl', lon_0=-180.0, lat_0=0.0,
+						area_thresh=10000,ax=_ax)
+			x0, y0 = m(self._current_array['lon'], self._current_array['lat'])
+			x, y = m(self._current_array_df.lon.tolist(), self._current_array_df.lat.tolist())
+			m.drawcoastlines(ax=_ax)
+			m.drawmapboundary(ax=_ax)
+			m.fillcontinents(color='lightgray',lake_color='white',ax=_ax)
+			parallels = np.arange(-90.0, 90.0, 60)
+			m.drawparallels(parallels,ax=_ax)
+			meridians = np.arange(-180.0, 180.0, 60.0)
+			m.drawmeridians(meridians,ax=_ax)
+			if _i == 0:
+				c = 'blue'
+			else:
+				c = color[_i-1]
+			m.scatter(x0, y0, marker='*',c='r',s=100,alpha=0.7,ax=_ax,zorder=10)
+			m.scatter(x, y, marker='o', c=c, s=50, alpha=0.7,ax=_ax,zorder=10)
 
-		self.fig.add_subplot(122)
-		_ax = self.fig.get_axes()[1]
-		_ax.set_xlabel('Time (s)')
-		delta = self.stackTr.stats.delta
-		npts = self.stackTr.stats.npts
-		time = np.arange(npts)*delta + self.stackTr.stats.sac.b
-		_ax.plot(time, self.stackTr.data,'darkred')
-		_ax.errorbar(time, self.stackTr.data, yerr=2*self.stdTr.data,
-					 marker='.',mew=0.1, ecolor='red', linewidth=0.2, markersize=0.2,
-					 capsize=0.1, alpha=0.5)
+			# self.fig.add_subplot(122)
+			delta = _stackSt[0].stats.delta
+			npts = _stackSt[0].stats.npts
+			time = np.arange(npts)*delta + _stackSt[0].stats.sac.b
+			for i in range(n):
+				_ax_st = self.fig.add_subplot(gs[i,1])
+				if i == n-1:
+					_ax_st.set_xlabel('Time (s)')
+				_ax_st.plot(time, _stackSt[i].data,'darkred')
+				_ax_st.hlines(0,time[0],time[-1],'k')
+				_ax_st.errorbar(time, _stackSt[i].data, yerr=2*_stdSt[i].data,
+							 marker='.',mew=0.1, ecolor='red', linewidth=0.2, markersize=0.2,
+							 capsize=0.1, alpha=0.5)
+		else:
+			_region = self._region[1:]
+			_current_df = self._current_array_df
+			_i = self.discb.currentIndex()
+			this_dis = self.dis[_i]
+			step_forward = this_dis['step'] * (1 - this_dis['overlap'])
+			n = int((this_dis['maxdis'] - this_dis['mindis'])/step_forward) + 1
+			gs = self.fig.add_gridspec(n,2)
+			_ax = self.fig.add_subplot(gs[:,0])
+			m = Basemap(projection='cyl', lon_0=-180.0, lat_0=0.0,
+						area_thresh=10000,ax=_ax)
+			x0, y0 = m(self._current_array['lon'], self._current_array['lat'])
+			x, y = m(self._current_array_df.lon.tolist(), self._current_array_df.lat.tolist())
+			m.drawcoastlines(ax=_ax)
+			m.drawmapboundary(ax=_ax)
+			m.fillcontinents(color='lightgray',lake_color='white',ax=_ax)
+			parallels = np.arange(-90.0, 90.0, 60)
+			m.drawparallels(parallels,ax=_ax)
+			meridians = np.arange(-180.0, 180.0, 60.0)
+			m.drawmeridians(meridians,ax=_ax)
+			x0, y0 = m(self._current_array['lon'], self._current_array['lat'])
+			m.scatter(x0, y0, marker='*',c='r',s=100,alpha=0.7,ax=_ax,zorder=10)
+
+			for i in range(n):
+				_ax_st = self.fig.add_subplot(gs[i,1])
+				if i == n-1:
+					_ax_st.set_xlabel('Time (s)')
+
+				for _i, _reg in enumerate(_region):
+					_name = _reg['name']
+					_df = self.regDf[_name]
+					x, y = m(_df.lon.tolist(), _df.lat.tolist())
+					m.scatter(x, y, marker='o', c=color[_i], s=50, alpha=0.7,ax=_ax,zorder=10)
+					_stackSt = self.stackSt[_name]
+					_stdSt = self.stdSt[_name]
+					delta = _stackSt[0].stats.delta
+					npts = _stackSt[0].stats.npts
+					time = np.arange(npts)*delta + _stackSt[0].stats.sac.b
+					_ax_st.plot(time, _stackSt[i].data,color=color[_i])
+					_ax_st.errorbar(time, _stackSt[i].data, yerr=2*_stdSt[i].data,
+							 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
+							 capsize=0.1, alpha=0.5)
+				_ax_st.hlines(0,time[0],time[-1],'k')
+
+
 		self._canvasDraw()
 
+	def _stackAll(self):
+		if self.stbtn.isChecked():
+			self._drawStack()
+		else:
+			self._drawFig()
+
+	def _line_select_callback(self, eclick, erelease):
+		x1, y1 = eclick.xdata, eclick.ydata
+		x2, y2 = erelease.xdata, erelease.ydata
+		# msg= 'Startposition: (%f, %f)\tendposition: (%f, %f)'%(x1, y1, x2, y2)
+		# gpar.log(__name__,msg,level='info',pri=True)
+
+
+	def _pltRectangle(self):
+		_ax = self.fig.get_axes()[0]
+		self._RS = RectangleSelector(_ax, self._line_select_callback,
+											   drawtype='box', useblit=True,
+											   button=[1],
+											   minspanx=1, minspany=1,
+											   interactive=True,
+											   state_modifier_keys={'move': ' ','center': 'ctrl',
+											   'square': 'shift','clear': self._shortcuts['cancel']})
+
+	def _selectRegOnPress(self,event):
+
+		if event.key is not None:
+			event.key = event.key.lower()
+		if event.inaxes is None:
+			return
+		if event.key == self._shortcuts['accept'] and self._RS.active:
+			extents=self._RS.extents
+			_value = dict(name='name',lonmin=extents[0],lonmax=extents[1],latmin=extents[2],latmax=extents[3])
+			self._newReg(_value)
+
+
+	def _newReg(self, value=None):
+		newReg = self.defReg(regionValue=value)
+		if newReg.exec_():
+			self._region.append(newReg.getValues())
+			self._updateRegion()
+			self.regcb.setCurrentIndex(len(self._region)-1)
+			self._calStack()
+			# self._appStack()
+
+	def _editRegion(self):
+
+		_i =self.regcb.currentIndex()
+		this_region = self._region[_i]
+		editRegion = self.defReg(self, this_region)
+		if editRegion.exec_():
+			self._region[_i] = editRegion.getValues()
+			self.updateRegion()
+			self.regcb.setCurrentIndex(_i)
+			self._calStack()
+			self._drawStack()
+
+	def _deleteRegion(self):
+		_i = self.regcb.currentIndex()
+		name = self._region[_i]['name']
+		if name == 'global':
+			msg = QMessageBox()
+			msg.setIcon(QMessageBox.Information)
+			msg.setText("Warning Text")
+			msg.setInformativeText("Global region is not deletebale")
+			msg.exec_()
+			return
+		else:
+			self._region.pop(_i)
+			self._updateRegion()
+
+	def _changeRegion(self, index):
+		if index == len(self._region):
+			self._newReg()
+			if self.stbtn.isChecked():
+				self._drawStack()
+			else:
+				self._drawFig()
+		else:
+			if self.stbtn.isChecked():
+				self._drawStack()
+			else:
+				self._drawFig()
+			
+
+	def _updateRegion(self):
+		self.regcb.clear()
+		self.regcb.setCurrentIndex(-1)
+		for _i, _f in enumerate(self._region):
+			self.regcb.addItem('Region: %s'%(_f['name']))
+		self.regcb.addItem('Create new region')
+
+	def _resetReg(self):
+		self._region = [{'name':'global', 
+						 'latmin':-90.0, 'latmax':90.0,
+						 'lonmin': -180.0, 'lonmax': 180.0}]
+		self._updateRegion()
+		self._drawFig()
 
 	def _changeStack(self,index):
 		if index == len(self.dis):
-			return self._newDis()
+			self._newDis()
+			if self.stbtn.isChecked():
+				self._drawStack()
+			else:
+				self._drawFig()
 		else:
-			return self._appStack()
+			self._calStack()
+			if self.stbtn.isChecked():
+				self._drawStack()
+			else:
+				self._drawFig()
 
 	def _newDis(self):
 		newDis = self.defDisStep(self)
@@ -1049,12 +1394,12 @@ class stackArray(QtGui.QMainWindow):
 			self.dis.append(newDis.getValues())
 			self._updateWindow()
 			self.discb.setCurrentIndex(len(self.dis)-1)
-			self._appStack()
+			self._calStack()
 
 	def _editDis(self):
 		_i = self.discb.currentIndex()
 		this_window = self.dis[_i]
-		editWindow = self.defWindow(self, this_window)
+		editWindow = self.defDisStep(self, this_window)
 		if editWindow.exec_():
 			self.dis[_i] = editWindow.getValues()
 			self.updateWindow()
@@ -1072,49 +1417,109 @@ class stackArray(QtGui.QMainWindow):
 			self.discb.addItem('Step %.2f deg - overlap %.2f ' %(_f['step'], _f['overlap']))
 		self.discb.addItem('Create new distance stack')
 
-	class defDisStep(QtGui.QDialog):
-		def __init__(self, parent=None, stepvalue=None):
-
-			QtGui.QDialog.__init__(self, parent)
-			self.setWindowTitle('Create new stacking distance step')
-			self.step = QtGui.QDoubleSpinBox(decimals=1, maximum=20, minimum=0.1, singleStep=0.1, value=0.1)
-			self.overlap = QtGui.QDoubleSpinBox(decimals=2, maximum=1.0, minimum=0.0, singleStep=0.1, value=0.1)
-			self.Name = QtGui.QLineEdit('Name')
+	class defReg(QDialog):
+		def __init__(self, parent=None, regionValue=None):
+			QDialog.__init__(self, parent)
+			self.setWindowTitle('Assign Name for the Region')
+			self.Name = QLineEdit('Name')
 			self.Name.selectAll()
-			self.saveTr = ['True', 'False']
+			self.latmin = QDoubleSpinBox(decimals=1, maximum=90.0, minimum=-90.0, singleStep=5, value=0)
+			self.latmax = QDoubleSpinBox(decimals=1, maximum=90.0, minimum=-90.0, singleStep=5, value=0)
+			self.lonmin = QDoubleSpinBox(decimals=1, maximum=180.0, minimum=-180.0, singleStep=5, value=0)
+			self.lonmax = QDoubleSpinBox(decimals=1, maximum=180.0, minimum=-180.0, singleStep=5, value=0)
+			# self.saveTr = ['True', 'False']
 
-			grid = QtGui.QGridLayout()
-			grid.addWidget(QtGui.QLabel('Name'), 0, 0)
-			grid.addWidget(self.NAme, 0, 1)
-			grid.addWidget(QtGui.QLabel('Step'), 1, 0)
-			grid.addWidget(self.step, 1, 1)
-			grid.addWidget(QtGui.QLabel('Overlap'), 2, 0)
-			grid.addWidget(self.overlap, 2, 1)
+			grid = QGridLayout()
+			grid.addWidget(QLabel('Region Name'), 0, 0)
+			grid.addWidget(self.Name, 0, 1)
+			grid.addWidget(QLabel('Min. Lat'), 1, 0)
+			grid.addWidget(self.latmin, 1, 1)
+			grid.addWidget(QLabel('Max. Lat'), 2, 0)
+			grid.addWidget(self.latmax, 2, 1)
+			grid.addWidget(QLabel('Min. Lon'), 3, 0)
+			grid.addWidget(self.lonmin, 3, 1)
+			grid.addWidget(QLabel('Max. Lon'), 4, 0)
+			grid.addWidget(self.lonmax, 4, 1)
+			grid.setVerticalSpacing(10)
 
-			_savebtn = [QtGui.QRadioButton("Yes"), QtGui.QRadioButton("No")]
-			self.saveGrp = QtGui.QButtonGroup()
-			self.saveGrp.setExclusive(True)
-			sbtn = QtGui.QHBoxLayout()
-
-			for _i, _btn in enumerate(_savebtn):
-				self.saveGrp.addButton(_btn, _i)
-				sbtn.addWidget(_btn)
-			grid.addWidget(QtGui.QLabel('Save Stack'), 3, 0)
-			grid.addWidget(sbtn, 3, 1)
-
-			btnbox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok |
-											QtGui.QDialogButtonBox.Cancel)
+			btnbox = QDialogButtonBox(QDialogButtonBox.Ok |
+											QDialogButtonBox.Cancel)
 
 			btnbox.accepted.connect(self.accept)
 			btnbox.rejected.connect(self.reject)
 
-			layout = QtGui.QVBoxLayout()
-			layout.addWidget(QtGui.QLabel('Define distance steps and overlap for stacking'))
+			layout = QVBoxLayout()
+			layout.addWidget(QLabel('Define noise window and coda window for stripping'))
+			layout.addLayout(grid)
+			layout.addWidget(btnbox)
+
+			if regionValue is not None:
+				self.Name.setText(regionValue['name'])
+				self.latmin.setValue(regionValue['latmin'])
+				self.latmax.setValue(regionValue['latmax'])
+				self.lonmin.setValue(regionValue['lonmin'])
+				self.lonmax.setValue(regionValue['lonmax'])
+			self.setLayout(layout)
+			self.setSizeGripEnabled(False)
+
+		def getValues(self):
+			return dict(name=str(self.Name.text()),
+						latmin=float(self.latmin.cleanText()),
+						latmax=float(self.latmax.cleanText()),
+						lonmin=float(self.lonmin.cleanText()),
+						lonmax=float(self.lonmax.cleanText()))
+
+	class defDisStep(QDialog):
+		def __init__(self, parent=None, stepvalue=None):
+
+			QDialog.__init__(self, parent)
+			self.setWindowTitle('Create new stacking distance step')
+			self.mindis = QDoubleSpinBox(decimals=1, maximum=180, minimum=0, singleStep=1, value=50)
+			self.maxdis = QDoubleSpinBox(decimals=1, maximum=180, minimum=0, singleStep=1, value=75)
+			self.step = QDoubleSpinBox(decimals=1, maximum=100, minimum=0.1, singleStep=0.1, value=0.1)
+			self.overlap = QDoubleSpinBox(decimals=2, maximum=1.0, minimum=0.0, singleStep=0.1, value=0.1)
+			self.Name = QLineEdit('Name')
+			self.Name.selectAll()
+			self.saveTr = ['True', 'False']
+
+			grid = QGridLayout()
+			grid.addWidget(QLabel('Name'), 0, 0)
+			grid.addWidget(self.Name, 0, 1)
+			grid.addWidget(QLabel('Min. Dis'), 1, 0)
+			grid.addWidget(self.mindis, 1, 1)
+			grid.addWidget(QLabel('Max. Dis'), 2, 0)
+			grid.addWidget(self.maxdis, 2, 1)
+			grid.addWidget(QLabel('Step'), 3, 0)
+			grid.addWidget(self.step, 3, 1)
+			grid.addWidget(QLabel('Overlap'), 4, 0)
+			grid.addWidget(self.overlap, 4, 1)
+
+			_savebtn = [QRadioButton("Yes"), QRadioButton("No")]
+			self.saveGrp = QButtonGroup()
+			self.saveGrp.setExclusive(True)
+			sbtn = QHBoxLayout()
+
+			for _i, _btn in enumerate(_savebtn):
+				self.saveGrp.addButton(_btn, _i)
+				sbtn.addWidget(_btn)
+			grid.addWidget(QLabel('Save Stack'), 5, 0)
+			grid.addLayout(sbtn, 5, 1)
+
+			btnbox = QDialogButtonBox(QDialogButtonBox.Ok |
+											QDialogButtonBox.Cancel)
+
+			btnbox.accepted.connect(self.accept)
+			btnbox.rejected.connect(self.reject)
+
+			layout = QVBoxLayout()
+			layout.addWidget(QLabel('Define distance steps and overlap for stacking'))
 			layout.addLayout(grid)
 			layout.addWidget(btnbox)
 
 			if stepvalue is not None:
 				self.Name.setText(stepvalue['name'])
+				self.mindis.setValue(stepvalue['mindis'])
+				self.maxdis.setValue(stepvalue['maxdis'])
 				self.step.setValue(stepvalue['step'])
 				self.overlap.setValue(stepvalue['overlap'])
 			self.setLayout(layout)
@@ -1122,9 +1527,11 @@ class stackArray(QtGui.QMainWindow):
 
 		def getValues(self):
 
-			savefile = self.saveTr(self.saveGrp.checkedId())
+			savefile = self.saveTr[self.saveGrp.checkedId()]
 
 			return dict(name=str(self.Name),
+						mindis=float(self.mindis.cleanText()),
+						maxdis=float(self.maxdis.cleanText()),
 						step=float(self.step.cleanText()),
 						overlap=float(self.overlap.cleanText()),
 						write=bool(savefile))
@@ -1138,7 +1545,6 @@ def codaStrip(eve, beamtype='beam', method='all',
 	"""
 	Function to remove background coda noise for events
 	"""
-	print 'doing coda strip'
 	
 	if not hasattr(eve, 'arrival'):
 		eve.getArrival(phase=phase,model=model)
@@ -1183,7 +1589,7 @@ def codaStrip(eve, beamtype='beam', method='all',
 		coda_res = obs_data - coda_data
 		res = np.mean(coda_res[ind:ind+sig_pts])
 		#store coda model information
-		codamod = {'RES':res,'lnA':coda_par[0][0],'B':coda_par[1][0],'C':coda_par[2][0]}
+		codamod = {'RMS':res,'lnA':coda_par[0][0],'B':coda_par[1][0],'C':coda_par[2][0]}
 		eve.codaMod = codamod
 		codaTr = obspy.core.trace.Trace()
 		codaTr.stats.delta = delta
@@ -1215,9 +1621,9 @@ def codaStrip(eve, beamtype='beam', method='all',
 		two_data = np.append(d1,d2)
 		two_data = np.append(two_data,d3)
 		two_res = obs_data[res_ind: res_ind+pts] - two_data
-		res = np.mean(two_res[int(noise)/delta:int(noise)/delta+sig_pts])
+		res = np.mean(two_res[int(int(noise)/delta):int(int(noise)/delta)+sig_pts])
 		twomod = {'kn1':twoline_par_before[1][0],'bn1':twoline_par_before[0][0],
-				  'kn2':twoline_par_after[1][0],'bn2':twoline_par_after[0][0],'RES':res}
+				  'kn2':twoline_par_after[1][0],'bn2':twoline_par_after[0][0],'RMS':res}
 		eve.twoMod = twomod
 		twoTr = obspy.core.trace.Trace()
 		twoTr.stats.delta = delta
@@ -1238,7 +1644,7 @@ def codaStrip(eve, beamtype='beam', method='all',
 		coda_data = np.exp(coda_par[0][0] - coda_par[1][0]*np.log(time) - coda_par[2][0]*time)
 		coda_res = obs_data - coda_data
 		res = np.mean(coda_res[ind:ind+sig_pts])
-		codamod = {'RES':res,'lnA':coda_par[0][0],'B':coda_par[1][0],'C':coda_par[2][0]}
+		codamod = {'RMS':res,'lnA':coda_par[0][0],'B':coda_par[1][0],'C':coda_par[2][0]}
 		eve.codaMod = codamod
 		codaTr = obspy.core.trace.Trace()
 		codaTr.stats.delta = delta
@@ -1273,9 +1679,9 @@ def codaStrip(eve, beamtype='beam', method='all',
 		two_data = np.append(d1,d2)
 		two_data = np.append(two_data,d3)
 		two_res = obs_data[res_ind: res_ind+pts] - two_data
-		res = np.mean(two_res[int(noise)/delta:int(noise)/delta+sig_pts])
+		res = np.mean(two_res[int(int(noise)/delta):int(int(noise)/delta)+sig_pts])
 		twomod = {'kn1':twoline_par_before[1][0],'bn1':twoline_par_before[0][0],
-				  'kn2':twoline_par_after[1][0],'bn2':twoline_par_after[0][0],'RES':res}
+				  'kn2':twoline_par_after[1][0],'bn2':twoline_par_after[0][0],'RMS':res}
 		eve.twoMod = twomod
 		twoTr = obspy.core.trace.Trace()
 		twoTr.stats.delta = delta
@@ -1347,17 +1753,12 @@ def moving_ave(x, window=5):
 
 	return y
 
-def norm(st,wins=[0.0,200.0]):
-	btime = st.stats.sac.b
-	delta = st.stats.sac.delta
-	startIndex = int((wins[0] - btime)/delta)
-	endIndex = int((wins[1]-btime)/delta)
+def norm(data,sind, eind):
+	
+	peak = np.max(np.absolute(data[sind:eind]))
+	data = data/peak
 
-	peak = np.max(np.absolute(st.data[startIndex:endIndex]))
-	data = st.data/peak
-	st.data = data
-
-	return st
+	return data
 
 def stack(df,win):
 
@@ -1365,8 +1766,8 @@ def stack(df,win):
 	std_data = np.std(data,axis=0)/np.sqrt(len(data))
 	#stack_data = np.sum(data,axis=0)/len(df)
 	stack_data = np.mean(data)
-	peak = np.max(np.absolute(stack_data[win[0]:win[1]]))
-	stack_data = stack_data/peak
+	# peak = np.max(np.absolute(stack_data[win[0]:win[1]]))
+	# stack_data = stack_data/peak
 
 	return stack_data, std_data
 
@@ -1377,40 +1778,56 @@ def misfit(data1,data2):
 	return l2
 
 def stackTR(obsdf, sacname=None,win=[200.0,200.0],
+			mindis=50., maxdis=75.,
 		   step=5.0,overlap=0.0, write=False):
 	DATA = [''] * len(obsdf)
-	for ind, row in obsdf.iterrows():
-		DATA[ind] = row.codaTr.data
-	obsdf['DATA'] = DATA
-	n = len(obsdf)
 	t = obsdf.iloc[0]
 	stats = t.codaResTr.stats
 	npt = stats.npts
 	delta = stats.delta
-	time = np.arange(npt) * delta - win[0]
 	sind = int((win[0])/delta)
-	eind = int((win[1])/delta)
+	eind = sind + int((win[1])/delta)
+	for ind, row in obsdf.iterrows():
+		DATA[ind] = norm(row.codaResTr.data, sind, eind)
+	obsdf['DATA'] = DATA
+	n = len(obsdf)
+	time = np.arange(npt) * delta - win[0]
 
-	stack_obs,std_obs = stack(obsdf,[sind,sind + eind])
+	st_obs = Stream()
+	st_std = Stream()
+	step_forward = step * (1-overlap)
+	n = int((maxdis - mindis)/step_forward) + 1
 
-	tr_obs = Trace()
-	tr_obs.stats.sac = AttribDict()
-	tr_obs.stats.delta = delta
-	tr_obs.stats.npts = npt
-	tr_obs.stats.station = n
-	tr_obs.data = stack_obs
-	tr_obs.stats.sac.delta = delta
-	tr_obs.stats.sac.b = b
-	tr_obs.stats.sac.e = e
-	tr_obs.stats.sac.npts = npt
+	ds = np.linspace(mindis, maxdis, n)[:-1]
 
-	tr_std = tr_obs.copy()
+	for d in ds:
 
-	tr_std.data = std_obs
+		tr_obs = Trace()
+		tr_obs.stats.sac = AttribDict()
+		tr_obs.stats.delta = delta
+		tr_obs.stats.npts = npt
+		tr_obs.stats.station = n
+		tr_obs.stats.sac.delta = delta
+		tr_obs.stats.sac.b = -win[0]
+		tr_obs.stats.sac.e = win[1]
+		tr_obs.stats.sac.npts = npt
+		tr_std = tr_obs.copy()
+		_df = obsdf[(obsdf.Del >= d) & (obsdf.Del < d+step)]
+		if len(_df) == 0:
+			tr_obs.data = np.zeros(npt)
+			tr_std.data = np.zeros(npt)
+			st_obs.append(tr_obs)
+			st_std.append(tr_std)
+			continue
+		stack_obs,std_obs = stack(_df,[sind, eind])
+		tr_obs.data = stack_obs	
+		tr_std.data = std_obs
+		st_obs.append(tr_obs)
+		st_std.append(tr_std)
 
-	if write != None:
+	if write:
 		if sacname is None:
 			sacname = 'stack.sac'
-		tr_obs.write(sacname,format='SAC')
+		st_obs.write(sacname,format='SAC')
 
-	return tr_obs, tr_std
+	return st_obs, st_std
