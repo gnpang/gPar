@@ -18,6 +18,7 @@ import inspect
 import logging
 import logging.handlers
 import sys
+from importlib import reload
 
 # gPar import
 import gpar
