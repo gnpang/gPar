@@ -467,7 +467,7 @@ def _loadDirectoryData(arrayName, df):
 		try:
 			st = read(sacfiles)
 		except:
-			msg = 'data from %s in array %s is not found, skipping' % (fet.arrayName,eve.DIR)
+			msg = 'data from %s in array %s is not found, skipping' % (arrayName,eve.DIR)
 			gpar.log(__name__,msg,level='warning',pri=True)
 			stream[ind] = pd.NaT
 			continue
