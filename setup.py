@@ -82,7 +82,7 @@ def setupPackage():
 		license = 'MIT',
 		packages=find_packages(),
 		classifiers = [
-			'Development Status :: 1 - Alpha',
+			'Development Status :: 1 - Beta',
 			'Intended Audience :: Geo-scientists',
 			'Topic :: Seismic array processing',
 			'License :: MIT License',
