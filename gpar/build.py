@@ -96,12 +96,12 @@ def createArray(arrayList='array.list',
 		# 	st = fet.getStream(eve.DIR)
 		# 	streams[num] = st
 		# eqdf['Stream'] = streams
-		eqdf = fet.getEqData(row, phase=phase)
+		eqdf, stadf = fet.getEqData(row, phase=phase)
 		if eqdf is None:
 			msg = 'Earthquake list for array %s is not existed, skipping' %(row.NAME)
 			gpar.log(__name__, msg, level='warning', pri=True)
 			continue
-		array = gpar.arrayProcess.Array(row.NAME,refpoint,eqdf,coordsys,phase)
+		array = gpar.arrayProcess.Array(row.NAME,refpoint,eqdf, stadf, coordsys,phase)
 
 		if calTime:
 			msg = ('Calculate time shift table for sliding window slowness beaforming for array %s'%row.NAME)

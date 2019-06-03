@@ -35,41 +35,60 @@ class Array(object):
 	Array object that contains multiple earthquake objects
 	"""
 
-	def __init__(self,arrayName,refPoint,eqDF,coordsys='lonlat',phase='PKiKP'):
+	def __init__(self,arrayName,refPoint,eqDF,staDf, coordsys='lonlat',phase='PKiKP'):
 		self.name = arrayName
 		self.refPoint = refPoint
 		self.coordsys = coordsys
 		self.events = [0]*len(eqDF)
-		self.getGeometry(eqDF,refPoint,coordsys=coordsys)
+		self.getGeometry(staDF,refPoint,coordsys=coordsys)
 		for ind, row in eqDF.iterrows():
 			self.events[ind] = Earthquake(self, row, phase=phase)
 
-	def getGeometry(self,eqDF,refPoint,coordsys='lonlat'):
+	def getGeometry(self,staDF,refPoint,coordsys='lonlat'):
 		"""
 		Return nested list containing the array geometry using for waveform shifting
 
 		"""
-		row = eqDF.iloc[0]
-		stream = row.Stream
-		nstat = len(stream)
+		# row = eqDF.iloc[0]
+		# stream = row.Stream
+		# nstat = len(staDF)
 		geometry = pd.DataFrame()
-		for i, tr in enumerate(stream):
-			if coordsys == 'lonlat':
-				sta = tr.stats.station
-				lat = tr.stats.sac.stla
-				lon = tr.stats.sac.stlo
-				dis_in_degree, az,baz = gpar.getdata.calc_Dist_Azi(refPoint[0],refPoint[1],lat,lon)
-				dis_in_km = dis_in_degree * deg2km
-				X = dis_in_km*np.sin(az*deg2rad)
-				Y = dis_in_km*np.cos(az*deg2rad)
-				newRow = {'STA':sta,'LAT':lat,'LON':lon,'X':X,'Y':Y}
-				geometry = geometry.append(newRow,ignore_index=True)
-			elif coordsys == 'xy':
-				sta = tr.stats.station
-				X = tr.stats.coordinates.x - refPoint[0]
-				Y = tr.stats.coordinates.y - refPoint[1]
-				newRow = {'STA':sta,'X':X,'Y':Y}
-				geometry =geometry.append(newRow,ignore_index=True)
+		# for i, tr in enumerate(stream):
+		# 	if coordsys == 'lonlat':
+		# 		sta = tr.stats.station
+		# 		lat = tr.stats.sac.stla
+		# 		lon = tr.stats.sac.stlo
+		# 		dis_in_degree, az,baz = gpar.getdata.calc_Dist_Azi(refPoint[0],refPoint[1],lat,lon)
+		# 		dis_in_km = dis_in_degree * deg2km
+		# 		X = dis_in_km*np.sin(az*deg2rad)
+		# 		Y = dis_in_km*np.cos(az*deg2rad)
+		# 		newRow = {'STA':sta,'LAT':lat,'LON':lon,'X':X,'Y':Y}
+		# 		geometry = geometry.append(newRow,ignore_index=True)
+		# 	elif coordsys == 'xy':
+		# 		sta = tr.stats.station
+		# 		X = tr.stats.coordinates.x - refPoint[0]
+		# 		Y = tr.stats.coordinates.y - refPoint[1]
+		# 		newRow = {'STA':sta,'X':X,'Y':Y}
+		# 		geometry =geometry.append(newRow,ignore_index=True)
+		if coordsys == 'lonlat':
+			dis_in_degree, az, baz = gpar.getdata.calc_Dist_Azi(refPoint[0], refPoint[1], staDF.LAT, staDF.LON)
+			dis_in_km = dis_in_degree * deg2km
+			X = dis_in_km * np.sin(az*deg2rad)
+			Y = dis_in_km * np.cos(az*deg2rad)
+			staDF['X'] = X
+			staDF['Y'] = Y
+			geometry = staDF
+		elif coordsys == 'xy':
+			X = staDF.X - refPoint[0]
+			Y = staDF.Y - refPoint[1]
+			staDF['X'] = X
+			staDF['Y'] = Y
+			geometry = staDF
+		else:
+			msg('Not a valid option, select from lonlat or xy')
+			gpar.log(__name__, msg, level='error', pri=True)
+
+		retrun geometry
 
 		self.geometry = geometry
 	def getTimeTable(self,sll_x=-15.0,sll_y=-15.0,sl_s=0.1,grdpts_x=301,grdpts_y=301,unit='deg'):
@@ -208,7 +227,15 @@ class Earthquake(object):
 		gpar.log(__name__,msg,level='info',pri=True)
 		tsDF = getTimeShift(self.rayParameter,self.bakAzimuth,geometry,unit=unit)
 		self.timeshift = tsDF
+		stalist = tsDF.STA
 		st = self.stream
+		if len(st) < len(tsDF):
+			for s in stalist:
+				tmp_st = st.select(station=s)
+				if len(tmp_st) == 0:
+					msg = 'Station %s is missing for event %s in array %s, dropping station'%(s, self.ID, arrayName)
+					gpar.log(__name__, msg, level='info', pri=True)
+					tsDF = tsDF[~tsDF.STA == s]
 		ntr = self.ntr
 		delta = self.delta
 		# st.detrend('demean')
