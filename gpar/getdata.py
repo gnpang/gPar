@@ -314,7 +314,7 @@ def quickFetch(fetch_arg,**kwargs):
 
 def makeDataDirectory(arraylist='array.list', fetch='IRIS',
 					  timeBeforeOrigin=0, timeAfterOrigin=3600,
-					  buildArray=False, **kwargs):
+					  buildArray=False, outsta=True, **kwargs):
 	ardf = util.readList(arraylist, list_type='array', sep='\s+')
 
 	if isinstance(fetch, gpar.getdata.DataFetcher):
@@ -323,7 +323,7 @@ def makeDataDirectory(arraylist='array.list', fetch='IRIS',
 		fetcher = gpar.getdata.DataFetcher(fetch, timeBeforeOrigin=timeBeforeOrigin, timeAfterOrigin=timeAfterOrigin)
 
 	for ind, row in ardf.iterrows():
-		edf = fetcher.getEqData(row)
+		edf, stadf = fetcher.getEqData(row)
 		edf.dropna(inplace=True)
 		edf.reset_index(drop=True, inplace=True)
 		arDir = os.path.join(row.NAME, 'Data')
@@ -347,6 +347,9 @@ def makeDataDirectory(arraylist='array.list', fetch='IRIS',
 			gpar.log(__name__,msg,level='info',pri=True)
 			array.getTimeTable()
 			array.write()
+		if outsta:
+			stafile = os.path.join(row.NAME, row.NAME+'.sta')
+			stadf.to_csv(stafile, sep=str('\t'), index=False)
 
 class DataFetcher(object):
 
@@ -409,9 +412,9 @@ class DataFetcher(object):
 				gpar.log(__name__,msg, level='warning', pri=True)
 				return None
 		eqdf = util.readList(eqlist,list_type='event', sep='\s+')
-		ndf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, loc='??')
+		ndf, stadf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, loc='??')
 
-		return ndf
+		return ndf, stadf
 
 	def getStream(self, ar, df, stime, etime, net, staele, chan, loc='??'):
 		if not isinstance(chan, (list, tuple)):
@@ -420,8 +423,9 @@ class DataFetcher(object):
 				gpar.log(__name__, msg, level=error, pri=True)
 			chan = [chan]
 		if self.method == 'dir':
-			df = self._getStream(ar.NAME, df)
+			df, stadf = self._getStream(ar.NAME, df)
 		else:
+			stadf = pd.DataFrame(columns=['STA','LAT','LON'])
 			client = self.client
 			stream = [''] * len(df)
 			for ind, row in df.iterrows():
@@ -449,17 +453,23 @@ class DataFetcher(object):
 										  'nzsec':time.second, 'nzmsec': time.microsecond/1000})
 						tr.stats.sac = sac
 						nst.append(tr)
+						if len(stadf) == 0:
+							newSta = {'STA':station, 'LAT': latitude, 'LON': longitude}
+							stadf = stadf.append(newSta, ignore_index=True)
+						else:
+							stadf = _checkSta(tr, stadf)
 					stream[ind] = nst
 
 			df['Stream'] = stream
 
-		return df		
+		return df, stadf		
 
 
 # Functions to get stream data based on selected method
 
 def _loadDirectoryData(arrayName, df):
 
+	staDf = pd.DataFrame(columns=['STA', 'LAT', 'LON'])
 	stream = [''] * len(df)
 	for ind, eve in df.iterrows():
 		_id = eve.DIR[:-6]
@@ -482,6 +492,16 @@ def _loadDirectoryData(arrayName, df):
 				st.remove(tr)
 				gpar.log(__name__,msg,level='warning',e=ValueError)
 				continue
+			if len(staDf) == 0:
+				stats = tr.stats
+				sta = stats.station
+				lat = stats.sac.stla
+				lon = stats.sac.stlon
+				newSta = {'STA': sta, 'LAT': lat, 'LON'}
+				staDf = staDf.append(newSta, ignore_index=True)
+			else:
+				staDf = _checkSta(tr, staDf)
+
 		if len(st) == 0:
 			msg = ("Waveforms for event %s have problem" % eve.DIR)
 			gpar.log(__name__,msg,level='warning,e=ValueError')
@@ -491,7 +511,7 @@ def _loadDirectoryData(arrayName, df):
 	df.dropna(inplace=True)
 	df.reset_index(drop=True, inplace=True)
 
-	return df
+	return df, staDf
 
 def _loadFromFDSN(fet, start, end, net, sta, chan, loc):
 
@@ -502,6 +522,8 @@ def _loadFromFDSN(fet, start, end, net, sta, chan, loc):
 	else:
 		if '-' in chan:
 			chan = ','.join(chan.split('-'))
+	if '-' in sta:
+		sta = ','.join(sta.split('-'))
 	try:
 		st = client.get_waveforms(net, sta, loc, chan, start, end)
 	except:
@@ -513,4 +535,16 @@ def _loadFromFDSN(fet, start, end, net, sta, chan, loc):
 	return st
 
 
+def _checkSta(tr, stadf):
+
+	stats = tr.stats
+	sta = stats.station
+	tmp = stadf[stadf.STA == sta]
+	if len(tmp) = 0:
+		lat = stats.sac.stla
+		lon = stats.sac.stlo
+		newSta = {'STA':sta,'LAT':lat, 'LON':lon}
+		stadf = stadf.append(newSta, ignore_index=True)
+
+	return stadf
 
