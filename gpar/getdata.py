@@ -398,7 +398,7 @@ class DataFetcher(object):
 			minlen = self.minlen
 
 		net = ar.NETWORK
-		sta = ar.NAME[0:2]+'*'
+		sta = ar.Station
 		chan = ar.Channel.split('-')
 		arDir = os.path.join(ar.NAME, 'Data')
 
