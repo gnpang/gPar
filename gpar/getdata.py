@@ -314,13 +314,14 @@ def quickFetch(fetch_arg,**kwargs):
 
 def makeDataDirectory(arraylist='array.list', fetch='IRIS',
 					  timeBeforeOrigin=0, timeAfterOrigin=3600,
-					  buildArray=False, outsta=True, **kwargs):
+					  buildArray=False, outsta=True, minlen=1500.0,
+					  **kwargs):
 	ardf = util.readList(arraylist, list_type='array', sep='\s+')
 
 	if isinstance(fetch, gpar.getdata.DataFetcher):
 		fetcher = fetch
 	else:
-		fetcher = gpar.getdata.DataFetcher(fetch, timeBeforeOrigin=timeBeforeOrigin, timeAfterOrigin=timeAfterOrigin)
+		fetcher = gpar.getdata.DataFetcher(fetch, timeBeforeOrigin=timeBeforeOrigin, timeAfterOrigin=timeAfterOrigin, minlen=minlen)
 
 	for ind, row in ardf.iterrows():
 		edf, stadf = fetcher.getEqData(row)
@@ -359,7 +360,7 @@ class DataFetcher(object):
 	"""
 	subMethods = ['dir', 'iris']
 	def __init__(self, method, arrayName=None, client=None, removeResponse=False,
-		         prefilt=None, timeBeforeOrigin=0.0, timeAfterOrigin=3600.0,
+		         prefilt=None, timeBeforeOrigin=0.0, timeAfterOrigin=3600.0, minlen=1500,
 		         checkData=True):
 		# self.arrayName = arrayName
 		self.__dict__.update(locals())
@@ -388,11 +389,13 @@ class DataFetcher(object):
 			self.client = obspy.clients.fdsn.Client('IRIS')
 			self._getStream = _loadFromFDSN
 
-	def getEqData(self, ar, timebefore=None, timeafter=None, phase=['PKiKP'], **kwargs):
+	def getEqData(self, ar, timebefore=None, timeafter=None, phase=['PKiKP'], minlen=None, **kwargs):
 		if timebefore is None:
 			timebefore = self.timeBeforeOrigin
 		if timeafter is None:
 			timeafter = self.timeAfterOrigin
+		if minlen=None:
+			minlen = self.minlen
 
 		net = ar.NETWORK
 		sta = ar.NAME[0:2]+'*'
@@ -412,11 +415,11 @@ class DataFetcher(object):
 				gpar.log(__name__,msg, level='warning', pri=True)
 				return None
 		eqdf = util.readList(eqlist,list_type='event', sep='\s+')
-		ndf, stadf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, loc='??')
+		ndf, stadf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, loc='??', minlen)
 
 		return ndf, stadf
 
-	def getStream(self, ar, df, stime, etime, net, staele, chan, loc='??'):
+	def getStream(self, ar, df, stime, etime, net, staele, chan, loc='??', minlen=1500):
 		if not isinstance(chan, (list, tuple)):
 			if not isinstance(chan, string_types):
 				msg = 'chan must be a string or list of string'
@@ -432,7 +435,7 @@ class DataFetcher(object):
 				time = UTCDateTime(row.TIME)
 				start = time - stime
 				end = time + etime
-				st = self._getStream(self, start, end, net, staele, chan, loc)
+				st = self._getStream(self, start, end, net, staele, chan, loc, minlen)
 				if st is None or len(st) < 1:
 					stream[ind] = pd.NaT
 				else:
@@ -453,11 +456,7 @@ class DataFetcher(object):
 										  'nzsec':time.second, 'nzmsec': time.microsecond/1000})
 						tr.stats.sac = sac
 						nst.append(tr)
-						if len(stadf) == 0:
-							newSta = {'STA':station, 'LAT': latitude, 'LON': longitude}
-							stadf = stadf.append(newSta, ignore_index=True)
-						else:
-							stadf = _checkSta(tr, stadf)
+						stadf = _checkSta(tr, stadf)
 					stream[ind] = nst
 
 			df['Stream'] = stream
@@ -492,15 +491,8 @@ def _loadDirectoryData(arrayName, df):
 				st.remove(tr)
 				gpar.log(__name__,msg,level='warning',e=ValueError)
 				continue
-			if len(staDf) == 0:
-				stats = tr.stats
-				sta = stats.station
-				lat = stats.sac.stla
-				lon = stats.sac.stlon
-				newSta = {'STA': sta, 'LAT': lat, 'LON'}
-				staDf = staDf.append(newSta, ignore_index=True)
-			else:
-				staDf = _checkSta(tr, staDf)
+		
+			staDf = _checkSta(tr, staDf)
 
 		if len(st) == 0:
 			msg = ("Waveforms for event %s have problem" % eve.DIR)
@@ -513,7 +505,7 @@ def _loadDirectoryData(arrayName, df):
 
 	return df, staDf
 
-def _loadFromFDSN(fet, start, end, net, sta, chan, loc):
+def _loadFromFDSN(fet, start, end, net, sta, chan, loc, minlen):
 
 	client = fet.client
 
@@ -526,6 +518,7 @@ def _loadFromFDSN(fet, start, end, net, sta, chan, loc):
 		sta = ','.join(sta.split('-'))
 	try:
 		st = client.get_waveforms(net, sta, loc, chan, start, end)
+		st = _checkData(st, minlen)
 	except:
 		msg = ('Could not fetch data on %s from %s to %s' %
 				(net+'.'+sta, start, end))
@@ -534,6 +527,19 @@ def _loadFromFDSN(fet, start, end, net, sta, chan, loc):
 
 	return st
 
+def _checkData(st, minlen):
+
+	for tr in st:
+		stats = tr.stats
+		lasttime = stats.npts * stats.delta
+
+		if lasttime < winlen:
+			msg = ('Trace in station %s starting from %s is shrter than require, removing'%(stats.station, stats.starttime))
+			gpar.log(__name__, msg, level='info')
+			st.remove(tr)
+	if len(st) == 0:
+		st = None
+	return st
 
 def _checkSta(tr, stadf):
 
