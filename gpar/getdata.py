@@ -415,7 +415,7 @@ class DataFetcher(object):
 				gpar.log(__name__,msg, level='warning', pri=True)
 				return None
 		eqdf = util.readList(eqlist,list_type='event', sep='\s+')
-		ndf, stadf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, loc='??', minlen)
+		ndf, stadf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, loc='??', minlen=minlen)
 
 		return ndf, stadf
 
