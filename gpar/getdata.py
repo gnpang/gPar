@@ -436,7 +436,7 @@ class DataFetcher(object):
 				start = time - stime
 				end = time + etime
 				st = self._getStream(self, start, end, net, staele, chan, loc)
-				st = _checkData(st)
+				st = _checkData(st,minlen)
 				if st is None or len(st) < 1:
 					stream[ind] = pd.NaT
 				else:
