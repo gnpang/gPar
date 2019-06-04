@@ -88,9 +88,8 @@ class Array(object):
 			msg('Not a valid option, select from lonlat or xy')
 			gpar.log(__name__, msg, level='error', pri=True)
 
-		retrun geometry
-
 		self.geometry = geometry
+		
 	def getTimeTable(self,sll_x=-15.0,sll_y=-15.0,sl_s=0.1,grdpts_x=301,grdpts_y=301,unit='deg'):
 		"""
 		Return timeshift table for given array geometry, modified from obsy
