@@ -71,7 +71,7 @@ class Array(object):
 		# 		newRow = {'STA':sta,'X':X,'Y':Y}
 		# 		geometry =geometry.append(newRow,ignore_index=True)
 		if coordsys == 'lonlat':
-			dis_in_degree, az, baz = gpar.getdata.calc_Dist_Azi(refPoint[0], refPoint[1], staDF.LAT, staDF.LON)
+			dis_in_degree, baz, az = gpar.getdata.calc_Dist_Azi(staDF.LAT, staDF.LON, refPoint[0], refPoint[1])
 			dis_in_km = dis_in_degree * deg2km
 			X = dis_in_km * np.sin(az*deg2rad)
 			Y = dis_in_km * np.cos(az*deg2rad)
@@ -89,7 +89,7 @@ class Array(object):
 			gpar.log(__name__, msg, level='error', pri=True)
 
 		self.geometry = geometry
-		
+
 	def getTimeTable(self,sll_x=-15.0,sll_y=-15.0,sl_s=0.1,grdpts_x=301,grdpts_y=301,unit='deg'):
 		"""
 		Return timeshift table for given array geometry, modified from obsy
@@ -133,6 +133,9 @@ class Array(object):
 					sl_s=sl_s, vary=vary,sll=sll,
 					starttime=starttime,endtime=endtime, unit=unit,
 					**kwargs)
+
+	# def codaInter(self, doublet, filt=[1.33, 2.67, 3, True], resample=0.01,
+	# 			  winlen=5, shift=0.05, starttime=1000.0, endtime=1500, ):
 
 	def write(self,fileName=None):
 		"""
@@ -234,7 +237,7 @@ class Earthquake(object):
 				if len(tmp_st) == 0:
 					msg = 'Station %s is missing for event %s in array %s, dropping station'%(s, self.ID, arrayName)
 					gpar.log(__name__, msg, level='info', pri=True)
-					tsDF = tsDF[~tsDF.STA == s]
+					tsDF = tsDF[~(tsDF.STA == s)]
 		ntr = self.ntr
 		delta = self.delta
 		# st.detrend('demean')
@@ -386,7 +389,7 @@ class Earthquake(object):
 		Retrun:
 			Stream store in slideSt of the Class
 		"""
-		msg = ('Calculating slide beamforming for earthquake %s' % self.ID)
+		msg = ('Calculating slide beamforming for earthquake %s in array %s' % (self.ID, arrayName))
 		gpar.log(__name__,msg,level='info',pri=True)
 		rel = slideBeam(self.stream, self.ntr, self.delta, 
 						geometry,timeTable,arrayName,grdpts_x,grdpts_y,
