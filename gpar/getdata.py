@@ -546,7 +546,7 @@ def _checkSta(tr, stadf):
 	stats = tr.stats
 	sta = stats.station
 	tmp = stadf[stadf.STA == sta]
-	if len(tmp) = 0:
+	if len(tmp) == 0:
 		lat = stats.sac.stla
 		lon = stats.sac.stlo
 		newSta = {'STA':sta,'LAT':lat, 'LON':lon}
