@@ -520,8 +520,8 @@ def _loadFromFDSN(fet, start, end, net, sta, chan, loc, minlen):
 		st = client.get_waveforms(net, sta, loc, chan, start, end)
 		st = _checkData(st, minlen)
 	except:
-		msg = ('Could not fetch data on %s from %s to %s' %
-				(net+'.'+sta, start, end))
+		msg = ('Could not fetch data on %s in channel %s from %s to %s' %
+				(net+'.'+sta, chan, start, end))
 		gpar.log(__name__, msg, level='warning', pri=True)
 		st = None
 
