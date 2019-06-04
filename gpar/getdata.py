@@ -394,7 +394,7 @@ class DataFetcher(object):
 			timebefore = self.timeBeforeOrigin
 		if timeafter is None:
 			timeafter = self.timeAfterOrigin
-		if minlen=None:
+		if minlen is None:
 			minlen = self.minlen
 
 		net = ar.NETWORK
