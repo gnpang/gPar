@@ -536,7 +536,7 @@ def _checkData(st, minlen):
 		stats = tr.stats
 		lasttime = stats.npts * stats.delta
 
-		if lasttime < winlen:
+		if lasttime < minlen:
 			msg = ('Trace in station %s starting from %s is shrter than require, removing'%(stats.station, stats.starttime))
 			gpar.log(__name__, msg, level='info')
 			st.remove(tr)
