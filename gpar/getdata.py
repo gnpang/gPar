@@ -435,7 +435,8 @@ class DataFetcher(object):
 				time = UTCDateTime(row.TIME)
 				start = time - stime
 				end = time + etime
-				st = self._getStream(self, start, end, net, staele, chan, loc, minlen)
+				st = self._getStream(self, start, end, net, staele, chan, loc)
+				st = _checkData(st)
 				if st is None or len(st) < 1:
 					stream[ind] = pd.NaT
 				else:
@@ -505,7 +506,7 @@ def _loadDirectoryData(arrayName, df):
 
 	return df, staDf
 
-def _loadFromFDSN(fet, start, end, net, sta, chan, loc, minlen):
+def _loadFromFDSN(fet, start, end, net, sta, chan, loc):
 
 	client = fet.client
 
@@ -518,7 +519,6 @@ def _loadFromFDSN(fet, start, end, net, sta, chan, loc, minlen):
 		sta = ','.join(sta.split('-'))
 	try:
 		st = client.get_waveforms(net, sta, loc, chan, start, end)
-		#st = _checkData(st, minlen)
 	except:
 		msg = ('Could not fetch data on %s in channel %s from %s to %s' %
 				(net+'.'+sta, chan, start, end))
