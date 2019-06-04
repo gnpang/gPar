@@ -40,7 +40,7 @@ class Array(object):
 		self.refPoint = refPoint
 		self.coordsys = coordsys
 		self.events = [0]*len(eqDF)
-		self.getGeometry(staDF,refPoint,coordsys=coordsys)
+		self.getGeometry(staDf,refPoint,coordsys=coordsys)
 		for ind, row in eqDF.iterrows():
 			self.events[ind] = Earthquake(self, row, phase=phase)
 
