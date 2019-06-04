@@ -529,6 +529,9 @@ def _loadFromFDSN(fet, start, end, net, sta, chan, loc):
 
 def _checkData(st, minlen):
 
+	if st is None or len(st)<1:
+		return None
+
 	for tr in st:
 		stats = tr.stats
 		lasttime = stats.npts * stats.delta
