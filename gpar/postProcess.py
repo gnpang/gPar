@@ -4,8 +4,6 @@ GUI code modified based on https://github.com/miili/StreamPick
 Need updates:
 Need to reformat the strip dataframe, add in stripping information when previous stripping is loaded
 """
-from __future__ import print_function, absolute_import
-from __future__ import with_statement, nested_scopes, division, generators
 
 import os
 import pickle
@@ -95,7 +93,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self._current_win = None
 		self._current_strip = False
 		self._eventCycle = cycle(self._eqlist)
-		self._eventInfo(self._eventCycle.next())
+		self._eventInfo(next(self._eventCycle))
 		QMainWindow.__init__(self)
 		self.setupUI()
 
@@ -338,7 +336,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		Plot event from DropDown Menu
 		"""
 		_i = self.evecb.currentIndex()
-		while self._eventCycle.next() != self._eqlist[_i]:
+		while next(self._eventCycle) != self._eqlist[_i]:
 			pass
 		self._eventInfo(self._eqlist[_i])
 		self._drawFig()
@@ -349,7 +347,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		"""
 		_j = self.evecb.currentIndex()
 		for _i in range(len(self._eqlist) - 1):
-			prevEvent = self._eventCycle.next()
+			prevEvent = next(self._eventCycle)
 		self._eventInfo(prevEvent)
 		self.evecb.setCurrentIndex(_j-1)
 		if self._btype == 'strip':
@@ -358,7 +356,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self._drawFig()
 
 	def _pltNextEvent(self):
-		self._eventInfo(self._eventCycle.next())
+		self._eventInfo(next(self._eventCycle))
 		_i = self.evecb.currentIndex()
 		self.evecb.setCurrentIndex(_i+1)
 		if self._btype == 'strip':
@@ -773,7 +771,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self._current_win = None
 		self._current_strip = False
 		self._eventCycle = cycle(self._eqlist)
-		self._eventInfo(self._eventCycle.next())
+		self._eventInfo(next(self._eventCycle))
 		self.setWindowTitle('Array Analysis: %s'%self.array.name)
 		self.evecb.clear()
 		for eve in self._eqlist:
@@ -901,7 +899,7 @@ class stackArray(QtWidgets.QMainWindow):
 					 'step':25.0,
 					 'overlap':0,
 					 'write':False}]
-		self._arrayInfo(self._arrayCycle.next())
+		self._arrayInfo(next(self._arrayCycle))
 		self._initReg()
 		QMainWindow.__init__(self)
 		self.setupUI()
@@ -1126,7 +1124,7 @@ class stackArray(QtWidgets.QMainWindow):
 
 	def _pltArray(self):
 		_i = self.arcb.currentIndex()
-		while self._arrayCycle.next() != self._namelist[_i]:
+		while next(self._arrayCycle) != self._namelist[_i]:
 			pass
 		self._arrayInfo(self._namelist[_i])
 		self._resetReg()
@@ -1134,14 +1132,14 @@ class stackArray(QtWidgets.QMainWindow):
 	def _pltPrevArray(self):
 		_j = self.arcb.currentIndex()
 		for _i in range(len(self._namelist) - 1):
-			prevarray = self._arrayCycle.next()
+			prevarray = next(self._arrayCycle)
 		self._arrayInfo(prevarray)
 		self.arcb.setCurrentIndex(_j-1)
 		self._resetReg()
 
 	def _pltNextArray(self):
 		_i = self.arcb.currentIndex()
-		self._arrayInfo(self._arrayCycle.next())
+		self._arrayInfo(next(self._arrayCycle))
 		self.arcb.setCurrentIndex(_i+1)
 		self._resetReg()
 
@@ -1545,7 +1543,7 @@ def codaStrip(eve, beamtype='beam', method='all',
 	"""
 	Function to remove background coda noise for events
 	"""
-	
+
 	if not hasattr(eve, 'arrival'):
 		eve.getArrival(phase=phase,model=model)
 		
