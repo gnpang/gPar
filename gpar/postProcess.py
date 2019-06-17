@@ -25,12 +25,14 @@ from itertools import cycle
 
 #figure plot import
 import matplotlib
+matplotlib.use('Qt5Agg')
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.transforms import offset_copy
 from matplotlib.widgets import RectangleSelector
 import matplotlib.colors as mcolors
 import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 
 from mpl_toolkits.basemap import Basemap 
 # from mpl_toolkits.axesgrid1 import make_axes_locatable
@@ -60,7 +62,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 		if isinstance(array, str):
 			ar = util.loadArray(array)
-		elif isinstance(array, gpar.arrayPropocess.Array):
+		elif isinstance(array, gpar.arrayProcess.Array):
 			ar = array
 		else:
 			msg = 'Define Array instance = gpar.arrayPropocess.Array() or a path to a pickle file'
@@ -493,7 +495,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		elif self._btype == 'vespetrum':
 			ax = self.fig.add_subplot(1, 1, 1)
 			extent=[np.min(self._current_time),np.max(self._current_time),np.min(self._current_K),np.max(self._current_K)]
-			ax.imshow(self._current_energy, extent=extent, aspect='auto')
+			ax.imshow(self._current_energy, extent=extent, aspect='auto', cmap='Reds', vmin=1.0, vmax=3)
 			if self._current_type == 'slowness':
 				a = u"\u00b0"
 				title = 'Slant Stack at a Backazimuth of %.1f %sN'%(self._current_event.bakAzimuth,a)
@@ -1539,7 +1541,7 @@ class stackArray(QtWidgets.QMainWindow):
 def codaStrip(eve, beamtype='beam', method='all',
 			  siglen=200, noise=200,phase='PKiKP', 
 			  model='ak135', stime=400.0, etime=1800.0,
-			  write=False):
+			  window=10, write=False):
 	"""
 	Function to remove background coda noise for events
 	"""
@@ -1584,7 +1586,7 @@ def codaStrip(eve, beamtype='beam', method='all',
 		#getting predict noise signal in linear scale
 		coda_data = np.exp(coda_par[0][0] - coda_par[1][0]*np.log(time) - coda_par[2][0]*time)
 		#getting residual signal after removing the predict noise
-		coda_res = obs_data - coda_data
+		coda_res = moving_ave(obs_data, window) - coda_data
 		res = np.mean(coda_res[ind:ind+sig_pts])
 		#store coda model information
 		codamod = {'RMS':res,'lnA':coda_par[0][0],'B':coda_par[1][0],'C':coda_par[2][0]}
@@ -1618,7 +1620,7 @@ def codaStrip(eve, beamtype='beam', method='all',
 		d3 = twoline_par_after[0][0] + twoline_par_after[1][0] * t3
 		two_data = np.append(d1,d2)
 		two_data = np.append(two_data,d3)
-		two_res = obs_data[res_ind: res_ind+pts] - two_data
+		two_res = moving_ave(obs_data[res_ind: res_ind+pts], window) - 10**two_data
 		res = np.mean(two_res[int(int(noise)/delta):int(int(noise)/delta)+sig_pts])
 		twomod = {'kn1':twoline_par_before[1][0],'bn1':twoline_par_before[0][0],
 				  'kn2':twoline_par_after[1][0],'bn2':twoline_par_after[0][0],'RMS':res}
@@ -1640,7 +1642,7 @@ def codaStrip(eve, beamtype='beam', method='all',
 		#fitting coda model
 		coda_par = codaFit(np.append(time_before,time_after),np.append(data_before,data_after))
 		coda_data = np.exp(coda_par[0][0] - coda_par[1][0]*np.log(time) - coda_par[2][0]*time)
-		coda_res = obs_data - coda_data
+		coda_res = moving_ave(obs_data, window) - coda_data
 		res = np.mean(coda_res[ind:ind+sig_pts])
 		codamod = {'RMS':res,'lnA':coda_par[0][0],'B':coda_par[1][0],'C':coda_par[2][0]}
 		eve.codaMod = codamod
@@ -1676,7 +1678,7 @@ def codaStrip(eve, beamtype='beam', method='all',
 		d3 = twoline_par_after[0][0] + twoline_par_after[1][0] * t3
 		two_data = np.append(d1,d2)
 		two_data = np.append(two_data,d3)
-		two_res = obs_data[res_ind: res_ind+pts] - two_data
+		two_res = moving_ave(obs_data[res_ind: res_ind+pts], window) - 10**two_data
 		res = np.mean(two_res[int(int(noise)/delta):int(int(noise)/delta)+sig_pts])
 		twomod = {'kn1':twoline_par_before[1][0],'bn1':twoline_par_before[0][0],
 				  'kn2':twoline_par_after[1][0],'bn2':twoline_par_after[0][0],'RMS':res}
