@@ -202,6 +202,13 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self.sbcb.activated.connect(self._updatePlot)
 		self.codacb.setMaximumWidth(100)
 		self.codacb.setMinimumWidth(80)
+		self.ampmin = QDoubleSpinBox(decimals=1, maximum=400, minimum=0, singleStep=.5, value=1)
+		self.ampmax = QDoubleSpinBox(decimals=1, maximum=400, minimum=0, singleStep=.5, value=3)
+		self.ampmin.valueChanged.connect(self._updatePlot)
+		self.ampmax.valueChanged.connect(self._updatePlot)
+		self.ampmin.setEnabled(False)
+		self.ampmax.setEnabled(False)
+		self.sbcb.activated.connect(self._activeAmp)
 		# Arrange buttons
 		vline = QFrame()
 		vline.setFrameStyle(QFrame.VLine | QFrame.Raised)
@@ -227,7 +234,11 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self.btnbar2.addWidget(vline)
 		self.btnbar2.addWidget(QLabel('TYPE'))
 		self.btnbar2.addWidget(self.sbcb)
-		self.btnbar2.addStretch(3)
+		self.btnbar2.addWidget(vline)
+		self.btnbar2.addWidget(QLabel('AMP'))
+		self.btnbar2.addWidget(self.ampmin)
+		self.btnbar2.addWidget(self.ampmax)
+		self.btnbar2.addStretch(2)
 
 		#Menubar
 		menubar = self.menuBar()
@@ -251,6 +262,14 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 	def _hardExist(self):
 		self.deleteLater()
+
+	def _activeAmp(self):
+		if self.sbcb.currentText() == 'vespetrum':
+			self.ampmin.setEnabled(True)
+			self.ampmax.setEnabled(True)
+		else:
+			self.ampmin.setEnabled(False)
+			self.ampmax.setEnabled(False)
 
 	def _createStatusBar(self):
 		"""
@@ -495,7 +514,9 @@ class glanceEQ(QtWidgets.QMainWindow):
 		elif self._btype == 'vespetrum':
 			ax = self.fig.add_subplot(1, 1, 1)
 			extent=[np.min(self._current_time),np.max(self._current_time),np.min(self._current_K),np.max(self._current_K)]
-			ax.imshow(self._current_energy, extent=extent, aspect='auto', cmap='Reds', vmin=1.0, vmax=3)
+			vmin = float(self.ampmin.cleanText())
+			vmax = float(self.ampmax.cleanText())
+			ax.imshow(self._current_energy, extent=extent, aspect='auto', cmap='Reds', vmin=vmin, vmax=vmax)
 			if self._current_type == 'slowness':
 				a = u"\u00b0"
 				title = 'Slant Stack at a Backazimuth of %.1f %sN'%(self._current_event.bakAzimuth,a)

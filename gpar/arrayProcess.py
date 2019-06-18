@@ -2,6 +2,7 @@ from __future__ import print_function, absolute_import
 from __future__ import with_statement, nested_scopes, division, generators
 
 import os
+import gc
 import time
 import numpy as np 
 import pandas as pd 
@@ -13,11 +14,13 @@ from obspy.taup import TauPyModel
 from obspy.signal.util import util_geo_km
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+from itertools import zip_longest
 try:
 	import cPickle
 except ImportError:
 	import pickle as cPickle
 
+from gpar.util.rolling_window import rolling_window
 
 PI = np.pi
 deg2rad = PI/180.0
@@ -35,14 +38,19 @@ class Array(object):
 	Array object that contains multiple earthquake objects
 	"""
 
-	def __init__(self,arrayName,refPoint,eqDF,staDf, coordsys='lonlat',phase='PKiKP'):
+	def __init__(self,arrayName,refPoint,eqDF,staDf, coordsys='lonlat',phase='PKiKP', isDoublet=False):
 		self.name = arrayName
 		self.refPoint = refPoint
 		self.coordsys = coordsys
 		self.events = [0]*len(eqDF)
-		self.getGeometry(staDf,refPoint,coordsys=coordsys)
-		for ind, row in eqDF.iterrows():
-			self.events[ind] = Earthquake(self, row, phase=phase)
+		if not isDoublet:
+			self.getGeometry(staDf,refPoint,coordsys=coordsys)
+		if not doublet:
+			for ind, row in eqDF.iterrows():
+				self.events[ind] = Earthquake(self, row, phase=phase)
+		else:
+			for ind, row in eqDF.iterrows():
+				self.doublet[ind] = Doublet(self, row)
 
 	def getGeometry(self,staDF,refPoint,coordsys='lonlat'):
 		"""
@@ -133,9 +141,6 @@ class Array(object):
 					sl_s=sl_s, vary=vary,sll=sll,
 					starttime=starttime,endtime=endtime, unit=unit,
 					**kwargs)
-
-	# def codaInter(self, doublet, filt=[1.33, 2.67, 3, True], resample=0.01,
-	# 			  winlen=5, shift=0.05, starttime=1000.0, endtime=1500, ):
 
 	def write(self,fileName=None):
 		"""
@@ -466,6 +471,97 @@ class Earthquake(object):
 		if show:
 			plt.show()
 
+class Doublet(object):
+	"""
+	Earthquake doublets object
+	"""
+
+	def __init__(self, array, row):
+
+		self.ID = row.DoubleID
+		self.ev1 = {'TIME': UTCDateTime(row.TIME1), 'LAT': row.LAT1,
+					'LON': row.LON1, 'DEP': row.DEP1,
+					'MAG': row.M1}
+		self.ev2 = {'TIME': UTCDateTime(row.TIME2), 'LAT': row.LAT2,
+					'LON': row.LON2, 'DEP': row.DEP2,
+					'MAG': row.M2}
+		self.st1 = row.ST1
+		self.st2 = row.ST2 
+
+	def _checkInput(self):
+		if not isinstance(self.st1, obspy.core.stream.Stream):
+			msg = ('Waveform data for %s is not stream, stop running' % self.ID)
+			gpar.log(__name__,msg,level='error',pri=True)
+		if not isinstance(self.st2, obspy.core.stream.Stream):
+			msg = ('Waveform data for %s is not stream, stop running' % self.ID)
+			gpar.log(__name__,msg,level='error',pri=True)
+
+	def codaInter(self, filt=[1.33, 2.67, 3, True], resample=0.01, winlen=5, step=0.05,
+				  starttime=1100.0, endtime=1450.0, method='resample'):
+		rrate = 1.0/resample
+
+		if method == 'resample':
+			self.st1.resample(sampling_rate=rrate)
+			self.st2.resample(sampling_rate=rrate)
+		elif method == 'interpolate':
+			self.st1.interpolate(sampling_rate=rrate)
+			self.st2.interpolate(sampling_rate=rrate)
+		else:
+			msg = ('Not a valid option for waveform resampling, choose from resample and interpolate')
+			gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
+
+		# npts = int((endtime - starttime)/shift)
+		# stalist = self.geometry.STA.tolist()
+
+		if len(self.st1) != len(self.st2):
+			msg = ('station records for two events are not equal, remove the additional station')
+			gpar.log(__name__,msg,level='info',pri=True)
+			sta1 = []
+			sta2 = []
+			for tr1, tr2 in zip_longest(st1, st2):
+				if tr1 is not None:
+					sta1.append(tr1.stats.network+'.'+tr1.stats.station+'..'+tr1.stats.channel)
+				if tr2 is not None:
+					sta2.append(tr2.stats.network+'.'+tr2.stats.station+'..'+tr2.stats.channel)
+			sta = list(set(sta1) & set(sta2))
+			st1 = obspy.Stream()
+			st2 = obspy.Stream()
+			for s in sta:
+				_tr1 = self.st1.select(id=s)[0]
+				_tr2 = self.st2.select(id=s)[0]
+				st1.append(_tr1)
+				st2.append(_tr2)
+			st1.sort(keys=['station'])
+			st2.sort(keys=['station'])
+			st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
+			st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
+		else:
+			st1 = self.st1
+			st2 = self.st2
+			st1.sort(keys=['station'])
+			st2.sort(keys=['station'])
+			st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
+			st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
+		stime1 = self.ev1['TIME'] + starttime
+		etime1 = self.ev1['TIME'] + endtime
+		st1.trim(starttime=stime1, endtime=etime1)
+		stime2 = self.ev2['TIME'] + starttime
+		etime2 = self.ev2['TIME'] + endtime
+		st2.trim(starttime=stime2, endtime=etime2)
+		npts = int(winlen / resample)
+		taup = []
+		cc = []
+		for win_st1, win_st2 in zip_longest(st1.slide(winlen, step), st2.slide(winlen, step)):
+			_taup, _cc = codaInt(win_st1, win_st2, delta=resample, npts=npts)
+			taup.append(taup)
+			cc.append(_cc)
+
+		self.taup = taup
+		self.cc = cc
+
+		tspan = endtime - starttime
+		ts = starttime + np.arange(int(tspan/step))
+		self.ts = ts
 
 def getTimeShift(rayParameter,bakAzimuth,geometry,unit='deg'):
 
@@ -589,7 +685,7 @@ def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdp
 	ndel = winlen*(1-overlap)
 	bnpts = int((endtime-starttime)/ndel)
 	hilbertTd = np.empty((ntr,npts),dtype=complex)
-	stations = timeTable
+	# stations = timeTable
 	for ind, tr in enumerate(st):
 		sta = tr.stats.station
 		if len(tr.data) > npts:
@@ -612,7 +708,7 @@ def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdp
 		order = kwargs['order']
 	else:
 		msg = 'Not available stack method, please choose form linaer, psw or root\n'
-		gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
+		gpar.log(__name__,msg,level='error',pri=True)
 	abspow = np.empty(bnpts)
 	cohere = np.empty(bnpts)
 	slow_h = np.empty(bnpts)
@@ -623,7 +719,7 @@ def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdp
 		errorcode = clibarray.slidebeam(ntr,grdpts_x,grdpts_y,
 					sflag,iflag,npts,delta,
 					begtime, winpts, order,
-					stations,hilbertTd,tmpabspow)
+					timeTable,hilbertTd,tmpabspow)
 		if errorcode != 0:
 			msg = 'slidebeam stack for %dth segment exited with error %d\n' % (ind, errorcode)
 			gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
@@ -647,7 +743,7 @@ def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdp
 		else:
 			slow_x = sll_x + ix * sl_s
 			slow_y = sll_y + iy * sl_s
-			tmpTimeTable = stations[:,ix,iy]
+			tmpTimeTable = timeTable[:,ix,iy]
 		abspow[ind] = tmpabspow[ix, iy]
 		slow = np.sqrt(slow_x**2 + slow_y**2)
 		if slow < 1e-8:
@@ -731,7 +827,40 @@ def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
 		gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
 	return [times, k, envel]
 
+def codaInt(st1, st2, delta, npts, fittype='cos'):
 
+	if len(st1) != len(st2):
+		msg = ('Stream 1 and stream 2 have diferent amount of traces')
+		gpar.log(__name__, msg, level='error', pri=True)
+
+	Mptd1 = np.zeros(len(st1), npts)
+	Mptd2 = np.zeros(len(st2), npts)
+	inds = range(len(st1))
+
+	for ind, tr1, tr2 in zip_longest(inds, st1, st2):
+
+		if tr1.stats.station != tr2.stats.station:
+			msg = ('Orders of the traces are not right')
+			gpar.log(__name__, msg, level='error',pri=True)
+		data1 = tr1.data
+		data2 = tr2.data
+
+		if len(data1) > npts:
+			data1 = data1[:npts]
+		elif len(data1) < npts:
+			data1 = np.pad(data1, (0,npts-len(data1)), 'edge')
+
+		if len(data2) > npts:
+			data2 = data2[:npts]
+		elif len(data2) < npts:
+			data2 = np.pad(data2, (0,npts-len(data2)), 'edge')
+
+		Mptd1[ind,:] = data1
+		Mptd2[ind,:] = data2
+
+	taup, cc = _getLag(Mptd1, Mptd2, delta, fittype)
+
+	return [taup, cc]
 
 def getCoherence(hilbertTd,sbeg,TimeTable,winpts,delta):
 	"""
@@ -795,7 +924,121 @@ def getCoherence(hilbertTd,sbeg,TimeTable,winpts,delta):
 	cohere = np.mean(np.absolute(tmp))
 
 
-	return cohere 
+	return cohere
+
+
+def _getFreqDomain(mptd):
+	reqlen = 2*mptd.shape[-1]
+	reqlenbits = 2**reqlen.bit_length()
+	mpfd = scipy.fftpack.fft(mptd, n =reqlenbits)
+
+	return mpfd
+
+def _corr(Mptd1, Mptd2):
+
+
+	t1, n = Mptd1.shape
+	t2, m = Mptd2.shape
+
+	if t1 != t2:
+		msg = ('Amounts of traces between events are not equal, please check')
+		gpar.log(__name__, msg, level='error', pri=True)
+
+
+	# denorm = np.sqrt(n * np.sum(Mptd1**2, axis=1) - np.sum(Mptd1, axis=1))
+	# denorm = denorm * np.sqrt(m * np.sum(Mptd2**2, axis=1) - np.sum(Mptd2, axis=1))
+	# denorm = denorm.reshape(t1, 1)
+	std1 = np.std(Mptd1, axis=1)
+	std2 = np.std(Mptd2, axis=1)
+	denorm = std1 * std2 * np.sqrt(n*m)
+	denorm = denorm.reshape(t1, 1)
+
+	if domain == 'freq':
+		nt1 = np.mean(Mptd1, axis=-1).reshape(t1,1)
+		nt2 = np.mean(Mptd2, axis=-1).reshape(t2,1)
+		Mpfd1 = _getFreqDomain(Mptd1 - nt1)
+		Mpfd2 = _getFreqDomain(Mptd2 - nt2)
+
+		c = np.real(scipy.fftpack.ifft(np.multiply(np.conjugate(Mpfd1), Mpfd2)))
+		c = np.concatenate((c[:,-(n-1):], c[:,:m]),axis=1)
+		cor = c/denorm
+	elif domain == 'time':
+		c = np.convolve(Mptd1[..., ::-1], Mptd2)
+		c = np.subtract(np.sqrt(n*m)*c, np.sum(Mptd1, axis=1)*np.sum(Mptd2, axis=1)) 
+		cor = c/denorm
+	else:
+		msg = ('Not a valid option for correlation, choose from freq or time')
+		gpar.log(__name__, msg, level='error', pri=True)
+
+	return cor
+
+def _getLag(Mptd1, Mptd2, delta, fittype='cos'):
+
+	cc = _corr(Mptd1, Mptd2)
+	ntr, ndt = Mptd1.shape
+	_dump, n = cc.shape
+	dt = (np.arange(n) - (ndt-1)) * delta
+	_i = np.arange(ntr) * ndt
+	_index = np.argmax(cc, axis=-1) 
+	_indexpre = _index - 1
+	_indexnxt = _index + 1
+
+	x = np.vstack([dt[_indexpre], dt[_index], dt[_indexnxt]]).transpose()
+
+	_cind = _index + _i
+	_cindpre = _cind - 1
+	_cindnxt = _cind + 1
+	_yindex = np.unravel_index(_cind,cc.shape)
+	_yindexpre = np.unravel_index(_cindpre,cc.shape)
+	_yindexnxt = np.unravel_index(_cindnxt,cc.shape)
+	y = np.vstack([cc[_yindexpre], cc[_yindex], cc[_yindexnxt]]).transpose()
+	if fittype == 'cos':
+		xmax, ymax = cosinfit(x, y, delta)
+	elif fittype == 'parabola':
+		xmax = []
+		ymax = []
+		for i in ntr:
+			_x, _y = polyfit(x[i,:], y[i,:])
+			xmax.append[_x]
+			ymax.append[_y]
+		xmax = np.array(xmax)
+		ymax = np.array(ymax)
+	else:
+		msg = ('Not a valid option for fitting CC curve, selet from parabola and cos')
+		gpar.log(__name__, msg, level='error', pri=True)
+
+	return [np.sum(xmax), np.sum(ymax)]
+
+def polyfit(x, y):
+	p = np.polyfit(x,y,2)
+	xmax = -p[1]/(2.0*p[0])
+	ymax = p[2]-p[1]**2/(4.0*p[0])
+
+	return [xmax, ymax]
+
+def cosinfit(x, y, delta):
+	w = np.arccos((y[:,0] + y[:,2])/(2*y[:,1]))/delta
+	a = np.arctan((y[:,0]-y[:,2])/(2*y[:,1]*np.sin(w*delta)))
+	t = -a/w
+	xmax = x[:,1] + t
+	O = a - w*x[:,1]
+	ymax = np.cos(w+xmax+O)
+
+	return [xmax, ymax]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

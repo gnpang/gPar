@@ -389,7 +389,7 @@ class DataFetcher(object):
 			self.client = obspy.clients.fdsn.Client('IRIS')
 			self._getStream = _loadFromFDSN
 
-	def getEqData(self, ar, timebefore=None, timeafter=None, phase=['PKiKP'], minlen=None, **kwargs):
+	def getEqData(self, ar, timebefore=None, timeafter=None, phase=['PKiKP'], minlen=None, mode='eq',**kwargs):
 		if timebefore is None:
 			timebefore = self.timeBeforeOrigin
 		if timeafter is None:
@@ -415,18 +415,18 @@ class DataFetcher(object):
 				gpar.log(__name__,msg, level='warning', pri=True)
 				return None
 		eqdf = util.readList(eqlist,list_type='event', sep='\s+')
-		ndf, stadf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, loc='??', minlen=minlen)
+		ndf, stadf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, loc='??', minlen=minlen, mode='eq')
 
 		return ndf, stadf
 
-	def getStream(self, ar, df, stime, etime, net, staele, chan, loc='??', minlen=1500):
+	def getStream(self, ar, df, stime, etime, net, staele, chan, loc='??', minlen=1500, mode='eq'):
 		if not isinstance(chan, (list, tuple)):
 			if not isinstance(chan, string_types):
 				msg = 'chan must be a string or list of string'
 				gpar.log(__name__, msg, level=error, pri=True)
 			chan = [chan]
 		if self.method == 'dir':
-			df, stadf = self._getStream(ar.NAME, df)
+			df, stadf = self._getStream(ar.NAME, df, mode)
 		else:
 			stadf = pd.DataFrame(columns=['STA','LAT','LON'])
 			client = self.client
@@ -467,40 +467,71 @@ class DataFetcher(object):
 
 # Functions to get stream data based on selected method
 
-def _loadDirectoryData(arrayName, df):
+def _loadDirectoryData(arrayName, df, mode):
 
 	staDf = pd.DataFrame(columns=['STA', 'LAT', 'LON'])
-	stream = [''] * len(df)
+	if mode == 'eq':
+		stream = [''] * len(df)
+	elif mode == 'db':
+		stream1 = [''] * len(df)
+		stream2 = [''] * len(df)
+	else:
+		msg = ('Not a valid option for earthquake type, choose eq or db')
+		gpar.log(__name__, msg, level='error', pri=True)
 	for ind, eve in df.iterrows():
-		_id = eve.DIR[:-6]
-		sacfiles = os.path.join(arrayName, 'Data', eve.DIR, _id+'*.sac')
-		try:
-			st = read(sacfiles)
-		except:
-			msg = 'data from %s in array %s is not found, skipping' % (arrayName,eve.DIR)
-			gpar.log(__name__,msg,level='warning',pri=True)
-			stream[ind] = pd.NaT
-			continue
-		for tr in st:
-			if not hasattr(tr.stats, 'sac'):
-				msg = ("Trace for %s in station %s doesn's have SAC attributes, removing" % eve, tr.stats.station)
-				st.remove(tr)
-				gpar.log(__name__,msg,level='warning',e=ValueError)
+		if mode == 'eq':
+			_id = eve.DIR[:-6]
+			sacfiles = os.path.join(arrayName, 'Data', eve.DIR, _id+'*.sac')
+			try:
+				st = read(sacfiles)
+			except:
+				msg = 'data from %s in array %s is not found, skipping' % (arrayName,eve.DIR)
+				gpar.log(__name__,msg,level='warning',pri=True)
+				stream[ind] = pd.NaT
 				continue
-			if not hasattr(tr.stats.sac, 'stla') or not hasattr(tr.stats.sac, 'stlo'):
-				msg = ("Trace for %s in station %s doesn's have station information, removing" % eve.DIR, tr.stats.station)
-				st.remove(tr)
-				gpar.log(__name__,msg,level='warning',e=ValueError)
-				continue
-		
-			staDf = _checkSta(tr, staDf)
+			for tr in st:
+				if not hasattr(tr.stats, 'sac'):
+					msg = ("Trace for %s in station %s doesn's have SAC attributes, removing" % eve, tr.stats.station)
+					st.remove(tr)
+					gpar.log(__name__,msg,level='warning',e=ValueError)
+					continue
+				if not hasattr(tr.stats.sac, 'stla') or not hasattr(tr.stats.sac, 'stlo'):
+					msg = ("Trace for %s in station %s doesn's have station information, removing" % eve.DIR, tr.stats.station)
+					st.remove(tr)
+					gpar.log(__name__,msg,level='warning',e=ValueError)
+					continue
+			
+				staDf = _checkSta(tr, staDf)
 
-		if len(st) == 0:
-			msg = ("Waveforms for event %s have problem" % eve.DIR)
-			gpar.log(__name__,msg,level='warning,e=ValueError')
-			st = pd.NaT
-		stream[ind] = st
-	df['Stream'] = stream
+			if len(st) == 0:
+				msg = ("Waveforms for event %s have problem" % eve.DIR)
+				gpar.log(__name__,msg,level='warning,e=ValueError')
+				st = pd.NaT
+			stream[ind] = st
+		elif mode == 'db':
+			_id1 = eve.DIR1[:-6]
+			_id2 = eve.DIR2[:-6]
+			sacfile1 = os.path.join(arrayName, 'Data', eve.DIR1, _id1+'*.sac')
+			sacfile2 = os.path.join(arrayName, 'Data', eve.DIR2, _id2+'*.sac')
+			try:
+				st1 = read(sacfile1)
+			except:
+				msg = 'data from %s in array %s is not found, skipping' % (arrayName,eve.DIR1)
+				gpar.log(__name__,msg,level='warning',pri=True)
+				stream1[ind] = pd.NaT
+				continue
+			try:
+				st2 = read(sacfile2)
+			except:
+				msg = 'data from %s in array %s is not found, skipping' % (arrayName,eve.DIR2)
+				gpar.log(__name__,msg,level='warning',pri=True)
+				stream2[ind] = pd.NaT
+				continue
+	if mode == 'eq':
+		df['Stream'] = stream
+	elif mode == 'db':
+		df['ST1'] = stream1
+		df['ST2'] = stream2
 	df.dropna(inplace=True)
 	df.reset_index(drop=True, inplace=True)
 

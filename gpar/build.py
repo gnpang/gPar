@@ -63,6 +63,7 @@ def createArray(arrayList='array.list',
 				calTime=True,
 				save=True,
 				saveName=False,
+				mode='eq',
 				**kwargs):
 
 	"""
@@ -96,33 +97,35 @@ def createArray(arrayList='array.list',
 		# 	st = fet.getStream(eve.DIR)
 		# 	streams[num] = st
 		# eqdf['Stream'] = streams
-		eqdf, stadf = fet.getEqData(row, phase=phase)
+		eqdf, stadf = fet.getEqData(row, phase=phase, mode=mode)
 		if eqdf is None:
 			msg = 'Earthquake list for array %s is not existed, skipping' %(row.NAME)
 			gpar.log(__name__, msg, level='warning', pri=True)
 			continue
-		array = gpar.arrayProcess.Array(row.NAME,refpoint,eqdf, stadf, coordsys,phase)
+		if mode == 'eq':
+			array = gpar.arrayProcess.Array(row.NAME,refpoint,eqdf, stadf, coordsys,phase, isDoublet=False)
 
-		if calTime:
-			msg = ('Calculate time shift table for sliding window slowness beaforming for array %s'%row.NAME)
-			gpar.log(__name__,msg,level='info',pri=True)
-
-			req_pa = set(['sll_x','sll_y','sl_s','grdpts_x','grdpts_y','unit'])
-
-			if not req_pa.issubset(kwargs.keys()):
-				msg = ('Required parameters %s for time shift table are missing\nusing default parameters sll_x=-15, sll_y=-15, sl_s=0.1,grdpts_x=301, grdpts_y=301, unit="deg"'%req_pa)
+			if calTime:
+				msg = ('Calculate time shift table for sliding window slowness beaforming for array %s'%row.NAME)
 				gpar.log(__name__,msg,level='info',pri=True)
-				array.getTimeTable()
-			else:
-				sll_x=kwargs['sll_x']
-				sll_y=kwargs['sll_y']
-				sl_s=kwargs['sl_s']
-				grdpts_x = kwargs['grdpts_x']
-				grdpts_y = kwargs['grdpts_y']
-				unit = kwargs['unit']
 
-				array.getTimeTable(sll_x=sll_x,sll_y=sll_y,sl_s=sl_s,grdpts_x=grdpts_x,grdpts_y=grdpts_y,unit=unit)
-		
+				req_pa = set(['sll_x','sll_y','sl_s','grdpts_x','grdpts_y','unit'])
+
+				if not req_pa.issubset(kwargs.keys()):
+					msg = ('Required parameters %s for time shift table are missing\nusing default parameters sll_x=-15, sll_y=-15, sl_s=0.1,grdpts_x=301, grdpts_y=301, unit="deg"'%req_pa)
+					gpar.log(__name__,msg,level='info',pri=True)
+					array.getTimeTable()
+				else:
+					sll_x=kwargs['sll_x']
+					sll_y=kwargs['sll_y']
+					sl_s=kwargs['sl_s']
+					grdpts_x = kwargs['grdpts_x']
+					grdpts_y = kwargs['grdpts_y']
+					unit = kwargs['unit']
+
+					array.getTimeTable(sll_x=sll_x,sll_y=sll_y,sl_s=sl_s,grdpts_x=grdpts_x,grdpts_y=grdpts_y,unit=unit)
+		elif mode =='db':
+			array = gpar.arrayProcess.Array(row.NAME, refpoint, eqdf, stadf, coordsys, phase, isDoublet=True)
 		if save:
 			array.write()
 
