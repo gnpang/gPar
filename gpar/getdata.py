@@ -402,7 +402,7 @@ class DataFetcher(object):
 		chan = ar.Channel.split('-')
 		arDir = os.path.join(ar.NAME, 'Data')
 
-		eqlist = os.path.join(ar.NAME, 'eq.'+ar.NAME+'.list')
+		eqlist = os.path.join(ar.NAME, mode+'.'+ar.NAME+'.list')
 		if not os.path.exists(eqlist):
 			msg = ('Earthquake list for array %s is not exists, building from ndk file first' % ar.NAME)
 			gpar.log(__name__,msg,level='warning',pri=True)
@@ -414,8 +414,11 @@ class DataFetcher(object):
 				msg = ('ndk file does not exist')
 				gpar.log(__name__,msg, level='warning', pri=True)
 				return None
-		eqdf = util.readList(eqlist,list_type='event', sep='\s+')
-		ndf, stadf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, loc='??', minlen=minlen, mode='eq')
+		if mode == 'eq':
+			eqdf = util.readList(eqlist,list_type='event', sep='\s+')
+		elif mode == 'db':
+			eqdf = util.readList(eqlist,list_type='doublet', sep='\s+')
+		ndf, stadf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, loc='??', minlen=minlen, mode=mode)
 
 		return ndf, stadf
 
@@ -527,6 +530,8 @@ def _loadDirectoryData(arrayName, df, mode):
 				gpar.log(__name__,msg,level='warning',pri=True)
 				stream2[ind] = pd.NaT
 				continue
+			stream1[ind] = st1
+			stream2[ind] = st2
 	if mode == 'eq':
 		df['Stream'] = stream
 	elif mode == 'db':

@@ -42,13 +42,14 @@ class Array(object):
 		self.name = arrayName
 		self.refPoint = refPoint
 		self.coordsys = coordsys
-		self.events = [0]*len(eqDF)
 		if not isDoublet:
 			self.getGeometry(staDf,refPoint,coordsys=coordsys)
-		if not doublet:
+		if not isDoublet:
+			self.events = [0]*len(eqDF)
 			for ind, row in eqDF.iterrows():
 				self.events[ind] = Earthquake(self, row, phase=phase)
 		else:
+			self.doublet = [0]*len(eqDF)
 			for ind, row in eqDF.iterrows():
 				self.doublet[ind] = Doublet(self, row)
 
@@ -497,7 +498,8 @@ class Doublet(object):
 			gpar.log(__name__,msg,level='error',pri=True)
 
 	def codaInter(self, filt=[1.33, 2.67, 3, True], resample=0.01, winlen=5, step=0.05,
-				  starttime=1100.0, endtime=1450.0, method='resample'):
+				  starttime=1100.0, endtime=1450.0, method='resample',
+				  domain='freq',fittype='cos'):
 		rrate = 1.0/resample
 
 		if method == 'resample':
@@ -552,7 +554,7 @@ class Doublet(object):
 		taup = []
 		cc = []
 		for win_st1, win_st2 in zip_longest(st1.slide(winlen, step), st2.slide(winlen, step)):
-			_taup, _cc = codaInt(win_st1, win_st2, delta=resample, npts=npts)
+			_taup, _cc = codaInt(win_st1, win_st2, delta=resample, npts=npts,domain=domain,fittype=fittype)
 			taup.append(taup)
 			cc.append(_cc)
 
@@ -827,14 +829,14 @@ def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
 		gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
 	return [times, k, envel]
 
-def codaInt(st1, st2, delta, npts, fittype='cos'):
+def codaInt(st1, st2, delta, npts, domain='freq', fittype='cos'):
 
 	if len(st1) != len(st2):
 		msg = ('Stream 1 and stream 2 have diferent amount of traces')
 		gpar.log(__name__, msg, level='error', pri=True)
 
-	Mptd1 = np.zeros(len(st1), npts)
-	Mptd2 = np.zeros(len(st2), npts)
+	Mptd1 = np.zeros([len(st1), npts])
+	Mptd2 = np.zeros([len(st2), npts])
 	inds = range(len(st1))
 
 	for ind, tr1, tr2 in zip_longest(inds, st1, st2):
@@ -858,7 +860,7 @@ def codaInt(st1, st2, delta, npts, fittype='cos'):
 		Mptd1[ind,:] = data1
 		Mptd2[ind,:] = data2
 
-	taup, cc = _getLag(Mptd1, Mptd2, delta, fittype)
+	taup, cc = _getLag(Mptd1, Mptd2, delta, domain,fittype)
 
 	return [taup, cc]
 
@@ -934,7 +936,7 @@ def _getFreqDomain(mptd):
 
 	return mpfd
 
-def _corr(Mptd1, Mptd2):
+def _corr(Mptd1, Mptd2, domain):
 
 
 	t1, n = Mptd1.shape
@@ -972,9 +974,9 @@ def _corr(Mptd1, Mptd2):
 
 	return cor
 
-def _getLag(Mptd1, Mptd2, delta, fittype='cos'):
+def _getLag(Mptd1, Mptd2, delta, domain='freq', fittype='cos'):
 
-	cc = _corr(Mptd1, Mptd2)
+	cc = _corr(Mptd1, Mptd2,domain=domain)
 	ntr, ndt = Mptd1.shape
 	_dump, n = cc.shape
 	dt = (np.arange(n) - (ndt-1)) * delta

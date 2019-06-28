@@ -744,7 +744,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 			self._saveCSV(savefile)
 	def _saveFileFormat(self):
 		files_types = "Pickle (*.pkl);; CSV (*.csv)"
-		self.savefile = QFileDialog.getSaveFileName(self,
+		self.savefile,_ = QFileDialog.getSaveFileName(self,
 										'Save as', os.getcwd(), files_types)
 		self.savefile = str(self.savefile)
 		if os.path.splitext(self.savefile)[1].lower() == '.pkl':
@@ -805,7 +805,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		# path = os.getcwd()
 		# path = os.path.join(path,self.array.name,self._current_event.ID)
 		file_types = "Image Format (*.png *.pdf *.ps *.eps);; ALL (*)"
-		filename = QFileDialog.getSaveFileName(self, 'Save Plot',
+		filename,_ = QFileDialog.getSaveFileName(self, 'Save Plot',
 													 os.getcwd(), file_types)
 		if not filename:
 			return
