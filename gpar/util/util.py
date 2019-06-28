@@ -1,6 +1,3 @@
-from __future__ import print_function, absolute_import
-from __future__ import with_statement, nested_scopes, division, generators
-
 import pandas as pd
 import numpy as np
 import os
@@ -29,10 +26,11 @@ def readList(flist, list_type='array',sep='\s+'):
 
 	read_array = set(['NAME','LAT','LON','CODE'])
 	read_eq = set(['TIME','LAT','LON','DEP','Mw','Del','Az','Baz','BB','Rayp','DIR'])
+	read_db = set(['DoubleID', 'DIR1', 'TIME1', 'LAT1', 'LON1', 'DEP1', 'M1', 'DIR2', 'TIME2', 'LAT2', 'LON2', 'DEP2', 'M2'])
 	read_coda = set(['TIME','LAT','LON','DEP','Mw','Del','Az','Baz','BB','Rayp','RES','lnA','B','C'])
 	read_two = set(['TIME','LAT','LON','DEP','Mw','Del','Az','Baz','BB','Rayp','RES','m1','b1','m2','b2'])
 
-	req_type = {'array':read_array,'event':read_eq,'coda':read_coda,'towline':read_two}
+	req_type = {'array':read_array,'event':read_eq,'coda':read_coda,'towline':read_two, 'doublet':read_db}
 
 	list_types = req_type.keys()
 
