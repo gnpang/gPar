@@ -13,6 +13,7 @@ from obspy.core import AttribDict
 from obspy.taup import TauPyModel
 from obspy.signal.util import util_geo_km
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 import matplotlib.cm as cm
 from itertools import zip_longest
 try:
@@ -38,7 +39,7 @@ class Array(object):
 	Array object that contains multiple earthquake objects
 	"""
 
-	def __init__(self,arrayName,refPoint,eqDF,staDf, coordsys='lonlat',phase='PKiKP', isDoublet=False):
+	def __init__(self,arrayName,refPoint,eqDF,staDf, coordsys='lonlat',phase=['PKiKP'], isDoublet=False):
 		self.name = arrayName
 		self.refPoint = refPoint
 		self.coordsys = coordsys
@@ -51,7 +52,7 @@ class Array(object):
 		else:
 			self.doublet = [0]*len(eqDF)
 			for ind, row in eqDF.iterrows():
-				self.doublet[ind] = Doublet(self, row)
+				self.doublet[ind] = Doublet(self, row, phase=phase)
 
 	def getGeometry(self,staDF,refPoint,coordsys='lonlat'):
 		"""
@@ -119,7 +120,7 @@ class Array(object):
 						   stack=stack, write=write)
 
 	def slideBeam(self,filt=[1,2,4,True],grdpts_x=301,grdpts_y=301,sflag=2,stack='linear',
-					sll_x=-15.0,sll_y=-15.0,sl_s=0.3,refine=True,
+					sll_x=-15.0,sll_y=-15.0,sl_s=0.1,refine=True,
 					starttime=400.0,endtime=1400.0, unit='deg',
 					winlen=2.0,overlap=0.5,write=False, **kwargs):
 		
@@ -236,7 +237,7 @@ class Earthquake(object):
 		tsDF = getTimeShift(self.rayParameter,self.bakAzimuth,geometry,unit=unit)
 		self.timeshift = tsDF
 		stalist = tsDF.STA
-		st = self.stream
+		st = self.stream.copy()
 		if len(st) < len(tsDF):
 			for s in stalist:
 				tmp_st = st.select(station=s)
@@ -246,9 +247,9 @@ class Earthquake(object):
 					tsDF = tsDF[~(tsDF.STA == s)]
 		ntr = self.ntr
 		delta = self.delta
-		# st.detrend('demean')
-		st.filter('bandpass',freqmin=filt[0],freqmax=filt[1],corners=filt[2],zerophase=filt[3])
 		st.detrend('demean')
+		st.filter('bandpass',freqmin=filt[0],freqmax=filt[1],corners=filt[2],zerophase=filt[3])
+		# st.detrend('demean')
 		DT = tsDF.TimeShift - (tsDF.TimeShift/delta).astype(int)*delta
 		lag = (tsDF.TimeShift/delta).astype(int)+1
 		tsDF['DT'] = DT
@@ -477,7 +478,7 @@ class Doublet(object):
 	Earthquake doublets object
 	"""
 
-	def __init__(self, array, row):
+	def __init__(self, array, row, phase=['PKIKP']):
 
 		self.ID = row.DoubleID
 		self.ev1 = {'TIME': UTCDateTime(row.TIME1), 'LAT': row.LAT1,
@@ -486,8 +487,16 @@ class Doublet(object):
 		self.ev2 = {'TIME': UTCDateTime(row.TIME2), 'LAT': row.LAT2,
 					'LON': row.LON2, 'DEP': row.DEP2,
 					'MAG': row.M2}
+		self.phase = phase
 		self.st1 = row.ST1
-		self.st2 = row.ST2 
+		self.st2 = row.ST2
+		if hasattr(row, 'TT1') and hasattr(row, 'TT2'):
+			self.tt1 = row.TT1
+			self.tt2 = row.TT2
+			self.arr1 = self.ev1['TIME'] + row.TT1
+			self.arr2 = self.ev2['TIME'] + row.TT2
+		else:
+			self.getArrival(array=array)
 
 	def _checkInput(self):
 		if not isinstance(self.st1, obspy.core.stream.Stream):
@@ -497,8 +506,35 @@ class Doublet(object):
 			msg = ('Waveform data for %s is not stream, stop running' % self.ID)
 			gpar.log(__name__,msg,level='error',pri=True)
 
+	def getArrival(self,array, phase=None, model='ak135'):
+		"""
+		Function to get theoritcal arrival times for the events
+
+		Parameters:
+			phase: str or list. Phase name for travel time calculating
+			model: str. Model using in taup.
+		"""
+
+		model = TauPyModel(model)
+		if phase != None:
+			phase = phase
+		else:
+			phase = self.phase
+		arr1 = model.get_travel_times_geo(source_depth_in_km=self.ev1['DEP'],source_latitude_in_deg=self.ev1['LAT'],
+										  source_longitude_in_deg=self.ev1['LON'],phase_list=phase,
+										  receiver_latitude_in_deg=array.refPoint[0], receiver_longitude_in_deg=array.refPoint[1])[0]
+		self.arr1 = self.ev1['TIME'] + arr1.time
+		self.tt1 = arr1.time
+		arr2 = model.get_travel_times_geo(source_depth_in_km=self.ev2['DEP'],source_latitude_in_deg=self.ev2['LAT'],
+										  source_longitude_in_deg=self.ev2['LON'],phase_list=phase,
+										  receiver_latitude_in_deg=array.refPoint[0], receiver_longitude_in_deg=array.refPoint[1])[0]
+		self.arr2 = self.ev2['TIME'] + arr2.time
+		self.tt2 = arr2.time
+		# msg = ('Travel time for %s for earthquake %s in depth of %.2f in distance of %.2f is %s' % (phase, self.ID, self.dep, self.Del, self.arrival))
+		# gpar.log(__name__,msg,level='info',pri=True)
+
 	def codaInter(self, filt=[1.33, 2.67, 3, True], resample=0.01, winlen=5, step=0.05,
-				  starttime=1100.0, endtime=1450.0, method='resample',
+				  starttime=100.0, endtime=300.0, method='resample', align=True,
 				  domain='freq',fittype='cos'):
 		rrate = 1.0/resample
 
@@ -520,7 +556,7 @@ class Doublet(object):
 			gpar.log(__name__,msg,level='info',pri=True)
 			sta1 = []
 			sta2 = []
-			for tr1, tr2 in zip_longest(st1, st2):
+			for tr1, tr2 in zip_longest(self.st1, self.st2):
 				if tr1 is not None:
 					sta1.append(tr1.stats.network+'.'+tr1.stats.station+'..'+tr1.stats.channel)
 				if tr2 is not None:
@@ -538,32 +574,88 @@ class Doublet(object):
 			st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
 			st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
 		else:
-			st1 = self.st1
-			st2 = self.st2
+			st1 = self.st1.copy()
+			st2 = self.st2.copy()
 			st1.sort(keys=['station'])
 			st2.sort(keys=['station'])
 			st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
 			st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
-		stime1 = self.ev1['TIME'] + starttime
-		etime1 = self.ev1['TIME'] + endtime
+		stime1 = self.arr1 - starttime
+		etime1 = self.arr1 + endtime
 		st1.trim(starttime=stime1, endtime=etime1)
-		stime2 = self.ev2['TIME'] + starttime
-		etime2 = self.ev2['TIME'] + endtime
+		stime2 = self.arr2 - starttime
+		etime2 = self.arr2 + endtime
 		st2.trim(starttime=stime2, endtime=etime2)
+		self.use_st1 = st1.copy()
+		self.use_st2 = st2.copy()
 		npts = int(winlen / resample)
 		taup = []
 		cc = []
 		for win_st1, win_st2 in zip_longest(st1.slide(winlen, step), st2.slide(winlen, step)):
 			_taup, _cc = codaInt(win_st1, win_st2, delta=resample, npts=npts,domain=domain,fittype=fittype)
-			taup.append(taup)
+			taup.append(_taup)
 			cc.append(_cc)
 
 		self.taup = taup
 		self.cc = cc
 
-		tspan = endtime - starttime
-		ts = starttime + np.arange(int(tspan/step))
+		tspan = endtime + starttime - winlen
+		ts = self.tt1 + np.arange(int(tspan/step) + 1) * step - starttime
 		self.ts = ts
+
+	def plotCoda(self,tstart=20, tend=10, 
+				 stime=100, etime=300,
+				 lim=[1100, 1450],
+				 filt=[1.33, 2.67, 3, True]):
+		# fig = plt.figure()
+
+		# 
+		plt.subplot(5,1,1)
+		st1 = self.use_st1.copy()
+		# st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1],corners=filt[2],zerophase=filt[3])
+		st2 = self.use_st2.copy()
+		# st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1],corners=filt[2],zerophase=filt[3])
+		st1.trim(starttime=self.arr1-tstart, endtime=self.arr1+tend)
+		st2.trim(starttime=self.arr2-tstart, endtime=self.arr2+tend)
+		data1 = st1[0].data / np.max(np.absolute(st1[0].data))
+		data2 = st2[0].data / np.max(np.absolute(st2[0].data))
+		# t1 = self.tt1 - tstart + np.arange(len(data1)) * st1[0].stats.delta 
+		t2 = self.tt2 - tstart + np.arange(len(data2)) * st1[0].stats.delta 
+		plt.plot(t2, data1, 'b', t2, data2, 'r')
+		# plt.xlabel('Time (s)')
+		plt.ylabel('Normalized Amp')
+
+		plt.subplot(5,1,2)
+		# stime = self.ts.min()
+		# etime = self.ts.max()
+		st1 = self.use_st1.copy()
+		st2 = self.use_st2.copy()
+		# st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1],corners=filt[2],zerophase=filt[3])
+		# st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1],corners=filt[2],zerophase=filt[3])
+		st1.trim(starttime=self.arr1-stime, endtime=self.arr1+etime)
+		st2.trim(starttime=self.arr2-stime, endtime=self.arr2+etime)
+		t = self.ts.min() + np.arange(len(st1[0].data))*st1[0].stats.delta
+		plt.plot(t, st1[0].data)
+		plt.ylabel('Event 1')
+		plt.xlim(lim)
+		plt.subplot(5,1,3)
+		plt.plot(t,st2[0].data)
+		plt.xlim(lim)
+		plt.ylabel('Event 2')
+		plt.subplot(5, 1, 4)
+		plt.plot(self.ts, self.cc)
+		plt.ylim([0, 1])
+		plt.xlim(lim)
+		plt.ylabel('CCmax Stack')
+		plt.subplot(5, 1, 5)
+		plt.plot(self.ts, self.taup)
+		plt.ylabel('Tau Stack')
+		plt.ylim([-2,2])
+		plt.xlim(lim)
+		plt.xlabel('Time (s)')
+		print('Showing figure')
+		plt.show()
+
 
 def getTimeShift(rayParameter,bakAzimuth,geometry,unit='deg'):
 
@@ -678,7 +770,7 @@ def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdp
 	if sflag not in [1, 2, 3]:
 		msg = 'Not available option, please choose from 1, 2 or 3\n1 for maximm amplitude\n2for mean\n3 for root-mean-sqaure\n'
 		gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
-	st = stream
+	st = stream.copy()
 	st.detrend('demean')
 	st.filter('bandpass',freqmin=filt[0],freqmax=filt[1],corners=filt[2],zerophase=filt[3])
 	npts = st[0].stats.npts#int((endtime - starttime+2.0*padlen)/delta)+1
@@ -774,7 +866,7 @@ def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
 					sl_s=0.1, vary='slowness',sll=-20.0,
 					starttime=400.0,endtime=1400.0, unit='deg',
 					**kwargs):
-	st = stream
+	st = stream.copy()
 	st.detrend('demean')
 	st.filter('bandpass',freqmin=filt[0],freqmax=filt[1],corners=filt[2],zerophase=filt[3])
 	npts = st[0].stats.npts
@@ -980,14 +1072,14 @@ def _getLag(Mptd1, Mptd2, delta, domain='freq', fittype='cos'):
 	ntr, ndt = Mptd1.shape
 	_dump, n = cc.shape
 	dt = (np.arange(n) - (ndt-1)) * delta
-	_i = np.arange(ntr) * ndt
+	_ind = np.arange(ntr) * n
 	_index = np.argmax(cc, axis=-1) 
 	_indexpre = _index - 1
 	_indexnxt = _index + 1
 
 	x = np.vstack([dt[_indexpre], dt[_index], dt[_indexnxt]]).transpose()
 
-	_cind = _index + _i
+	_cind = _index + _ind
 	_cindpre = _cind - 1
 	_cindnxt = _cind + 1
 	_yindex = np.unravel_index(_cind,cc.shape)
@@ -1009,7 +1101,7 @@ def _getLag(Mptd1, Mptd2, delta, domain='freq', fittype='cos'):
 		msg = ('Not a valid option for fitting CC curve, selet from parabola and cos')
 		gpar.log(__name__, msg, level='error', pri=True)
 
-	return [np.sum(xmax), np.sum(ymax)]
+	return [np.mean(xmax), np.mean(ymax)]
 
 def polyfit(x, y):
 	p = np.polyfit(x,y,2)
@@ -1024,7 +1116,8 @@ def cosinfit(x, y, delta):
 	t = -a/w
 	xmax = x[:,1] + t
 	O = a - w*x[:,1]
-	ymax = np.cos(w+xmax+O)
+	ymax = y[:,1] / np.cos(a)
+	# ymax = np.cos(w*xmax+O)
 
 	return [xmax, ymax]
 

@@ -470,7 +470,7 @@ class DataFetcher(object):
 
 # Functions to get stream data based on selected method
 
-def _loadDirectoryData(arrayName, df, mode):
+def _loadDirectoryData(arrayName, df, mode,channel='Z'):
 
 	staDf = pd.DataFrame(columns=['STA', 'LAT', 'LON'])
 	if mode == 'eq':
@@ -484,7 +484,7 @@ def _loadDirectoryData(arrayName, df, mode):
 	for ind, eve in df.iterrows():
 		if mode == 'eq':
 			_id = eve.DIR[:-6]
-			sacfiles = os.path.join(arrayName, 'Data', eve.DIR, _id+'*.sac')
+			sacfiles = os.path.join(arrayName, 'Data', eve.DIR, _id+'*'+channel+'.sac')
 			try:
 				st = read(sacfiles)
 			except:

@@ -58,6 +58,7 @@ def createArray(arrayList='array.list',
 				savecarray=True,
 				fileName='array.pkl',
 				model='ak135',
+				channel='Z',
 				phase=['PKiKP'],
 				coordsys='lonlat',
 				calTime=True,
@@ -97,7 +98,7 @@ def createArray(arrayList='array.list',
 		# 	st = fet.getStream(eve.DIR)
 		# 	streams[num] = st
 		# eqdf['Stream'] = streams
-		eqdf, stadf = fet.getEqData(row, phase=phase, mode=mode)
+		eqdf, stadf = fet.getEqData(row, phase=phase, mode=mode,channel=channel)
 		if eqdf is None:
 			msg = 'Earthquake list for array %s is not existed, skipping' %(row.NAME)
 			gpar.log(__name__, msg, level='warning', pri=True)

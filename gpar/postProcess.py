@@ -209,6 +209,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self.ampmin.setEnabled(False)
 		self.ampmax.setEnabled(False)
 		self.sbcb.activated.connect(self._activeAmp)
+
+		self.ttbtn = QtWidgets.QPushButton('Strip', parent=self.main_widget)
+		self.ttbtn.setCheckable(True)
+		self.ttbtn.clicked.connect(self._plotTT)
 		# Arrange buttons
 		vline = QFrame()
 		vline.setFrameStyle(QFrame.VLine | QFrame.Raised)
@@ -633,6 +637,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 		
 		self._canvasDraw()
+
+	def _plotTT(self):
+		if self.ttbtn.isChecked() is False:
+			
 
 	def _updatePlot(self):
 
