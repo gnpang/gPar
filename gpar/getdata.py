@@ -418,18 +418,18 @@ class DataFetcher(object):
 			eqdf = util.readList(eqlist,list_type='event', sep='\s+')
 		elif mode == 'db':
 			eqdf = util.readList(eqlist,list_type='doublet', sep='\s+')
-		ndf, stadf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, loc='??', minlen=minlen, mode=mode)
+		ndf, stadf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, loc='??', minlen=minlen, mode=mode,channel=kwargs['channel'])
 
 		return ndf, stadf
 
-	def getStream(self, ar, df, stime, etime, net, staele, chan, loc='??', minlen=1500, mode='eq'):
+	def getStream(self, ar, df, stime, etime, net, staele, chan, loc='??', minlen=1500, mode='eq',channel='Z'):
 		if not isinstance(chan, (list, tuple)):
 			if not isinstance(chan, string_types):
 				msg = 'chan must be a string or list of string'
 				gpar.log(__name__, msg, level=error, pri=True)
 			chan = [chan]
 		if self.method == 'dir':
-			df, stadf = self._getStream(ar.NAME, df, mode)
+			df, stadf = self._getStream(ar.NAME, df, mode,minlen,channel)
 		else:
 			stadf = pd.DataFrame(columns=['STA','LAT','LON'])
 			client = self.client
@@ -470,7 +470,7 @@ class DataFetcher(object):
 
 # Functions to get stream data based on selected method
 
-def _loadDirectoryData(arrayName, df, mode,channel='Z'):
+def _loadDirectoryData(arrayName, df, mode,minlen,channel='Z'):
 
 	staDf = pd.DataFrame(columns=['STA', 'LAT', 'LON'])
 	if mode == 'eq':
@@ -494,12 +494,18 @@ def _loadDirectoryData(arrayName, df, mode,channel='Z'):
 				continue
 			for tr in st:
 				if not hasattr(tr.stats, 'sac'):
-					msg = ("Trace for %s in station %s doesn's have SAC attributes, removing" % eve, tr.stats.station)
+					msg = ("Trace for %s in station %s doesn's have SAC attributes, removing" % (eve, tr.stats.station))
 					st.remove(tr)
 					gpar.log(__name__,msg,level='warning',e=ValueError)
 					continue
 				if not hasattr(tr.stats.sac, 'stla') or not hasattr(tr.stats.sac, 'stlo'):
-					msg = ("Trace for %s in station %s doesn's have station information, removing" % eve.DIR, tr.stats.station)
+					msg = ("Trace for %s in station %s doesn's have station information, removing" % (eve.DIR, tr.stats.station))
+					st.remove(tr)
+					gpar.log(__name__,msg,level='warning',e=ValueError)
+					continue
+				data = tr.data
+				if np.std(data) < 0.1:
+					msg = ("Trace data for %s in station %s has std smaller than 0.1, removing" % (eve.DIR, tr.stats.station))
 					st.remove(tr)
 					gpar.log(__name__,msg,level='warning',e=ValueError)
 					continue
@@ -510,12 +516,13 @@ def _loadDirectoryData(arrayName, df, mode,channel='Z'):
 				msg = ("Waveforms for event %s have problem" % eve.DIR)
 				gpar.log(__name__,msg,level='warning,e=ValueError')
 				st = pd.NaT
+			st = _checkData(st,minlen)
 			stream[ind] = st
 		elif mode == 'db':
 			_id1 = eve.DIR1[:-6]
 			_id2 = eve.DIR2[:-6]
-			sacfile1 = os.path.join(arrayName, 'Data', eve.DIR1, _id1+'*.sac')
-			sacfile2 = os.path.join(arrayName, 'Data', eve.DIR2, _id2+'*.sac')
+			sacfile1 = os.path.join(arrayName, 'Data', eve.DIR1, _id1+'*'+channel+'.sac')
+			sacfile2 = os.path.join(arrayName, 'Data', eve.DIR2, _id2+'*'+channel+'.sac')
 			try:
 				st1 = read(sacfile1)
 			except:
@@ -530,6 +537,8 @@ def _loadDirectoryData(arrayName, df, mode,channel='Z'):
 				gpar.log(__name__,msg,level='warning',pri=True)
 				stream2[ind] = pd.NaT
 				continue
+			st1 = _checkData(st1,minlen)
+			st2 = _checkData(st2,minlen)
 			stream1[ind] = st1
 			stream2[ind] = st2
 	if mode == 'eq':
@@ -576,6 +585,11 @@ def _checkData(st, minlen):
 			msg = ('Trace in station %s starting from %s is shrter than require, removing'%(stats.station, stats.starttime))
 			gpar.log(__name__, msg, level='info')
 			st.remove(tr)
+		if np.std(tr.data) < 0.1:
+			msg = ("Trace data for %s in station %s has std smaller than 0.1, removing" % (stats.starttime, tr.stats.station))
+			st.remove(tr)
+			gpar.log(__name__,msg,level='warning',e=ValueError)
+			continue
 	if len(st) == 0:
 		st = None
 	return st

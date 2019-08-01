@@ -493,13 +493,9 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 	def _drawFig(self):
 		self.fig.clear()
-		if self._btype == 'beam' or self._btype == 'slide':
-			if self._btype == 'beam':
-				self._current_st = obspy.core.stream.Stream(traces=[self._current_beam])
-			elif self._btype == 'slide':
-				self._current_st = self._current_slide
-			num_plots = len(self._current_st)
-			for _i, tr in enumerate(self._current_st):
+		if self._btype == 'beam':
+			num_plots = len(self._current_beam)
+			for _i, tr in enumerate(self._current_beam):
 				ax = self.fig.add_subplot(num_plots, 1, _i+1)
 				if hasattr(tr.stats, 'channel'):
 					label = tr.stats.channel
@@ -507,20 +503,44 @@ class glanceEQ(QtWidgets.QMainWindow):
 					label=None
 				time = np.arange(tr.stats.npts) * tr.stats.delta + tr.stats.sac.b
 				ax.plot(time, tr.data, 'k', label=label)
-				if not hasattr(self._current_event, 'arrival'):
+				if not hasattr(self._current_event, 'arrivals'):
 					self._current_event.getArrival()
-				arrival = self._current_event.arrival - self._current_event.time
+				arrival = self._current_event.arrivals[self.beamphase] - self._current_event.time
 				ax.vlines(arrival, ax.get_ylim()[0],ax.get_ylim()[1],'r')
 				ax.legend()
 				if _i == 0:
 					ax.set_xlabel('Seconds')
 				self.fig.suptitle('%s - %s'%(self._current_event.ID, self._btype))
+		elif self._btype == 'slide':
+			nfilts = len(self._current_slide.keys())
+			ax = self.fig.subplots(4, nfilts, sharex='col', sharey='row')
+			for ind, (name,st) in enumerate(self._current_slide.items()):
+				for _i, tr in enumerate(st):
+					if hasattr(tr.stats, 'channel'):
+						label = tr.stats.channel
+					else:
+						label=None
+					time = np.arange(tr.stats.npts) * tr.stats.delta + tr.stats.sac.b
+					ax[_i,ind].plot(time, tr.data, 'k', label=None)
+					if not hasattr(self._current_event, 'arrivals'):
+						self._current_event.getArrival()
+					arrival = self._current_event.arrivals[self.beamphase] - self._current_event.time
+					ax[_i,ind].vlines(arrival, ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'r',label=self.beamphase)
+					ax[_i,ind].legend()
+					ax[_i,ind].set_aspect(aspect=0.3)
+					if _i == 3:
+						ax[_i,ind].set_xlabel('Seconds')
+					if ind == 0:
+						ax[_i,ind].set_ylabel(label)
 		elif self._btype == 'vespetrum':
-			ax = self.fig.add_subplot(1, 1, 1)
+			num = len(self._current_energy.keys())
 			extent=[np.min(self._current_time),np.max(self._current_time),np.min(self._current_K),np.max(self._current_K)]
 			vmin = float(self.ampmin.cleanText())
 			vmax = float(self.ampmax.cleanText())
-			ax.imshow(self._current_energy, extent=extent, aspect='auto', cmap='Reds', vmin=vmin, vmax=vmax)
+			for _i, (name, abspow) in enumerate(self._current_energy.item()):
+				ax = self.fig.add_subplot(1, num, _i+1)
+				ax.imshow(abspow, extent=extent, aspect='auto', cmap='Reds', vmin=vmin, vmax=vmax)
+				ax.set_title(name)
 			if self._current_type == 'slowness':
 				a = u"\u00b0"
 				title = 'Slant Stack at a Backazimuth of %.1f %sN'%(self._current_event.bakAzimuth,a)
@@ -638,8 +658,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 		
 		self._canvasDraw()
 
-	def _plotTT(self):
-		if self.ttbtn.isChecked() is False:
+	#def _plotTT(self):
+	#	if self.ttbtn.isChecked() is False:
 			
 
 	def _updatePlot(self):
@@ -1579,7 +1599,7 @@ def codaStrip(eve, beamtype='beam', method='all',
 		eve.getArrival(phase=phase,model=model)
 		
 	if beamtype == 'beam':
-		tr = eve.beam
+		tr = eve.beam[0]
 	elif beamtype == 'slide':
 		tr = eve.slideSt
 	else:

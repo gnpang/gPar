@@ -41,7 +41,7 @@ def createEqList(arrayList='array.list',
 		evedf = gpar.getdata.makeEventList(ndk=ndk, array=name,
 						Olat=row.LAT, Olon=row.LON, 
 						mindis=mindis, maxdis=maxdis, minmag=mag,
-						model=model, phase=phase,
+						model=model, phase=beamphase,
 						)
 		# evedf = evedf[evedf.time>= UTCDateTime(starttime)]
 		n = len(evedf)
@@ -59,12 +59,14 @@ def createArray(arrayList='array.list',
 				fileName='array.pkl',
 				model='ak135',
 				channel='Z',
-				phase=['PKiKP'],
+				beamphase=['PKiKP'],
 				coordsys='lonlat',
 				calTime=True,
 				save=True,
 				saveName=False,
 				mode='eq',
+				minlen=1500,
+				phase_list=['P','PP','PcP','ScP','PKiKP','SP','ScS'],
 				**kwargs):
 
 	"""
@@ -98,13 +100,13 @@ def createArray(arrayList='array.list',
 		# 	st = fet.getStream(eve.DIR)
 		# 	streams[num] = st
 		# eqdf['Stream'] = streams
-		eqdf, stadf = fet.getEqData(row, phase=phase, mode=mode,channel=channel)
+		eqdf, stadf = fet.getEqData(row, phase=beamphase, mode=mode,minlen=minlen,channel=channel)
 		if eqdf is None:
 			msg = 'Earthquake list for array %s is not existed, skipping' %(row.NAME)
 			gpar.log(__name__, msg, level='warning', pri=True)
 			continue
 		if mode == 'eq':
-			array = gpar.arrayProcess.Array(row.NAME,refpoint,eqdf, stadf, coordsys,phase, isDoublet=False)
+			array = gpar.arrayProcess.Array(row.NAME,refpoint,eqdf, stadf, coordsys,beamphase, isDoublet=False,phase_list=phase_list)
 
 			if calTime:
 				msg = ('Calculate time shift table for sliding window slowness beaforming for array %s'%row.NAME)
@@ -126,7 +128,10 @@ def createArray(arrayList='array.list',
 
 					array.getTimeTable(sll_x=sll_x,sll_y=sll_y,sl_s=sl_s,grdpts_x=grdpts_x,grdpts_y=grdpts_y,unit=unit)
 		elif mode =='db':
-			array = gpar.arrayProcess.Array(row.NAME, refpoint, eqdf, stadf, coordsys, phase, isDoublet=True)
+			array = gpar.arrayProcess.Array(row.NAME, refpoint, eqdf, stadf, coordsys, beamphase, 
+											isDoublet=True,starttime=kwargs['starttime'],endtime=kwargs['endtime'],
+											cstime=kwargs['cstime'], cetime=kwargs['cetime'],
+											filt=kwargs['filt'],domain=kwargs['domain'],fittype=kwargs['fittype'])
 		if save:
 			array.write()
 

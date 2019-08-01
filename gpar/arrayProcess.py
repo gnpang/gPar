@@ -39,7 +39,11 @@ class Array(object):
 	Array object that contains multiple earthquake objects
 	"""
 
-	def __init__(self,arrayName,refPoint,eqDF,staDf, coordsys='lonlat',phase=['PKiKP'], isDoublet=False):
+	def __init__(self,arrayName,refPoint,eqDF,staDf, 
+				 coordsys='lonlat',beamphase='PKiKP', 
+				 isDoublet=False,
+				 phase_list=['P','PP','PcP','ScP','PKiKP','SP','ScS']
+				 ,**kwargs):
 		self.name = arrayName
 		self.refPoint = refPoint
 		self.coordsys = coordsys
@@ -48,11 +52,11 @@ class Array(object):
 		if not isDoublet:
 			self.events = [0]*len(eqDF)
 			for ind, row in eqDF.iterrows():
-				self.events[ind] = Earthquake(self, row, phase=phase)
+				self.events[ind] = Earthquake(self, row, beamphase=beamphase,phase_list=phase_list)
 		else:
 			self.doublet = [0]*len(eqDF)
 			for ind, row in eqDF.iterrows():
-				self.doublet[ind] = Doublet(self, row, phase=phase)
+				self.doublet[ind] = Doublet(self, row, phase=[beamphase],**kwargs)
 
 	def getGeometry(self,staDF,refPoint,coordsys='lonlat'):
 		"""
@@ -160,7 +164,7 @@ class Earthquake(object):
 	Earthquake object
 	"""
 
-	def __init__(self, array, row, phase=['PKiKP']):
+	def __init__(self, array, row, beamphase='PKiKP',phase_list=['P','PP','PcP','ScP','PKiKP','SP','ScS']):
 		"""
 		Earthquake basic information including ray parameters for specific phase
 		defualt is for PKiKP
@@ -177,7 +181,8 @@ class Earthquake(object):
 		self.pattern = row.BB
 		self.rayParameter = row.Rayp
 		# self.takeOffAngle = row.Angle
-		self.phase = phase
+		self.beamphase = phase
+		self.phase_list = phase_list
 		self.stream = row.Stream
 		self.ntr = len(row.Stream)
 		self.delta = row.Stream[0].stats.delta
@@ -190,7 +195,7 @@ class Earthquake(object):
 			msg = ('Waveform data for %s is not stream, stop running' % self.ID)
 			gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
 
-	def getArrival(self,phase=None, model='ak135'):
+	def getArrival(self,phase_list=None, model='ak135'):
 		"""
 		Function to get theoritcal arrival times for the events
 
@@ -200,17 +205,25 @@ class Earthquake(object):
 		"""
 
 		model = TauPyModel(model)
-		if phase != None:
-			phase = phase
-		else:
-			phase = self.phase
-		arrival = model.get_travel_times(source_depth_in_km=self.dep,distance_in_degree=self.Del,phase_list=phase)[0]
-		self.arrival = self.time + arrival.time
-		msg = ('Travel time for %s for earthquake %s in depth of %.2f in distance of %.2f is %s' % (phase, self.ID, self.dep, self.Del, self.arrival))
+		if phase_list == None:
+			phase_list = self.phase_list
+		arrivals = model.get_travel_times(source_depth_in_km=self.dep,distance_in_degree=self.Del,phase_list=phase_list)
+
+		phases = {}
+		for arr in arrivals:
+			pha = arr.name
+			times = {'UTC':self.time + arr.time,
+					 'TT':arr.time,
+					 'RP':arr.ray_param_sec_degree}
+			phases[pha] = times
+
+		self.arrivals = phases
+		msg = ('Travel times for %s for earthquake %s in depth of %.2f in distance of %.2f' % (phase, self.ID, self.dep, self.Del))
 		gpar.log(__name__,msg,level='info',pri=True)
 
 	def beamforming(self, geometry, arrayName, starttime=0.0, winlen=1800.0,
-					filt=[1,2,4,True],stack='linear',unit='deg',write=True,**kwargs):
+					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
+					stack='linear',unit='deg',write=True,**kwargs):
 		"""
 		Function to get beamforming for the phase in self.phase. Default is for PKiKP
 		Only coding linear stacking now
@@ -232,8 +245,6 @@ class Earthquake(object):
 			write: boot, if True write a sac file for beamforming trace, store into the directory where the event waveforms are.
 		"""
 		# stime = time.time()
-		msg = ('Calculating beamforming for earthquake %s' % self.ID)
-		gpar.log(__name__,msg,level='info',pri=True)
 		tsDF = getTimeShift(self.rayParameter,self.bakAzimuth,geometry,unit=unit)
 		self.timeshift = tsDF
 		stalist = tsDF.STA
@@ -248,114 +259,124 @@ class Earthquake(object):
 		ntr = self.ntr
 		delta = self.delta
 		st.detrend('demean')
-		st.filter('bandpass',freqmin=filt[0],freqmax=filt[1],corners=filt[2],zerophase=filt[3])
+
+		
 		# st.detrend('demean')
 		DT = tsDF.TimeShift - (tsDF.TimeShift/delta).astype(int)*delta
 		lag = (tsDF.TimeShift/delta).astype(int)+1
 		tsDF['DT'] = DT
 		tsDF['LAG'] = lag
 		npt = int(winlen/delta) + 1
-		beamTr = obspy.core.trace.Trace()
-		beamTr.stats.delta = self.delta
-		if stack == 'psw':
-			shiftTRdata = np.empty((ntr,npt),dtype=complex)
-		else:
-			shiftTRdata = np.empty((ntr,npt))
-		for ind, tr in enumerate(st):
-			sta = tr.stats.station
-			data = tr.data
-			if stack == 'root':
-				order = kwargs['order']
+		beamSt = obspy.core.stream.Stream()
+		for name, filt in filts.items():
+			msg = ('Calculating beamforming for earthquake %s in filter %s - %s' % self.ID, name, filt)
+			gpar.log(__name__,msg,level='info',pri=True)
+			tmp_st = st.copy()
+			tmp_st.filter('bandpass',freqmin=filt[0],freqmax=filt[1],corners=filt[2],zerophase=filt[3])
+			beamTr = obspy.core.trace.Trace()
+			beamTr.stats.delta = self.delta
+			if stack == 'psw':
+				shiftTRdata = np.empty((ntr,npt),dtype=complex)
+			else:
+				shiftTRdata = np.empty((ntr,npt))
+			for ind, tr in enumerate(tmp_st):
+				sta = tr.stats.station
+				data = tr.data
+				if stack == 'root':
+					order = kwargs['order']
+				elif stack == 'psw':
+					order = kwargs['order']
+					data = scipy.signal.hilbert(data)
+				tr_npt = tr.stats.npts
+				tmp_tsDF = tsDF[tsDF.STA==sta].iloc[0]
+				sind = int(int(starttime - tr.stats.sac.b)/delta + tmp_tsDF.LAG)
+
+				if sind < 0:
+					msg = ('Shift time is before start of records, padding %d points staion %s'%(sind,sta))
+					gpar.log(__name__,msg,level='info',pri=True)
+				if (sind+npt) >= tr_npt:
+					msg = ('Shift time past end of record, padding %d points'%(sind+npt-tr_npt))
+					gpar.log(__name__,msg,level='info',pri=True)
+
+				if sind < 0 and (sind+npt) < tr_npt:
+					dnpt = npt - np.abs(sind)
+					data_use = data[0:dnpt]
+					data_use = np.pad(data_use,(np.abs(sind),0),'edge')
+					data_com = np.diff(data_use) * tmp_tsDF.DT/delta
+					data_com = np.append(data_com,0)
+					tmp_data = data_use + data_com
+					if stack == 'root':
+						shiftTRdata[ind,:] = np.sign(tmp_data)*tmp_data
+					elif stack == 'linear' or stack == 'psw':
+						shiftTRdata[ind,:] = tmp_data
+
+				elif sind >=0 and sind+npt < tr_npt:
+					data_use = data[sind:npt+sind]
+					# print(data_use[0])
+					data_com = np.diff(data_use) * tmp_tsDF.DT/delta
+					data_com = np.append(data_com,0)
+					tmp_data = data_use + data_com
+					if stack == 'root':
+						shiftTRdata[ind,:] = np.sign(tmp_data)*tmp_data
+					elif stack == 'linear' or stack == 'psw':
+						shiftTRdata[ind,:] = tmp_data
+				elif sind >=0 and (sind+npt) >= tr_npt:
+					data_use = data[sind:]
+					pad_end = sind+npt - tr_npt
+					data_use = np.pad(data_use,(0,pad_end),'edge')
+					data_com = np.diff(data_use) * tmp_tsDF.DT/delta
+					data_com = np.append(data_com,0)
+					tmp_data = data_use + data_com
+					if stack == 'root':
+						shiftTRdata[ind,:] = np.sign(tmp_data)*np.power(np.abs(tmp_data), 1.0/order)
+					elif stack == 'linear' or stack == 'psw':
+						shiftTRdata[ind,:] = tmp_data
+				elif sind < 0 and sind+npt >= tr_npt:
+					pad_head = -sind
+					pad_end = npt+sind-tr_npt
+					data_use = data
+					data_use = np.pad(data_use,(pad_head,pad_end),'edge')
+					data_com = np.diff(data_use) * tmp_tsDF.DT/delta
+					data_com = np.append(data_com,0)
+					tmp_data = data_use + data_com
+					if stack == 'root':
+						shiftTRdata[ind,:] = np.sign(tmp_data)*tmp_data
+					elif stack == 'linear' or stack == 'psw':
+						shiftTRdata[ind,:] = tmp_data
+			if stack == 'linear':
+				beamdata = shiftTRdata.sum(axis=0) / ntr
+			elif stack == 'root':
+				beamdata = shiftTRdata.sum(axis=0) / ntr
+				beamdata = np.sign(beamdata) * np.power(np.abs(beamdata), 1.0/order)
 			elif stack == 'psw':
-				order = kwargs['order']
-				data = scipy.signal.hilbert(data)
-			tr_npt = tr.stats.npts
-			tmp_tsDF = tsDF[tsDF.STA==sta].iloc[0]
-			sind = int(int(starttime - tr.stats.sac.b)/delta + tmp_tsDF.LAG)
+				amp = np.absolute(shiftTRdata)
+				stack_amp = np.sum(np.real(shiftTRdata),axis=0)
+				beamdata = stack_amp * np.power(np.absolute(np.sum(shiftTRdata/amp,axis=0))/ntr, order)/ntr
+			beamTr.data = beamdata
+			beamTr.stats.starttime = self.time
+			beamTr.stats.channel = 'beam_'+name
+			sac = AttribDict({'b':starttime,'e':starttime + (npt-1)*delta,
+							  'evla':self.lat,'evlo':self.lon,'evdp':self.dep,
+							  'kcmpnm':"beam",'delta':delta,
+							  'nzyear':self.time.year,'nzjday':self.time.julday,
+							  'nzhour':self.time.hour,'nzmin':self.time.minute,
+							  'nzsec':self.time.second,'nzmsec':self.time.microsecond/1000})
+			beamTr.stats.sac = sac
+			if write:
+				bpfilt = str(filt[0]) +'-'+str(filt[1])
+				name = 'beam.' + self.ID + '.'+stack +'.'+bpfilt+'.sac'
+				name = os.path.join('./',arrayName,'Data',self.ID,name)
+				beamTr.write(name,format='SAC')
+			beamSt.append(beamTr)
 
-			if sind < 0:
-				msg = ('Shift time is before start of records, padding %d points staion %s'%(sind,sta))
-				gpar.log(__name__,msg,level='info',pri=True)
-			if (sind+npt) >= tr_npt:
-				msg = ('Shift time past end of record, padding %d points'%(sind+npt-tr_npt))
-				gpar.log(__name__,msg,level='info',pri=True)
-
-			if sind < 0 and (sind+npt) < tr_npt:
-				dnpt = npt - np.abs(sind)
-				data_use = data[0:dnpt]
-				data_use = np.pad(data_use,(np.abs(sind),0),'edge')
-				data_com = np.diff(data_use) * tmp_tsDF.DT/delta
-				data_com = np.append(data_com,0)
-				tmp_data = data_use + data_com
-				if stack == 'root':
-					shiftTRdata[ind,:] = np.sign(tmp_data)*tmp_data
-				elif stack == 'linear' or stack == 'psw':
-					shiftTRdata[ind,:] = tmp_data
-
-			elif sind >=0 and sind+npt < tr_npt:
-				data_use = data[sind:npt+sind]
-				# print(data_use[0])
-				data_com = np.diff(data_use) * tmp_tsDF.DT/delta
-				data_com = np.append(data_com,0)
-				tmp_data = data_use + data_com
-				if stack == 'root':
-					shiftTRdata[ind,:] = np.sign(tmp_data)*tmp_data
-				elif stack == 'linear' or stack == 'psw':
-					shiftTRdata[ind,:] = tmp_data
-			elif sind >=0 and (sind+npt) >= tr_npt:
-				data_use = data[sind:]
-				pad_end = sind+npt - tr_npt
-				data_use = np.pad(data_use,(0,pad_end),'edge')
-				data_com = np.diff(data_use) * tmp_tsDF.DT/delta
-				data_com = np.append(data_com,0)
-				tmp_data = data_use + data_com
-				if stack == 'root':
-					shiftTRdata[ind,:] = np.sign(tmp_data)*np.power(np.abs(tmp_data), 1.0/order)
-				elif stack == 'linear' or stack == 'psw':
-					shiftTRdata[ind,:] = tmp_data
-			elif sind < 0 and sind+npt >= tr_npt:
-				pad_head = -sind
-				pad_end = npt+sind-tr_npt
-				data_use = data
-				data_use = np.pad(data_use,(pad_head,pad_end),'edge')
-				data_com = np.diff(data_use) * tmp_tsDF.DT/delta
-				data_com = np.append(data_com,0)
-				tmp_data = data_use + data_com
-				if stack == 'root':
-					shiftTRdata[ind,:] = np.sign(tmp_data)*tmp_data
-				elif stack == 'linear' or stack == 'psw':
-					shiftTRdata[ind,:] = tmp_data
-		if stack == 'linear':
-			beamdata = shiftTRdata.sum(axis=0) / ntr
-		elif stack == 'root':
-			beamdata = shiftTRdata.sum(axis=0) / ntr
-			beamdata = np.sign(beamdata) * np.power(np.abs(beamdata), 1.0/order)
-		elif stack == 'psw':
-			amp = np.absolute(shiftTRdata)
-			stack_amp = np.sum(np.real(shiftTRdata),axis=0)
-			beamdata = stack_amp * np.power(np.absolute(np.sum(shiftTRdata/amp,axis=0))/ntr, order)/ntr
-		beamTr.data = beamdata
-		beamTr.stats.starttime = self.time
-		beamTr.stats.channel = 'beam'
-		sac = AttribDict({'b':starttime,'e':starttime + (npt-1)*delta,
-						  'evla':self.lat,'evlo':self.lon,'evdp':self.dep,
-						  'kcmpnm':"beam",'delta':delta,
-						  'nzyear':self.time.year,'nzjday':self.time.julday,
-						  'nzhour':self.time.hour,'nzmin':self.time.minute,
-						  'nzsec':self.time.second,'nzmsec':self.time.microsecond/1000})
-		beamTr.stats.sac = sac
-
-		self.beam = beamTr
-		if write:
-			bpfilt = str(filt[0]) +'-'+str(filt[1])
-			name = 'beam.' + self.ID + '.'+stack +'.'+bpfilt+'.sac'
-			name = os.path.join('./',arrayName,'Data',self.ID,name)
-			beamTr.write(name,format='SAC')
+		self.beam = beamSt
+		
 		# etime = time.time()
 		# print(etime - stime)
 
 	def slideBeam(self,geometry,timeTable,arrayName,grdpts_x=301,grdpts_y=301,
-					filt=[1,2,4,True], sflag=1,stack='linear',
+					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]}, 
+					sflag=1,stack='linear',
 					sll_x=-15.0,sll_y=-15.0,sl_s=0.3,refine=True,
 					starttime=400.0,endtime=1400.0, unit='deg',
 					winlen=2.0,overlap=0.5,write=False, **kwargs):
@@ -372,7 +393,7 @@ class Earthquake(object):
 					1: return the maximum amplitude of the traces
 					2: return the mean of the trace
 					3: return the root-mean-sqaure of the trace
-			filt: list, filter parameters for waveform filtering
+			filts: dict, filters parameters for waveform filtering
 			stack: str, wave to stack shifted wavefrom.
 					linear: linear stacking
 					psw: phase weight stacking
@@ -396,43 +417,46 @@ class Earthquake(object):
 		Retrun:
 			Stream store in slideSt of the Class
 		"""
-		msg = ('Calculating slide beamforming for earthquake %s in array %s' % (self.ID, arrayName))
-		gpar.log(__name__,msg,level='info',pri=True)
-		rel = slideBeam(self.stream, self.ntr, self.delta, 
-						geometry,timeTable,arrayName,grdpts_x,grdpts_y,
-					filt, sflag,stack,sll_x,sll_y,sl_s,refine,
-					starttime,endtime, unit,
-					winlen,overlap,**kwargs)
-		st = obspy.core.stream.Stream()
-		otime = self.time
-		ndel = winlen*(1-overlap)
-		bnpts = int((endtime-starttime)/ndel)
-		label = ['Amplitude','Slowness','Back Azimuzh','coherence']
+		self.slideSt = {}
+		for name, filt in filts.items():
+			msg = ('Calculating slide beamforming for earthquake %s in array %s in filter %s - %s' % (self.ID, arrayName, name, filt))
+			gpar.log(__name__,msg,level='info',pri=True)
+			rel = slideBeam(self.stream, self.ntr, self.delta, 
+							geometry,timeTable,arrayName,grdpts_x,grdpts_y,
+						filt, sflag,stack,sll_x,sll_y,sl_s,refine,
+						starttime,endtime, unit,
+						winlen,overlap,**kwargs)
+			st = obspy.core.stream.Stream()
+			otime = self.time
+			ndel = winlen*(1-overlap)
+			bnpts = int((endtime-starttime)/ndel)
+			label = ['Amplitude','Slowness','Back Azimuzh','coherence']
 		# print(label)
-		for i in range(4):
-			tr = obspy.core.trace.Trace()
-			tr.data = rel[i,:]
-			tr.stats.starttime = otime+starttime
-			tr.stats.delta = ndel
-			tr.stats.channel = label[i]
-			sac = AttribDict({'b':starttime,'e':starttime + (bnpts-1)*ndel,
-						  'evla':self.lat,'evlo':self.lon,'evdp':self.dep,
-						  'kcmpnm':"beam",'delta':ndel,
-						  'nzyear':self.time.year,'nzjday':self.time.julday,
-						  'nzhour':self.time.hour,'nzmin':self.time.minute,
-						  'nzsec':self.time.second,'nzmsec':self.time.microsecond/1000})
-			tr.stats.sac = sac
-			st.append(tr)
-		self.slideSt = st
+			for i in range(4):
+				tr = obspy.core.trace.Trace()
+				tr.data = rel[i,:]
+				tr.stats.starttime = otime+starttime
+				tr.stats.delta = ndel
+				tr.stats.channel = label[i]
+				sac = AttribDict({'b':starttime,'e':starttime + (bnpts-1)*ndel,
+							  'evla':self.lat,'evlo':self.lon,'evdp':self.dep,
+							  'kcmpnm':"beam",'delta':ndel,
+							  'nzyear':self.time.year,'nzjday':self.time.julday,
+							  'nzhour':self.time.hour,'nzmin':self.time.minute,
+							  'nzsec':self.time.second,'nzmsec':self.time.microsecond/1000})
+				tr.stats.sac = sac
+				st.append(tr)
+			self.slideSt[name] = st
 		# print("done")
-		if write:
-			bpfilt = str(filt[0]) +'-'+str(filt[1])
-			name = 'slide.' + self.ID + '.'+stack+'.'+bpfilt+'.sac'
-			name = os.path.join('./',arrayName,'Data',self.ID,name)
-			st.write(name,format='SAC')
+			if write:
+				bpfilt = str(filt[0]) +'-'+str(filt[1])
+				name = 'slide.' + self.ID + '.'+stack+'.'+bpfilt+'.pkl'
+				name = os.path.join('./',arrayName,'Data',self.ID,name)
+				st.write(name,format='PICKLE')
 
 	def vespectrum(self,geometry,arrayName,grdpts=401,
-					filt=[1,2,4,True], sflag='log10',stack='linear',
+					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
+					sflag='log10',stack='linear',
 					sl_s=0.1, vary='slowness',sll=-20.0,
 					starttime=400.0,endtime=1400.0, unit='deg',
 					**kwargs ):
@@ -441,12 +465,12 @@ class Earthquake(object):
 		if vary == 'slowness':
 			times, k, abspow = slantBeam(self.stream, self.ntr, self.delta,
 									geometry, arrayName, grdpts,
-									filt, sflag, stack, sl_s, vary, sll,starttime,
+									filts, sflag, stack, sl_s, vary, sll,starttime,
 									endtime, unit, bakAzimuth=self.bakAzimuth)
 		elif vary == 'theta':
 			times, k, abspow = slantBeam(self.stream, self.ntr, self.delta,
 									geometry,  arrayName, grdpts,
-									filt, sflag, stack, sl_s, vary, sll,starttime,
+									filts, sflag, stack, sl_s, vary, sll,starttime,
 									endtime, unit, rayParameter=self.rayParameter)
 		self.slantTime = times
 		self.slantType = vary
@@ -456,8 +480,11 @@ class Earthquake(object):
 	def plotves(self, show=True, saveName=False,**kwargs):
 
 		extent=[np.min(self.slantTime),np.max(self.slantTime),np.min(self.slantK),np.max(self.slantK)]
-		fig, ax = plt.subplots(figsize=(8,6))
-		im = ax.imshow(self.energy,extent=extent, aspect='auto',**kwargs)
+		fig, ax = plt.subplots(1, len(self.energy.keys()),figsize=(8,6),sharey='row')
+		for ind, (name, abspow) in enumerate(self.energy.items()):
+			im = ax[ind].imshow(abspow,extent=extent, aspect='auto',**kwargs)
+			ax[ind].set_title(name)
+			ax[ind].set_xlabel('Time (s)')
 		if self.slantType == 'slowness':
 			unit = 's/deg'
 			a = u"\u00b0"
@@ -465,9 +492,9 @@ class Earthquake(object):
 		elif self.slantType == 'theta':
 			unit = 'deg'
 			title = 'Slant Stack at a slowness of %.2f s/deg'%(self.rayParameter)
-		ax.set_xlabel('Time (s)')
-		ax.set_ylabel(self.slantType)
-		ax.set_title(title)
+		
+		ax[0].set_ylabel(self.slantType)
+		fig.suptitle(title)
 		if saveName:
 			plt.savefig(saveName)
 		if show:
@@ -478,7 +505,14 @@ class Doublet(object):
 	Earthquake doublets object
 	"""
 
-	def __init__(self, array, row, phase=['PKIKP']):
+	def __init__(self, array, row, 
+				 resample=0.01, method='resample',
+				 filt=[1.33, 2.67,3,True],
+				 cstime=20.0, cetime=20.0,
+				 winlen=5, step=0.05,
+				 starttime=100.0, endtime=300.0,
+				 domain='freq', fittype='cos',
+				 phase=['PKIKP']):
 
 		self.ID = row.DoubleID
 		self.ev1 = {'TIME': UTCDateTime(row.TIME1), 'LAT': row.LAT1,
@@ -488,8 +522,13 @@ class Doublet(object):
 					'LON': row.LON2, 'DEP': row.DEP2,
 					'MAG': row.M2}
 		self.phase = phase
+		self.delta = resample
+		self.winlen = winlen
+		self.step = step
 		self.st1 = row.ST1
 		self.st2 = row.ST2
+		self._checkInput()
+		self._resample(resample,method)
 		if hasattr(row, 'TT1') and hasattr(row, 'TT2'):
 			self.tt1 = row.TT1
 			self.tt2 = row.TT2
@@ -497,6 +536,8 @@ class Doublet(object):
 			self.arr2 = self.ev2['TIME'] + row.TT2
 		else:
 			self.getArrival(array=array)
+		self._alignWave(filt=filt,delta=resample,cstime=cstime,cetime=cetime,
+						starttime=starttime,endtime=endtime,domain=domain,fittype=fittype)
 
 	def _checkInput(self):
 		if not isinstance(self.st1, obspy.core.stream.Stream):
@@ -505,6 +546,19 @@ class Doublet(object):
 		if not isinstance(self.st2, obspy.core.stream.Stream):
 			msg = ('Waveform data for %s is not stream, stop running' % self.ID)
 			gpar.log(__name__,msg,level='error',pri=True)
+	def _resample(self, resample, method):
+		self.st1.detrend('demean')
+		self.st2.detrend('demean')
+		rrate = 1.0/resample
+		if method == 'resample':
+			self.st1.resample(sampling_rate=rrate)
+			self.st2.resample(sampling_rate=rrate)
+		elif method == 'interpolate':
+			self.st1.interpolate(sampling_rate=rrate)
+			self.st2.interpolate(sampling_rate=rrate)
+		else:
+			msg = ('Not a valid option for waveform resampling, choose from resample and interpolate')
+			gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
 
 	def getArrival(self,array, phase=None, model='ak135'):
 		"""
@@ -533,46 +587,34 @@ class Doublet(object):
 		# msg = ('Travel time for %s for earthquake %s in depth of %.2f in distance of %.2f is %s' % (phase, self.ID, self.dep, self.Del, self.arrival))
 		# gpar.log(__name__,msg,level='info',pri=True)
 
-	def codaInter(self, filt=[1.33, 2.67, 3, True], resample=0.01, winlen=5, step=0.05,
-				  starttime=100.0, endtime=300.0, method='resample', align=True,
-				  domain='freq',fittype='cos'):
-		rrate = 1.0/resample
-
-		if method == 'resample':
-			self.st1.resample(sampling_rate=rrate)
-			self.st2.resample(sampling_rate=rrate)
-		elif method == 'interpolate':
-			self.st1.interpolate(sampling_rate=rrate)
-			self.st2.interpolate(sampling_rate=rrate)
-		else:
-			msg = ('Not a valid option for waveform resampling, choose from resample and interpolate')
-			gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
-
-		# npts = int((endtime - starttime)/shift)
-		# stalist = self.geometry.STA.tolist()
-
+	def _alignWave(self,filt=[1.33, 2.67,3,True],delta=0.01,
+				   cstime=20.0, cetime=20.0,
+				   starttime=100.0, endtime=300.0,
+				   domain='freq', fittype='cos'):
+		sta1 = []
+		sta2 = []
+		for tr1, tr2 in zip_longest(self.st1, self.st2):
+			if tr1 is not None:
+				sta1.append(tr1.stats.network+'.'+tr1.stats.station+'..'+tr1.stats.channel)
+			if tr2 is not None:
+				sta2.append(tr2.stats.network+'.'+tr2.stats.station+'..'+tr2.stats.channel)
 		if len(self.st1) != len(self.st2):
 			msg = ('station records for two events are not equal, remove the additional station')
 			gpar.log(__name__,msg,level='info',pri=True)
-			sta1 = []
-			sta2 = []
-			for tr1, tr2 in zip_longest(self.st1, self.st2):
-				if tr1 is not None:
-					sta1.append(tr1.stats.network+'.'+tr1.stats.station+'..'+tr1.stats.channel)
-				if tr2 is not None:
-					sta2.append(tr2.stats.network+'.'+tr2.stats.station+'..'+tr2.stats.channel)
+			
 			sta = list(set(sta1) & set(sta2))
 			st1 = obspy.Stream()
 			st2 = obspy.Stream()
 			for s in sta:
-				_tr1 = self.st1.select(id=s)[0]
-				_tr2 = self.st2.select(id=s)[0]
+				_tr1 = self.st1.select(id=s).copy()[0]
+				_tr2 = self.st2.select(id=s).copy()[0]
 				st1.append(_tr1)
 				st2.append(_tr2)
 			st1.sort(keys=['station'])
 			st2.sort(keys=['station'])
 			st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
 			st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
+			sta.sort()
 		else:
 			st1 = self.st1.copy()
 			st2 = self.st2.copy()
@@ -580,30 +622,111 @@ class Doublet(object):
 			st2.sort(keys=['station'])
 			st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
 			st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
-		stime1 = self.arr1 - starttime
-		etime1 = self.arr1 + endtime
-		st1.trim(starttime=stime1, endtime=etime1)
-		stime2 = self.arr2 - starttime
-		etime2 = self.arr2 + endtime
-		st2.trim(starttime=stime2, endtime=etime2)
-		self.use_st1 = st1.copy()
-		self.use_st2 = st2.copy()
-		npts = int(winlen / resample)
+			sta1.sort()
+			sta = sta1
+
+		stime1 = self.arr1 - cstime
+		etime1 = self.arr1 + cetime
+		tmp_st1 = st1.copy()
+		tmp_st1.trim(starttime=stime1, endtime=etime1)
+		stime2 = self.arr2 - cstime
+		etime2 = self.arr2 + cetime
+		tmp_st2 = st2.copy()
+		tmp_st2.trim(starttime=stime2, endtime=etime2)
+
+		npts = int((cetime + cstime)/delta) + 1
+		Mptd1 = np.zeros([len(st1), npts])
+		Mptd2 = np.zeros([len(st2), npts])
+		inds = range(len(st1))
+		for ind, tr1, tr2 in zip_longest(inds, tmp_st1, tmp_st2):
+
+			if tr1.stats.station != tr2.stats.station:
+				msg = ('Orders of the traces are not right')
+				gpar.log(__name__, msg, level='error',pri=True)
+			data1 = tr1.data
+			data2 = tr2.data
+
+			if len(data1) > npts:
+				data1 = data1[:npts]
+			elif len(data1) < npts:
+				data1 = np.pad(data1, (0,npts-len(data1)), 'edge')
+
+			if len(data2) > npts:
+				data2 = data2[:npts]
+			elif len(data2) < npts:
+				data2 = np.pad(data2, (0,npts-len(data2)), 'edge')
+
+			Mptd1[ind,:] = data1
+			Mptd2[ind,:] = data2
+
+		taup, cc, _, _ = _getLag(Mptd1, Mptd2, delta, domain, fittype)
+		col = ['STA','TS','CC']
+		_df = pd.DataFrame(columns=col)
+		_df['STA'] = sta
+		_df['TS'] = taup
+		_df['CC'] = cc
+		self.align = _df
+		# self.initTS = np.array(taup)
+		# self.alignCC = np.array(cc)
+		thiftBT = - starttime - np.array(taup)
+		st2.trim(starttime = self.arr2-starttime, endtime=self.arr2+endtime)
+		for ind, tr in enumerate(st1):
+			stime = self.arr1 + thiftBT[ind]
+			tr.trim(starttime=stime, endtime=stime+starttime+endtime)
+		self.use_st1 = st1
+		self.use_st2 = st2
+
+	def codaInter(self, delta=0.01, 
+				  winlen=5, step=0.05, 
+				  starttime=100.0,
+				  domain='freq',fittype='cos'):
+		# rrate = 1.0/resample
+
+		# if method == 'resample':
+		# 	self.st1.resample(sampling_rate=rrate)
+		# 	self.st2.resample(sampling_rate=rrate)
+		# elif method == 'interpolate':
+		# 	self.st1.interpolate(sampling_rate=rrate)
+		# 	self.st2.interpolate(sampling_rate=rrate)
+		# else:
+		# 	msg = ('Not a valid option for waveform resampling, choose from resample and interpolate')
+		# 	gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
+
+		# npts = int((endtime - starttime)/shift)
+		# stalist = self.geometry.STA.tolist()
+		if winlen is None:
+			winlen = self.winlen
+		if step is None:
+			step = self.step
+		if delta is None:
+			delta = self.delta
+		st1 = self.use_st1.copy()
+		st2 = self.use_st2.copy()
+		npts = int(winlen / delta)
 		taup = []
 		cc = []
 		for win_st1, win_st2 in zip_longest(st1.slide(winlen, step), st2.slide(winlen, step)):
-			_taup, _cc = codaInt(win_st1, win_st2, delta=resample, npts=npts,domain=domain,fittype=fittype)
+			_taup, _cc = codaInt(win_st1, win_st2, delta=delta, npts=npts,domain=domain,fittype=fittype)
 			taup.append(_taup)
 			cc.append(_cc)
 
 		self.taup = taup
 		self.cc = cc
 
-		tspan = endtime + starttime - winlen
-		ts = self.tt1 + np.arange(int(tspan/step) + 1) * step - starttime
+		tpts = len(taup)
+		ts = self.tt1 + np.arange(tpts) * step - starttime
 		self.ts = ts
 
+	def updateFilter(filt, starttime=100, endtime=300,
+					cstime=20.0, cetime=20.0,
+					winlen=None, step=None):
+		self._alignWave(filt=filt,delta=self.delta,
+						cstime=cstime,cetime=cetime,
+						starttime=starttime,endtime=endtime)
+		self.codaInter(delta=None, winlen=winlen, step=step,starttime=starttime)
+
 	def plotCoda(self,tstart=20, tend=10, 
+				 sta_id='CN.YKR9..SHZ',
 				 stime=100, etime=300,
 				 lim=[1100, 1450],
 				 filt=[1.33, 2.67, 3, True]):
@@ -612,34 +735,31 @@ class Doublet(object):
 		# 
 		plt.subplot(5,1,1)
 		st1 = self.use_st1.copy()
-		# st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1],corners=filt[2],zerophase=filt[3])
 		st2 = self.use_st2.copy()
-		# st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1],corners=filt[2],zerophase=filt[3])
-		st1.trim(starttime=self.arr1-tstart, endtime=self.arr1+tend)
-		st2.trim(starttime=self.arr2-tstart, endtime=self.arr2+tend)
-		data1 = st1[0].data / np.max(np.absolute(st1[0].data))
-		data2 = st2[0].data / np.max(np.absolute(st2[0].data))
+		tr1 = st1.select(id=sta_id).copy()[0]
+		tr2 = st2.select(id=sta_id).copy()[0]
+		_ts = self.align[self.align.STA==sta_id].TS.iloc[0]
+		tr1.trim(starttime=self.arr1-tstart-_ts, endtime=self.arr1+tend-_ts)
+		tr2.trim(starttime=self.arr2-tstart, endtime=self.arr2+tend)
+		data1 = tr1.data / np.max(np.absolute(tr1.data))
+		data2 = tr2.data / np.max(np.absolute(tr2.data))
 		# t1 = self.tt1 - tstart + np.arange(len(data1)) * st1[0].stats.delta 
-		t2 = self.tt2 - tstart + np.arange(len(data2)) * st1[0].stats.delta 
+		t2 = self.tt2 - tstart + np.arange(len(data2)) * tr2.stats.delta 
 		plt.plot(t2, data1, 'b', t2, data2, 'r')
 		# plt.xlabel('Time (s)')
 		plt.ylabel('Normalized Amp')
 
 		plt.subplot(5,1,2)
-		# stime = self.ts.min()
-		# etime = self.ts.max()
-		st1 = self.use_st1.copy()
-		st2 = self.use_st2.copy()
-		# st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1],corners=filt[2],zerophase=filt[3])
-		# st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1],corners=filt[2],zerophase=filt[3])
-		st1.trim(starttime=self.arr1-stime, endtime=self.arr1+etime)
-		st2.trim(starttime=self.arr2-stime, endtime=self.arr2+etime)
+		tr1 = st1.select(id=sta_id).copy()[0]
+		tr2 = st2.select(id=sta_id).copy()[0]
+		tr1.trim(starttime=self.arr1-stime-_ts, endtime=self.arr1+etime-_ts)
+		tr2.trim(starttime=self.arr2-stime, endtime=self.arr2+etime)
 		t = self.ts.min() + np.arange(len(st1[0].data))*st1[0].stats.delta
-		plt.plot(t, st1[0].data)
+		plt.plot(t, tr1.data)
 		plt.ylabel('Event 1')
 		plt.xlim(lim)
 		plt.subplot(5,1,3)
-		plt.plot(t,st2[0].data)
+		plt.plot(t,tr2.data)
 		plt.xlim(lim)
 		plt.ylabel('Event 2')
 		plt.subplot(5, 1, 4)
@@ -862,63 +982,70 @@ def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdp
 	return rel
 
 def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
-					filt=[1,2,4,True], sflag='log',stack='linear',
+					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]}, 
+					sflag='log',stack='linear',
 					sl_s=0.1, vary='slowness',sll=-20.0,
 					starttime=400.0,endtime=1400.0, unit='deg',
 					**kwargs):
 	st = stream.copy()
 	st.detrend('demean')
-	st.filter('bandpass',freqmin=filt[0],freqmax=filt[1],corners=filt[2],zerophase=filt[3])
+	# st.filter('bandpass',freqmin=filt[0],freqmax=filt[1],corners=filt[2],zerophase=filt[3])
 	npts = st[0].stats.npts
 	winlen = endtime - starttime
 	winpts = int(winlen/delta) + 1
 	times = starttime + np.arange(winpts) * delta
 	timeTable = getSlantTime(geometry,grdpts,sl_s,sll,vary,unit,**kwargs)
-	hilbertTd = np.empty((ntr,npts),dtype=complex)
-	for ind, tr in enumerate(st):
-		sta = tr.stats.station
-		if len(tr.data) > npts:
-			data = tr.data[0:npts]
-		elif len(tr.data) < npts:
-			dn = npts - len(tr.data)
-			data = tr.data
-			data = np.pad(data,(0,dn),'edge')
-		else:
-			data = tr.data 
-		hilbertTd[ind,:] = scipy.signal.hilbert(data)
-	if stack == 'linear':
-		order = -1
-		iflag = 1
-	elif stack == 'psw':
-		iflag = 2
-		order = kwargs['order']
-	elif stack == 'root':
-		iflag = 3
-		order = kwargs['order']
-	else:
-		msg = 'Not available stack method, please choose from linear, psw or root\n'
-		gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
 	k = sll + np.arange(grdpts)*sl_s
-	abspow = np.empty((grdpts,winpts))
-	errorcode = clibarray.slant(ntr,grdpts,
-				iflag,npts,delta,
-				starttime, winpts, order,
-				timeTable,hilbertTd,abspow)
-	if errorcode != 0:
-		msg = 'slidebeam stack for %dth segment exited with error %d\n' % (ind, errorcode)
-		gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
-	if sflag == 'beam':
-		return [time, k, abspow]
-	envel = np.abs(scipy.signal.hilbert(abspow))
-	if sflag == 'log':
-		envel = np.log(envel)
-	elif sflag == 'log10':
-		envel = np.log10(envel)
-	elif sflag == 'sqrt':
-		envel = np.sqrt(envel)
-	else:
-		msg = 'Not available option, please choose from beam, log, log10 or sqrt\n'
-		gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
+	envel = {}
+	for name, filt in filts.items():
+		tmp_st = st.copy()
+		tmp_st.filter('bandpass',freqmin=filt[0],freqmax=filt[1],corners=filt[2],zerophase=filt[3])
+		hilbertTd = np.empty((ntr,npts),dtype=complex)
+		for ind, tr in enumerate(tmp_st):
+			sta = tr.stats.station
+			if len(tr.data) > npts:
+				data = tr.data[0:npts]
+			elif len(tr.data) < npts:
+				dn = npts - len(tr.data)
+				data = tr.data
+				data = np.pad(data,(0,dn),'edge')
+			else:
+				data = tr.data 
+			hilbertTd[ind,:] = scipy.signal.hilbert(data)
+		if stack == 'linear':
+			order = -1
+			iflag = 1
+		elif stack == 'psw':
+			iflag = 2
+			order = kwargs['order']
+		elif stack == 'root':
+			iflag = 3
+			order = kwargs['order']
+		else:
+			msg = 'Not available stack method, please choose from linear, psw or root\n'
+			gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
+	
+		abspow = np.empty((grdpts,winpts))
+		errorcode = clibarray.slant(ntr,grdpts,
+					iflag,npts,delta,
+					starttime, winpts, order,
+					timeTable,hilbertTd,abspow)
+		if errorcode != 0:
+			msg = 'slantbeam stack for %dth segment in filter %s-%s exited with error %d\n' % (ind, name, filt,errorcode)
+			gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
+		if sflag == 'beam':
+			envel[name] = abspow
+		else:
+			env = np.abs(scipy.signal.hilbert(abspow))
+			if sflag == 'log':
+				envel[name] = np.log(env)
+			elif sflag == 'log10':
+				envel[name] = np.log10(env)
+			elif sflag == 'sqrt':
+				envel[name] = np.sqrt(env)
+			else:
+				msg = 'Not available option, please choose from beam, log, log10 or sqrt\n'
+				gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
 	return [times, k, envel]
 
 def codaInt(st1, st2, delta, npts, domain='freq', fittype='cos'):
@@ -952,7 +1079,7 @@ def codaInt(st1, st2, delta, npts, domain='freq', fittype='cos'):
 		Mptd1[ind,:] = data1
 		Mptd2[ind,:] = data2
 
-	taup, cc = _getLag(Mptd1, Mptd2, delta, domain,fittype)
+	_,_,taup, cc = _getLag(Mptd1, Mptd2, delta, domain,fittype)
 
 	return [taup, cc]
 
@@ -1020,7 +1147,6 @@ def getCoherence(hilbertTd,sbeg,TimeTable,winpts,delta):
 
 	return cohere
 
-
 def _getFreqDomain(mptd):
 	reqlen = 2*mptd.shape[-1]
 	reqlenbits = 2**reqlen.bit_length()
@@ -1046,6 +1172,7 @@ def _corr(Mptd1, Mptd2, domain):
 	std2 = np.std(Mptd2, axis=1)
 	denorm = std1 * std2 * np.sqrt(n*m)
 	denorm = denorm.reshape(t1, 1)
+	# print(denorm)
 
 	if domain == 'freq':
 		nt1 = np.mean(Mptd1, axis=-1).reshape(t1,1)
@@ -1055,6 +1182,7 @@ def _corr(Mptd1, Mptd2, domain):
 
 		c = np.real(scipy.fftpack.ifft(np.multiply(np.conjugate(Mpfd1), Mpfd2)))
 		c = np.concatenate((c[:,-(n-1):], c[:,:m]),axis=1)
+		# print(c[16,:])
 		cor = c/denorm
 	elif domain == 'time':
 		c = np.convolve(Mptd1[..., ::-1], Mptd2)
@@ -1101,7 +1229,7 @@ def _getLag(Mptd1, Mptd2, delta, domain='freq', fittype='cos'):
 		msg = ('Not a valid option for fitting CC curve, selet from parabola and cos')
 		gpar.log(__name__, msg, level='error', pri=True)
 
-	return [np.mean(xmax), np.mean(ymax)]
+	return [xmax, ymax,np.mean(xmax), np.mean(ymax)]
 
 def polyfit(x, y):
 	p = np.polyfit(x,y,2)
