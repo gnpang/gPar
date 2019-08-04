@@ -1698,7 +1698,7 @@ def codaStrip(eve, beamtype='beam', method='all',
 		_df['FILT'] = filts
 		_df['lnA'] = np.asarray(coda_par)[0]
 		_df['B'] = np.asarray(coda_par)[1]
-		_df['C'] np.asarray(coda_par)[2]
+		_df['C'] = np.asarray(coda_par)[2]
 		_df['RMS'] = res
 		# codamod = {'RMS':res,'lnA':coda_par[0][0],'B':coda_par[1][0],'C':coda_par[2][0]}
 		# eve.codaMod = codamod
@@ -1787,7 +1787,7 @@ def codaStrip(eve, beamtype='beam', method='all',
 		_df['FILT'] = filts
 		_df['lnA'] = np.asarray(coda_par)[0]
 		_df['B'] = np.asarray(coda_par)[1]
-		_df['C'] np.asarray(coda_par)[2]
+		_df['C'] = np.asarray(coda_par)[2]
 		_df['RMS'] = res
 		eve.codaMod = _df
 		codaSt = obspy.core.stream.Stream()
