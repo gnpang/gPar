@@ -396,11 +396,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 					self._setCodaStrip()
 		self._eventInfo(next(self._eventCycle))
 		_i = self.evecb.currentIndex()
-		level = self.eve_type(self.levelGrp.checkedId())
-		if level == 'D':
-
 		self.evecb.setCurrentIndex(_i+1)
-		if self.
 		if self._btype == 'strip':
 			self._btype = 'beam'
 			self.sbcb.setCurrentIndex(0)
