@@ -61,9 +61,10 @@ def setLogger(fileName='gpar_log.log',deleteOld=False):
 	if os.path.exists(fil):
 		if os.path.getsize(fil) > maxSize:
 			print ('old log file %s exceeds size limit, deleting' % fil)
-			os.path.remove(fil)
+			# os.path.remove(fil)
+			os.remove(fil)
 		elif deleteOld:
-			ps.path.realpath(fil)
+			os.path.realpath(fil)
 	fh = logging.FileHandler(fil)
 	fh.setLevel(logging.DEBUG)
 	fmat = '%(asctime)s\t%(name)s\t%(levelname)s\t%(message)s'
