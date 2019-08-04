@@ -200,6 +200,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		for btype in ['beam', 'slide', 'vespetrum','strip']:
 			self.sbcb.addItem(btype)
 		self.sbcb.activated.connect(self._updatePlot)
+		
 		self.codacb.setMaximumWidth(100)
 		self.codacb.setMinimumWidth(80)
 		self.ampmin = QDoubleSpinBox(decimals=1, maximum=400, minimum=0, singleStep=.5, value=1)
@@ -381,9 +382,25 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self._drawFig()
 
 	def _pltNextEvent(self):
+		_id = self._current_event.ID
+		level = self.eve_type[self.levelGrp.checkedId()]
+		if level == 'D':
+			self._setCodaStrip()
+		else:
+			existDF = self._stripDF[(self._stripDF.ID == _id)]
+			if len(existDF) == 0:
+				choice = QMessageBox.question(self, 'Stripping?',
+							"Haven't stripping yet, want to do it?",
+							QMessageBox.Yes | QMessageBox.No)
+				if choice is QMessageBox.Yes:
+					self._setCodaStrip()
 		self._eventInfo(next(self._eventCycle))
 		_i = self.evecb.currentIndex()
+		level = self.eve_type(self.levelGrp.checkedId())
+		if level == 'D':
+
 		self.evecb.setCurrentIndex(_i+1)
+		if self.
 		if self._btype == 'strip':
 			self._btype = 'beam'
 			self.sbcb.setCurrentIndex(0)
@@ -402,6 +419,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 		if not hasattr(event, 'beam'):
 			return
 		self._current_beam = event.beam
+		filts = {}
+		for tr in self._current_beam:
+			filts[tr.stat.station] = tr.stats.channel
+		self._current_filts = filts
 		self._current_ID = event.ID
 		self._current_dis = event.Del
 		self._current_p = event.rayParameter
@@ -425,6 +446,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		win = self.trinWin[_i]
 		if len(self._stripDF) != 0:
 			existDF = self._stripDF[(self._stripDF.ID == self._current_event.ID) & (self._stripDF.winName == win['name'])]
+			_badDF = self._badDF[self._badDF.ID == self._current_event.ID]
 			if len(existDF) !=0:
 				choice = QMessageBox.question(self, 'Replace stripping',
 							"Do you want to replace existed stripping?",
@@ -433,6 +455,16 @@ class glanceEQ(QtWidgets.QMainWindow):
 					index = existDF.index
 					self._stripDF.drop(index,axis=0,inplace=True)
 					self._stripDF.reset_index()
+				else:
+					return
+			if len(_badDF) != 0:
+				choice = QMessageBox.question(self, 'Bad Event',
+						 "Want to replace it?",
+						 QMessageBox.Yes | QMessageBox.No)
+				if choice == QMessageBox.Yes:
+					index = _badDF.index
+					self._badDF.drop(index,axis=0,inplace=True)
+					self._badDF.reset_index()
 				else:
 					return
 		level = self.eve_type[self.levelGrp.checkedId()]
@@ -459,11 +491,11 @@ class glanceEQ(QtWidgets.QMainWindow):
 						  'BB':bb,'bakAzi':bakAzi,
 						  'winName':win['name'], 'win':win,
 						  'Level':level,
-						  'codaResTr':event.codaResTr,
-						  'codaTr':event.codaTr,
+						  'codaResSt':event.codaResSt,
+						  'codaSt':event.codaSt,
 						  'crms':event.codaMod,
-						  'twoResTr':event.twoResTr,
-						  'twoTr':event.twoTr,
+						  'twoResSt':event.twoResSt,
+						  'twoSt':event.twoSt,
 						  'trms':event.twoMod}
 				self._stripDF = self._stripDF.append(newRow, ignore_index=True)
 			elif self._method == 'coda':
@@ -473,8 +505,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 						  'winName':win['name'], 'win':win,
 						  'BB':bb,'bakAzi':bakAzi,
 						  'Level':level,
-						  'codaResTr':event.codaResTr,
-						  'codaTr':event.codaTr,
+						  'codaResSt':event.codaResSt,
+						  'codaSt':event.codaSt,
 						  'crms':event.codaMod,
 						  }
 				self._stripDF = self._stripDF.append(newRow, ignore_index=True)
@@ -485,8 +517,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 						  'BB':bb,'bakAzi':bakAzi,
 						  'Level':level,
 						  'winName':win['name'], 'win':win,
-						  'twoResTr':event.twoResTr,
-						  'twoTr':event.twoTr,
+						  'twoResSt':event.twoResSt,
+						  'twoSt':event.twoSt,
 						  'trms':event.twoMod}
 				self._stripDF = self._stripDF.append(newRow, ignore_index=True)
 
@@ -505,7 +537,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 				ax.plot(time, tr.data, 'k', label=label)
 				if not hasattr(self._current_event, 'arrivals'):
 					self._current_event.getArrival()
-				arrival = self._current_event.arrivals[self.beamphase] - self._current_event.time
+				arrival = self._current_event.arrivals[self.beamphase]['TT']# - self._current_event.time
 				ax.vlines(arrival, ax.get_ylim()[0],ax.get_ylim()[1],'r')
 				ax.legend()
 				if _i == 0:
@@ -524,7 +556,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 					ax[_i,ind].plot(time, tr.data, 'k', label=None)
 					if not hasattr(self._current_event, 'arrivals'):
 						self._current_event.getArrival()
-					arrival = self._current_event.arrivals[self.beamphase] - self._current_event.time
+					arrival = self._current_event.arrivals[self.beamphase]['TT']# - self._current_event.time
 					ax[_i,ind].vlines(arrival, ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'r',label=self.beamphase)
 					ax[_i,ind].legend()
 					ax[_i,ind].set_aspect(aspect=0.3)
@@ -549,7 +581,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 			self.fig.suptitle(title)
 		elif self._btype == 'strip':
 			existDF = self._stripDF[(self._stripDF.ID == self._current_event.ID)]
-			if len(existDF) == 0:
+			_badDF = self._badDF[self._badDF.ID == self._current_event.ID]
+			if len(existDF) == 0 and len(_badDF) == 0:
 				choice = QMessageBox.question(self, 'Stripping?',
 						"Haven't stripping yet, want to do it?",
 						QMessageBox.Yes | QMessageBox.No)
@@ -559,7 +592,20 @@ class glanceEQ(QtWidgets.QMainWindow):
 					self._btype = 'beam'
 					self.sbcb.setCurrentIndex(3)
 					self._updatePlot()
-			else:
+			elif len(existDF == 0) and len(_badDF) != 0:
+				choice = QMessageBox.question(self, 'Bad event!',
+						 "Want to reevalua it?",
+						 QMessageBox.Yes | QMessageBox.No)
+				if choice == QMessageBox.Yes:
+					index = _badDF.index
+					self._badDF.drop(index,axis=0,inplace=True)
+					self._badDF.reset_index()
+					self.sbcb.setCurrentIndex(0)
+					self._updatePlot()
+				else:
+					self.sbcb.setCurrentIndex(0)
+					self._updatePlot()
+			elif len(existDF) != 0:
 				trinwin = existDF.win.iloc[0]
 				stime = trinwin['stime']
 				etime = trinwin['etime']
@@ -1588,163 +1634,233 @@ class stackArray(QtWidgets.QMainWindow):
 
 
 def codaStrip(eve, beamtype='beam', method='all',
-			  siglen=200, noise=200,phase='PKiKP', 
+			  siglen=200, noise=200,beamphase='PKiKP',
+			  phase_list=['P','PP','PcP','ScP','PKiKP','SP','ScS'], 
 			  model='ak135', stime=400.0, etime=1800.0,
 			  window=10, write=False):
 	"""
 	Function to remove background coda noise for events
 	"""
-
-	if not hasattr(eve, 'arrival'):
-		eve.getArrival(phase=phase,model=model)
+	if phase_list is None:
+		phase_list = eve.phase_list
+	if not hasattr(eve, 'arrivals'):
+		eve.getArrival(phase_list=phase_list,model=model)
 		
 	if beamtype == 'beam':
-		tr = eve.beam[0]
+		st = eve.beam
 	elif beamtype == 'slide':
 		tr = eve.slideSt
 	else:
 		msg = ('Not a valid option for codastrip')
 		gpar.log(__name__,msg,level='error',pri=True)
 
-	delta = tr.stats.delta
-	starttime = tr.stats.starttime
-	tt1 = eve.arrival - noise - starttime
-	tt2 = eve.arrival + siglen - starttime
-	tari = eve.arrival - starttime
-	data = np.abs(scipy.signal.hilbert(tr.data))
+	filts=[]
+	delta = st[0].stats.delta
+	starttime = st[0].stats.starttime
+	tt1 = eve.arrivals[beamphase]['TT'] - noise #- starttime
+	tt2 = eve.arrivals[beamphase]['TT'] + siglen #- starttime
+	# tari = eve.arrivals[beamphase]['UTC'] - starttime
+	tari = eve.arrivals[beamphase]['TT']
+	n_tr = len(st)
+	npts = st[0].stats.npts
+	data = np.empty((n_tr,npts))
+	for ind, tr in enumerate(st):
+		data[ind,:] = np.abs(scipy.signal.hilbert(tr.data))
+		filts.append(tr.stats.channel)
+	# data = np.abs(scipy.signal.hilbert(tr.data))
 	sig_pts = int(siglen/delta) + 1
 	noi_pts = int(noise/delta) + 1
 	noi_ind1 = int(tt1/delta)
-	sig_ind = int((eve.arrival - starttime)/delta)
+	sig_ind = int(tari/delta)
 	noi_ind2 = int(tt2/delta)
 	time_before = tt1 + np.arange(int(noise/delta)+1) * delta
-	data_before = data[noi_ind1: noi_ind1 + noi_pts]
 	
-	data_sig = data[sig_ind:sig_ind + sig_pts]
+	# data_before = np.empty((n_tr, noi_pts))
+	data_before = data[:, noi_ind1: noi_ind1 + noi_pts]
+	
+	data_sig = data[:, sig_ind:sig_ind + sig_pts]
 
 	time_after = tt2 + np.arange(int(noise/delta)+1) * delta
-	data_after = data[noi_ind2: noi_ind2+noi_pts]
+	data_after = data[:, noi_ind2: noi_ind2+noi_pts]
 	sind = int(stime/delta)
 	npts = int((etime - stime)/delta) + 1
-	time = np.linspace(stime, etime, npts)
-	obs_data = data[sind: sind+npts] 
+	time = np.matrix(np.linspace(stime, etime, npts))
+	obs_data = data[:, sind: sind+npts] 
 	ind = int((tari - stime)/delta)
 	if method == 'all':
 		#fitting coda model
-		coda_par = codaFit(np.append(time_before,time_after),np.append(data_before,data_after))
+		coda_par = codaFit(np.append(time_before,time_after),np.append(data_before,data_after,axis=1))
 		#getting predict noise signal in linear scale
-		coda_data = np.exp(coda_par[0][0] - coda_par[1][0]*np.log(time) - coda_par[2][0]*time)
+		coda_data = np.asarray(np.exp(np.transpose(coda_par[0,:]) - np.transepose(coda_par[1,:]) \
+					*np.log(time) - np.transpose(coda_par[2,:])*time))
+		# coda_data = np.asarray(coda_data)
 		#getting residual signal after removing the predict noise
 		coda_res = moving_ave(obs_data, window) - coda_data
-		res = np.mean(coda_res[ind:ind+sig_pts])
+		res = np.mean(coda_res[:,ind:ind+sig_pts],axis=-1)
 		#store coda model information
-		codamod = {'RMS':res,'lnA':coda_par[0][0],'B':coda_par[1][0],'C':coda_par[2][0]}
-		eve.codaMod = codamod
-		codaTr = obspy.core.trace.Trace()
-		codaTr.stats.delta = delta
-		codaTr.stats.npts = npts
-		codaTr.stats.starttime = starttime + stime
-		codaTr.data = coda_data
-		eve.codaTr = codaTr
-		resTr = obspy.core.trace.Trace()
-		resTr.stats.delta = delta
-		resTr.stats.starttime = eve.arrival - noise
+		_df = pd.DataFrame(columns=['FILT','lnA','B','C','RMS'])
+		_df['FILT'] = filts
+		_df['lnA'] = np.asarray(coda_par)[0]
+		_df['B'] = np.asarray(coda_par)[1]
+		_df['C'] np.asarray(coda_par)[2]
+		_df['RMS'] = res
+		# codamod = {'RMS':res,'lnA':coda_par[0][0],'B':coda_par[1][0],'C':coda_par[2][0]}
+		# eve.codaMod = codamod
+		eve.codaMod = _df
+		codaSt = obspy.core.stream.Stream()
+		resSt = obspy.core.stream.Stream()
 		res_ind = int((tt1 - stime)/delta)
 		pts = int((noise*2+siglen)/delta)+1
-		resTr.data = coda_res[res_ind: res_ind+pts]
-		resTr.stats.npts = pts
-		eve.codaResTr = resTr
+		for i in range(n_tr):
+			_tr = obspy.core.trace.Trace()
+			_tr.stats.delta = delta
+			_tr.stats.npts = npts
+			_tr.stats.starttime = starttime + stime
+			_tr.stats.channel = filts[i]
+			_tr.data = coda_data[i,:]
+			codaSt.append(_tr)
+			_tr = obspy.core.trace.Trace()
+			_tr.stats.delta = delta
+			_tr.stats.npts = pts
+			_tr.stats.starttime = eve.arrivals[beamphase]['UTC'] - noise
+			_tr.stats.channel = filts[i]
+			_tr.data = coda_res[i,res_ind:res_ind+pts]
+			resSt.append(_tr)
+		eve.codaSt = codaSt
+		eve.codaResSt = resSt
 		#fittint twoline model
+		#For multi-filters all calculations are using np.matrix
+		#all np.matrix are converted back to np.array to store
 		twoline_par_before = twoLineFit(time_before, data_before)
 		twoline_par_after = twoLineFit(time_after, data_after)
-		y1 = twoline_par_before[0][0] + twoline_par_before[1][0] * tari
-		y2 = twoline_par_after[0][0] + twoline_par_after[1][0] * tt2
+		y1 = twoline_par_before[0,:] + twoline_par_before[0,:] * tari
+		y2 = twoline_par_after[0,:] + twoline_par_after[1,:] * tt2
 		k = (y2 - y1)/(tt2 - tari)
 		b = y2 - k * tt2
-		t1 = np.linspace(tt1,tari, int(noise/delta)+1)
-		d1 = twoline_par_before[0][0] + twoline_par_before[1][0] * t1
-		t2 = np.linspace(tari+delta, tt2, int(siglen/delta))
-		d2 = k * t2 + b
-		t3 = np.linspace(tt2+delta,tt2+noise, int(noise/delta))
-		d3 = twoline_par_after[0][0] + twoline_par_after[1][0] * t3
-		two_data = np.append(d1,d2)
-		two_data = np.append(two_data,d3)
-		two_res = moving_ave(obs_data[res_ind: res_ind+pts], window) - 10**two_data
-		res = np.mean(two_res[int(int(noise)/delta):int(int(noise)/delta)+sig_pts])
-		twomod = {'kn1':twoline_par_before[1][0],'bn1':twoline_par_before[0][0],
-				  'kn2':twoline_par_after[1][0],'bn2':twoline_par_after[0][0],'RMS':res}
-		eve.twoMod = twomod
-		twoTr = obspy.core.trace.Trace()
-		twoTr.stats.delta = delta
-		twoTr.stats.starttime = starttime + tt1
-		twoTr.data = two_data
-		eve.twoTr = twoTr
-		resTr = obspy.core.trace.Trace()
-		resTr.stats.delta = delta
-		resTr.stats.starttime = eve.arrival - noise
-		res_ind = int((tt1 - stime)/delta)
+		t1 = np.matrix(np.linspace(tt1,tari, int(noise/delta)+1))
+		d1 = np.asaaray(np.transpose(twoline_par_before[0,:]) + np.tanspose(twoline_par_before[1,:]) * t1)
+		t2 = np.matrix(np.linspace(tari+delta, tt2, int(siglen/delta)))
+		d2 = np.asarray(k * t2 + b)
+		t3 = np.matrix(np.linspace(tt2+delta,tt2+noise, int(noise/delta)))
+		d3 = np.asarray(np.transpose(twoline_par_after[0,:]) + np.transpose(twoline_par_after[1,:]) * t3)
+		two_data = np.append(d1,d2,axis=-1)
+		two_data = np.append(two_data,d3,axis=-1)
+		two_res = moving_ave(obs_data[:,res_ind: res_ind+pts], window) - 10**two_data
+		res = np.mean(two_res[int(int(noise)/delta):int(int(noise)/delta)+sig_pts],axis=-1)
+		_df = pd.DataFrame(columns=['FILT','kn1','bn1','kn2','bn2','RMS'])
+		_df['FILT'] = filts
+		_df['kn1'] = np.asarray(twoline_par_before)[0]
+		_df['bn1'] = np.asarray(twoline_par_before)[1]
+		_df['kn2'] = np.asarray(twoline_par_after)[0]
+		_df['bn2'] = np.asarray(twoline_par_after)[1]
+		_df['RMS'] = res
+		# twomod = {'kn1':twoline_par_before[1][0],'bn1':twoline_par_before[0][0],
+		# 		  'kn2':twoline_par_after[1][0],'bn2':twoline_par_after[0][0],'RMS':res}
+		eve.twoMod = _df
+		twoSt = obspy.core.stream.Stream()
+		resSt = obspy.core.stream.Stream()
 		pts = int((noise*2+siglen)/delta)+1
-		resTr.data = two_res
-		resTr.stats.npts = pts
-		eve.twoResTr = resTr	
+		# res_ind = int((tt1 - stime)/delta)
+		for i in n_tr:
+			_tr = obspy.core.trace.Trace()
+			_tr.stats.delta = delta
+			_tr.stats.starttime = starttime + tt1
+			_tr.stats.channel = filts[i]
+			_tr.data = two_data[i]
+			twoSt.append(_tr)
+			_trr = obspy.core.trace.Trace()
+			_trr.stats.delta = delta
+			_trr.stats.starttime = eve.arrivals[beamphase]['UTC'] - noise
+			_trr.stats.channel = filts[i]
+			_trr.stats.npts = pts
+			_trr.data = two_res
+			resSt.append(_trr)
+		eve.twoSt = twoSt
+		eve.twoResSt = resSt	
 	elif method == 'coda':
 		#fitting coda model
-		coda_par = codaFit(np.append(time_before,time_after),np.append(data_before,data_after))
-		coda_data = np.exp(coda_par[0][0] - coda_par[1][0]*np.log(time) - coda_par[2][0]*time)
+		coda_par = codaFit(np.append(time_before,time_after),np.append(data_before,data_after,axis=1))
+		#getting predict noise signal in linear scale
+		coda_data = np.asarray(np.exp(np.transpose(coda_par[0,:]) - np.transepose(coda_par[1,:]) \
+					*np.log(time) - np.transpose(coda_par[2,:])*time))
+		#getting residual signal after removing the predict noise
 		coda_res = moving_ave(obs_data, window) - coda_data
-		res = np.mean(coda_res[ind:ind+sig_pts])
-		codamod = {'RMS':res,'lnA':coda_par[0][0],'B':coda_par[1][0],'C':coda_par[2][0]}
-		eve.codaMod = codamod
-		codaTr = obspy.core.trace.Trace()
-		codaTr.stats.delta = delta
-		codaTr.stats.npts = npts
-		codaTr.stats.starttime = starttime + stime
-		codaTr.data = coda_data
-		eve.codaTr = codaTr
-		resTr = obspy.core.trace.Trace()
-		resTr.stats.delta = delta
-		resTr.stats.starttime = eve.arrival - noise
+		res = np.mean(coda_res[:,ind:ind+sig_pts],axis=-1)
+		#store coda model information
+		_df = pd.DataFrame(columns=['FILT','lnA','B','C','RMS'])
+		_df['FILT'] = filts
+		_df['lnA'] = np.asarray(coda_par)[0]
+		_df['B'] = np.asarray(coda_par)[1]
+		_df['C'] np.asarray(coda_par)[2]
+		_df['RMS'] = res
+		eve.codaMod = _df
+		codaSt = obspy.core.stream.Stream()
+		resSt = obspy.core.stream.Stream()
 		res_ind = int((tt1 - stime)/delta)
 		pts = int((noise*2+siglen)/delta)+1
-		resTr.data = coda_res[res_ind: res_ind+pts]
-		resTr.stats.npts = pts
-		eve.codaResTr = resTr
+		for i in range(n_tr):
+			_tr = obspy.core.trace.Trace()
+			_tr.stats.delta = delta
+			_tr.stats.npts = npts
+			_tr.stats.starttime = starttime + stime
+			_tr.stats.channel = filts[i]
+			_tr.data = coda_data[i,:]
+			codaSt.append(_tr)
+			_tr = obspy.core.trace.Trace()
+			_tr.stats.delta = delta
+			_tr.stats.npts = pts
+			_tr.stats.starttime = eve.arrivals[beamphase]['UTC'] - noise
+			_tr.stats.channel = filts[i]
+			_tr.data = coda_res[i,res_ind:res_ind+pts]
+			resSt.append(_tr)
+		eve.codaSt = codaSt
+		eve.codaResSt = resSt
 	elif method == 'twoline':
 		#fittint twoline model
 		twoline_par_before = twoLineFit(time_before, data_before)
 		twoline_par_after = twoLineFit(time_after, data_after)
-		res_ind = int((tt1 - stime)/delta)
-		pts = int((noise*2+siglen)/delta)+1
-		y1 = twoline_par_before[0][0] + twoline_par_before[1][0] * tari
-		y2 = twoline_par_after[0][0] + twoline_par_after[1][0] * tt2
+		y1 = twoline_par_before[0,:] + twoline_par_before[0,:] * tari
+		y2 = twoline_par_after[0,:] + twoline_par_after[1,:] * tt2
 		k = (y2 - y1)/(tt2 - tari)
 		b = y2 - k * tt2
-		t1 = np.linspace(tt1,tari, int(noise/delta)+1)
-		d1 = twoline_par_before[0][0] + twoline_par_before[1][0] * t1
-		t2 = np.linspace(tari+delta, tt2, int(siglen/delta))
-		d2 = k * t2 + b
-		t3 = np.linspace(tt2+delta,tt2+noise, int(noise/delta))
-		d3 = twoline_par_after[0][0] + twoline_par_after[1][0] * t3
-		two_data = np.append(d1,d2)
-		two_data = np.append(two_data,d3)
-		two_res = moving_ave(obs_data[res_ind: res_ind+pts], window) - 10**two_data
-		res = np.mean(two_res[int(int(noise)/delta):int(int(noise)/delta)+sig_pts])
-		twomod = {'kn1':twoline_par_before[1][0],'bn1':twoline_par_before[0][0],
-				  'kn2':twoline_par_after[1][0],'bn2':twoline_par_after[0][0],'RMS':res}
-		eve.twoMod = twomod
-		twoTr = obspy.core.trace.Trace()
-		twoTr.stats.delta = delta
-		twoTr.stats.starttime = starttime + tt1
-		twoTr.data = two_data
-		eve.twoTr = twoTr
-		resTr = obspy.core.trace.Trace()
-		resTr.stats.delta = delta
-		resTr.stats.starttime = eve.arrival - noise
-		res_ind = int((tt1 - stime)/delta)
+		t1 = np.matrix(np.linspace(tt1,tari, int(noise/delta)+1))
+		d1 = np.asaaray(np.transpose(twoline_par_before[0,:]) + np.tanspose(twoline_par_before[1,:]) * t1)
+		t2 = np.matrix(np.linspace(tari+delta, tt2, int(siglen/delta)))
+		d2 = np.asarray(k * t2 + b)
+		t3 = np.matrix(np.linspace(tt2+delta,tt2+noise, int(noise/delta)))
+		d3 = np.asarray(np.transpose(twoline_par_after[0,:]) + np.transpose(twoline_par_after[1,:]) * t3)
+		two_data = np.append(d1,d2,axis=-1)
+		two_data = np.append(two_data,d3,axis=-1)
+		two_res = moving_ave(obs_data[:,res_ind: res_ind+pts], window) - 10**two_data
+		res = np.mean(two_res[int(int(noise)/delta):int(int(noise)/delta)+sig_pts],axis=-1)
+		_df = pd.DataFrame(columns=['FILT','kn1','bn1','kn2','bn2','RMS'])
+		_df['FILT'] = filts
+		_df['kn1'] = np.asarray(twoline_par_before)[0]
+		_df['bn1'] = np.asarray(twoline_par_before)[1]
+		_df['kn2'] = np.asarray(twoline_par_after)[0]
+		_df['bn2'] = np.asarray(twoline_par_after)[1]
+		_df['RMS'] = res
+		eve.twoMod = _df
+		twoSt = obspy.core.stream.Stream()
+		resSt = obspy.core.stream.Stream()
 		pts = int((noise*2+siglen)/delta)+1
-		resTr.data = two_res
-		resTr.stats.npts = pts
-		eve.twoResTr = resTr
+		# res_ind = int((tt1 - stime)/delta)
+		for i in n_tr:
+			_tr = obspy.core.trace.Trace()
+			_tr.stats.delta = delta
+			_tr.stats.starttime = starttime + tt1
+			_tr.stats.channel = filts[i]
+			_tr.data = two_data[i]
+			twoSt.append(_tr)
+			_trr = obspy.core.trace.Trace()
+			_trr.stats.delta = delta
+			_trr.stats.starttime = eve.arrivals[beamphase]['UTC'] - noise
+			_trr.stats.channel = filts[i]
+			_trr.stats.npts = pts
+			_trr.data = two_res
+			resSt.append(_trr)
+		eve.twoSt = twoSt
+		eve.twoResSt = resSt	
 	return eve
 
 
@@ -1756,7 +1872,8 @@ def codaFit(time, amp):
 	"""
 	amp = np.matrix(np.log(amp))
 	n = len(time)
-	amp = amp.reshape(n,1)
+	# amp = amp.reshape(n,1)
+	amp = amp.transpose()
 	A = np.zeros((n,3))
 	a = np.ones(time.shape)
 	b = -np.log(time)
@@ -1770,7 +1887,8 @@ def codaFit(time, amp):
 	d = A.transpose() * amp
 	m = np.linalg.inv(G) * d
 
-	return np.asarray(m)
+	# return np.asarray(m)
+	return m
 
 def twoLineFit(time, amp):
 	"""
@@ -1779,8 +1897,8 @@ def twoLineFit(time, amp):
 
 	amp = np.matrix(np.log10(amp))
 	n = len(time)
-	amp = amp.reshape(n,1)
-
+	# amp = amp.reshape(n,1)
+	amp = amp.transpose()
 	A = np.zeros((n,2))
 	A[:,0] = np.ones(time.shape)
 	A[:,1] = time
@@ -1790,15 +1908,18 @@ def twoLineFit(time, amp):
 	d = A.transpose() * amp
 	m = np.linalg.inv(G) * d
 
-	return np.asarray(m)
+	# return np.asarray(m)
+	return m
 
 def moving_ave(x, window=5):
 	"""
 	Function to smooth data
 	"""
-
+	ind,_ = x.shape
 	weigths = np.ones(window)/window
-	y = np.convolve(x,weigths,mode='same')
+	y = np.empty(x.shape)
+	for i in range(ind):
+		y[i,:] = np.convolve(x[i,:],weigths,mode='same')
 
 	return y
 

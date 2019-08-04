@@ -145,7 +145,8 @@ def createArray(arrayList='array.list',
 	return arDF
 
 
-def upDateArray(array, beamtype='beam', filt=[1,2,4,True],
+def upDateArray(array, beamtype='beam', 
+			    filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
 				starttime=0,endtime=1800,unit='deg', stack='linear',
 				save=True,write=True,**kwargs):
 	"""
@@ -171,7 +172,7 @@ def upDateArray(array, beamtype='beam', filt=[1,2,4,True],
 
 	if beamtype == 'beam':
 		winlen = endtime - starttime
-		ar.beamforming(filt=filt,starttime=starttime,winlen=winlen,
+		ar.beamforming(filts=filts,starttime=starttime,winlen=winlen,
 						stack=stack, unit=unit,write=write)
 		if save:
 			fileName = ar.name + '.beam.pkl'
@@ -193,7 +194,7 @@ def upDateArray(array, beamtype='beam', filt=[1,2,4,True],
 			msg = ('Shift time table is not calculated before for array %s, now calculating the shift time table first'%(ar.name))
 			gpar.log(__name__,msg,level='info',pri=True)
 			ar.getTimeTable(sll_x=sll_x,sll_y=sll_y,sl_s=sl_s,grdpts_x=grdpts_x,grdpts_y=grdpts_y,unit=unit)
-		ar.slideBeam(filt=filt, stack=stack,
+		ar.slideBeam(filts=filts, stack=stack,
 					 starttime=starttime, endtime=endtime,
 					 write=write,**kwargs)
 		if save:
@@ -205,7 +206,7 @@ def upDateArray(array, beamtype='beam', filt=[1,2,4,True],
 		if not req_pa.issubset(kwargs.keys()):
 			msg = ('Required parameters %s for vespectrum are missing'%req_pa)
 			gpar.log(__name__,msg,level='error',pri=True)
-		ar.vespectrum(filt=filt,stack=stack,
+		ar.vespectrum(filts=filts,stack=stack,
 					  starttime=starttime,endtime=endtime,
 					  unit=unit,**kwargs)
 		if save:

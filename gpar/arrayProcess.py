@@ -113,37 +113,41 @@ class Array(object):
 
 		self.timeTable = getTimeTable(geometry,sll_x,sll_y,sl_s,grdpts_x,grdpts_y,unit)
 
-	def beamforming(self,filt=[1,2,4,True],starttime=0,winlen=1800.0,
+	def beamforming(self,filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
+				    starttime=0,winlen=1800.0,
 					stack='linear',unit='deg',write=True):
 		"""
 		Function to do beamforming for all earthquakes in the array
 		"""
 		for eq in self.events:
 			eq.beamforming(geometry=self.geometry,arrayName=self.name,starttime=starttime,
-						   winlen=winlen,filt=filt,unit=unit,
+						   winlen=winlen,filts=filts,unit=unit,
 						   stack=stack, write=write)
 
-	def slideBeam(self,filt=[1,2,4,True],grdpts_x=301,grdpts_y=301,sflag=2,stack='linear',
-					sll_x=-15.0,sll_y=-15.0,sl_s=0.1,refine=True,
-					starttime=400.0,endtime=1400.0, unit='deg',
-					winlen=2.0,overlap=0.5,write=False, **kwargs):
+	def slideBeam(self,filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
+				  grdpts_x=301,grdpts_y=301,sflag=2,stack='linear',
+				  sll_x=-15.0,sll_y=-15.0,sl_s=0.1,refine=True,
+				  starttime=400.0,endtime=1400.0, unit='deg',
+				  winlen=2.0,overlap=0.5,write=False, **kwargs):
 		
 		for eq in self.events:
 			eq.slideBeam(geometry=self.geometry,timeTable=self.timeTable,arrayName=self.name,
 						 grdpts_x=grdpts_x,grdpts_y=grdpts_y,
-					filt=filt, sflag=sflag,stack=stack,
-					sll_x=sll_x,sll_y=sll_y,sl_s=sl_s,refine=refine,
-					starttime=starttime,endtime=endtime, unit=unit,
-					winlen=winlen,overlap=overlap,write=write, **kwargs)
+						 filts=filts, 
+						 sflag=sflag,stack=stack,
+						 sll_x=sll_x,sll_y=sll_y,sl_s=sl_s,refine=refine,
+						 starttime=starttime,endtime=endtime, unit=unit,
+						 winlen=winlen,overlap=overlap,write=write, **kwargs)
 
 	def vespectrum(self,grdpts=401,
-					filt=[1,2,4,True], sflag='log10',stack='linear',
+					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]}, 
+					sflag='log10',stack='linear',
 					sl_s=0.1, vary='slowness',sll=-20.0,
 					starttime=400.0,endtime=1400.0, unit='deg',
 					**kwargs ):
 		for eq in self.events:
 			eq.vespectrum(geometry=self.geometry,arrayName=self.name,grdpts=grdpts,
-					filt=filt, sflag=sflag,stack=stack,
+					filts=filts, sflag=sflag,stack=stack,
 					sl_s=sl_s, vary=vary,sll=sll,
 					starttime=starttime,endtime=endtime, unit=unit,
 					**kwargs)
@@ -181,7 +185,7 @@ class Earthquake(object):
 		self.pattern = row.BB
 		self.rayParameter = row.Rayp
 		# self.takeOffAngle = row.Angle
-		self.beamphase = phase
+		self.beamphase = beamphase
 		self.phase_list = phase_list
 		self.stream = row.Stream
 		self.ntr = len(row.Stream)
@@ -218,7 +222,7 @@ class Earthquake(object):
 			phases[pha] = times
 
 		self.arrivals = phases
-		msg = ('Travel times for %s for earthquake %s in depth of %.2f in distance of %.2f' % (phase, self.ID, self.dep, self.Del))
+		msg = ('Travel times for %s for earthquake %s in depth of %.2f in distance of %.2f' % (phase_list, self.ID, self.dep, self.Del))
 		gpar.log(__name__,msg,level='info',pri=True)
 
 	def beamforming(self, geometry, arrayName, starttime=0.0, winlen=1800.0,
@@ -269,7 +273,7 @@ class Earthquake(object):
 		npt = int(winlen/delta) + 1
 		beamSt = obspy.core.stream.Stream()
 		for name, filt in filts.items():
-			msg = ('Calculating beamforming for earthquake %s in filter %s - %s' % self.ID, name, filt)
+			msg = ('Calculating beamforming for earthquake %s in filter %s - %s' % (self.ID, name, filt))
 			gpar.log(__name__,msg,level='info',pri=True)
 			tmp_st = st.copy()
 			tmp_st.filter('bandpass',freqmin=filt[0],freqmax=filt[1],corners=filt[2],zerophase=filt[3])
@@ -354,16 +358,18 @@ class Earthquake(object):
 				beamdata = stack_amp * np.power(np.absolute(np.sum(shiftTRdata/amp,axis=0))/ntr, order)/ntr
 			beamTr.data = beamdata
 			beamTr.stats.starttime = self.time
-			beamTr.stats.channel = 'beam_'+name
+			bpfilt = str(filt[0]) +'-'+str(filt[1])
+			self.stats.network = 'beam'
+			beamTr.stats.channel = bpfilt
+			beamTr.stats.station = name
 			sac = AttribDict({'b':starttime,'e':starttime + (npt-1)*delta,
 							  'evla':self.lat,'evlo':self.lon,'evdp':self.dep,
-							  'kcmpnm':"beam",'delta':delta,
+							  'delta':delta,
 							  'nzyear':self.time.year,'nzjday':self.time.julday,
 							  'nzhour':self.time.hour,'nzmin':self.time.minute,
 							  'nzsec':self.time.second,'nzmsec':self.time.microsecond/1000})
 			beamTr.stats.sac = sac
 			if write:
-				bpfilt = str(filt[0]) +'-'+str(filt[1])
 				name = 'beam.' + self.ID + '.'+stack +'.'+bpfilt+'.sac'
 				name = os.path.join('./',arrayName,'Data',self.ID,name)
 				beamTr.write(name,format='SAC')
