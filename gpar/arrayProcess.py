@@ -359,7 +359,7 @@ class Earthquake(object):
 			beamTr.data = beamdata
 			beamTr.stats.starttime = self.time
 			bpfilt = str(filt[0]) +'-'+str(filt[1])
-			self.stats.network = 'beam'
+			beamTr.stats.network = 'beam'
 			beamTr.stats.channel = bpfilt
 			beamTr.stats.station = name
 			sac = AttribDict({'b':starttime,'e':starttime + (npt-1)*delta,
