@@ -8,7 +8,7 @@ Need to reformat the strip dataframe, add in stripping information when previous
 import os
 import pickle
 import pandas as pd
-import numpy as np 
+import numpy as np
 
 # GUI import
 import PyQt5
@@ -34,11 +34,11 @@ import matplotlib.colors as mcolors
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 
-from mpl_toolkits.basemap import Basemap 
+from mpl_toolkits.basemap import Basemap
 # from mpl_toolkits.axesgrid1 import make_axes_locatable
 
 #obspy import
-from obspy.taup import TauPyModel 
+from obspy.taup import TauPyModel
 import obspy
 from obspy.core.trace import Trace
 from obspy.core.stream import Stream
@@ -172,7 +172,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self.wincb = QComboBox(self)
 		self.wincb.activated.connect(self._changeStrip)
 		self._updateWinow()
-		
+
 		# edit/delete coda selected window
 		winEdit = QtWidgets.QPushButton('Coda Window')
 		winEdit.resize(winEdit.sizeHint())
@@ -200,11 +200,17 @@ class glanceEQ(QtWidgets.QMainWindow):
 		for btype in ['beam', 'slide', 'vespetrum','strip']:
 			self.sbcb.addItem(btype)
 		self.sbcb.activated.connect(self._updatePlot)
-		
+
+		self.vepcb = QComboBox(self)
+		for scale in ['log10', 'log','sqrt','beam']:
+			self.vepcb.addItem(scale)
+		self.vepcb.activated.connect(self._updatePlot)
+		self.vepcb.setEnabled(False)
+
 		self.codacb.setMaximumWidth(100)
 		self.codacb.setMinimumWidth(80)
-		self.ampmin = QDoubleSpinBox(decimals=1, maximum=400, minimum=0, singleStep=.5, value=1)
-		self.ampmax = QDoubleSpinBox(decimals=1, maximum=400, minimum=0, singleStep=.5, value=3)
+		self.ampmin = QDoubleSpinBox(decimals=1, maximum=5, minimum=0, singleStep=.5, value=1)
+		self.ampmax = QDoubleSpinBox(decimals=1, maximum=5, minimum=0, singleStep=.5, value=3)
 		self.ampmin.valueChanged.connect(self._updatePlot)
 		self.ampmax.valueChanged.connect(self._updatePlot)
 		self.ampmin.setEnabled(False)
@@ -234,7 +240,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self.btnbar2 = QHBoxLayout()
 		self.btnbar2.addWidget(QLabel('Level: '))
 		self.btnbar2.addLayout(levelbtn)
-		
+
 
 		self.btnbar2.addWidget(vline)
 		self.btnbar2.addWidget(QLabel('TYPE'))
@@ -272,9 +278,29 @@ class glanceEQ(QtWidgets.QMainWindow):
 		if self.sbcb.currentText() == 'vespetrum':
 			self.ampmin.setEnabled(True)
 			self.ampmax.setEnabled(True)
+			self.vepcb.setEnabled(True)
+			if self.vepcb.currentText() == 'beam':
+				self.ampmax.setMaximum(100000)
+				self.ampmax.setValue(1000)
+				self.ampmax.setSingleStep(500)
+				self.ampmin.setValue(10)
+				self.ampmin.setSingleStep(500)
+			elif self.vepcb.currentText() == 'sqrt':
+				self.ampmax.setMaximum(300)
+				self.ampmax.setValue(30)
+				self.ampmax.setSingleStep(5)
+				self.ampmin.setValue(3)
+				self.ampmin.setSingleStep(5)
+			elif self.vepcb.currentText() == 'log':
+				self.ampmax.setMaximum(12)
+				self.ampmax.setValue(7)
+				self.ampmax.setSingleStep(1)
+				self.ampmin.setValue(2)
+				self.ampmin.setSingleStep(1)
 		else:
 			self.ampmin.setEnabled(False)
 			self.ampmax.setEnabled(False)
+			self.vepcb.setEnabled(False)
 
 	def _createStatusBar(self):
 		"""
@@ -349,13 +375,13 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self._eventInfo(self._current_id)
 		self._current_strip = True
 		codaStrip(self._current_event,beamtype=self._btype,method=_method,
-				 	  siglen=self.trinWin[_j]['coda'], noise=self.trinWin[_j]['noise'],phase='PKiKP', 
+				 	  siglen=self.trinWin[_j]['coda'], noise=self.trinWin[_j]['noise'],phase='PKiKP',
 			  		  model=self.trinWin[_j]['model'], stime=self.trinWin[_j]['stime'], etime=self.trinWin[_j]['etime'],)
 		self._btype = 'strip'
 		self.sbcb.setCurrentIndex(3)
 		self._setCodaStrip()
 		self._updatePlot()
-				
+
 
 	def _pltEvent(self):
 		"""
@@ -394,6 +420,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 							QMessageBox.Yes | QMessageBox.No)
 				if choice is QMessageBox.Yes:
 					self._setCodaStrip()
+					self._updatePlot()
+					return
 		self._eventInfo(next(self._eventCycle))
 		_i = self.evecb.currentIndex()
 		self.evecb.setCurrentIndex(_i+1)
@@ -431,7 +459,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 			self._current_time = event.slantTime
 			self._current_K = event.slantK
 			self._current_type = event.slantType
-	
+
 	def _setCodaStrip(self):
 
 		if not self._current_strip:
@@ -566,6 +594,12 @@ class glanceEQ(QtWidgets.QMainWindow):
 			vmin = float(self.ampmin.cleanText())
 			vmax = float(self.ampmax.cleanText())
 			for _i, (name, abspow) in enumerate(self._current_energy.item()):
+				if self.vepcb.currentText == 'log10':
+					abspow = np.log10(abspow)
+				elif self.vepcb.currentText == 'log':
+					abspow = np.log(abspow)
+				elif self.vepcb.currentText == 'sqrt':
+					abspow = np.sqrt(abspow)
 				ax = self.fig.add_subplot(1, num, _i+1)
 				ax.imshow(abspow, extent=extent, aspect='auto', cmap='Reds', vmin=vmin, vmax=vmax)
 				ax.set_title(name)
@@ -697,12 +731,12 @@ class glanceEQ(QtWidgets.QMainWindow):
 					ax4.set_xlabel('Seconds')
 				self.fig.suptitle('Coda Strip for %s using %s method in win %s'%(self._current_event.ID, self._method, trinwin['name']))
 
-		
+
 		self._canvasDraw()
 
 	#def _plotTT(self):
 	#	if self.ttbtn.isChecked() is False:
-			
+
 
 	def _updatePlot(self):
 
@@ -785,7 +819,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 				self._plt_drag = event.xdata
 				return
 			for _ax in axes:
-				_ax.set_xlim([_ax.get_xlim()[0] + 
+				_ax.set_xlim([_ax.get_xlim()[0] +
 							  (self._plt_drag - event.xdata), _ax.get_xlim()[1] + (self._plt_drag - event.xdata)])
 		else:
 			return
@@ -959,7 +993,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 			return dict(name=str(self.winName.text()),
 						noise=float(self.noisewin.cleanText()),
-						coda=float(self.coda.cleanText()))	
+						coda=float(self.coda.cleanText()))
 
 # class for event stacking in arrays
 class stackArray(QtWidgets.QMainWindow):
@@ -1124,7 +1158,7 @@ class stackArray(QtWidgets.QMainWindow):
 		self._namelist = self._list.NAME.tolist()
 
 	def _initReg(self):
-		self._region = [{'name':'global', 
+		self._region = [{'name':'global',
 						 'latmin':-90.0, 'latmax':90.0,
 						 'lonmin': -180.0, 'lonmax': 180.0}]
 		self.stackSt = {}
@@ -1163,7 +1197,7 @@ class stackArray(QtWidgets.QMainWindow):
 		m = Basemap(projection='cyl', lon_0=-180.0, lat_0=0.0,
 					area_thresh=10000,ax=_ax[0])
 		x0, y0 = m(self._current_array['lon'], self._current_array['lat'])
-		
+
 		m.drawcoastlines(ax=_ax[0])
 		m.drawmapboundary(ax=_ax[0])
 		m.fillcontinents(color='lightgray',lake_color='white',ax=_ax[0])
@@ -1182,7 +1216,7 @@ class stackArray(QtWidgets.QMainWindow):
 			for _j, _reg in enumerate(_region):
 				_name = _region['name']
 				_df = self.regDf[_name]
-				_rest_df = _rest_df[~((_rest_df['lat']>_reg['latmin']) & 
+				_rest_df = _rest_df[~((_rest_df['lat']>_reg['latmin']) &
 						  			(_rest_df['lat']<_reg['latmax']) &
 						  			(_rest_df['lon']>_reg['lonmin']) &
 						  			(_rest_df['lon']<_reg['lonmax']))]
@@ -1206,7 +1240,7 @@ class stackArray(QtWidgets.QMainWindow):
 
 		self.fig.suptitle('Earthquakes in array %s'%self._current_array['name'])
 		self._canvasDraw()
-		
+
 
 	def _canvasDraw(self):
 
@@ -1240,7 +1274,7 @@ class stackArray(QtWidgets.QMainWindow):
 		_i = self.discb.currentIndex()
 		self._arrayInfo(self._current_array['name'])
 		savefile = None
-		
+
 		win = self._current_array_df['win'].iloc[0]
 		window = [win['noise'], win['coda']]
 
@@ -1249,13 +1283,13 @@ class stackArray(QtWidgets.QMainWindow):
 		if self.dis[_i]['write']:
 			savefile = _reg['name'] + '.'+self.dis[_i]['name'] + '.sac'
 		_current_df = self._current_array_df
-		_df = _current_df[(_current_df['lat']>_reg['latmin']) & 
+		_df = _current_df[(_current_df['lat']>_reg['latmin']) &
 						  (_current_df['lat']<_reg['latmax']) &
 						  (_current_df['lon']>_reg['lonmin']) &
 						  (_current_df['lon']<_reg['lonmax'])]
 		_df.reset_index()
 		self.regDf[_reg['name']] = _df
-		
+
 		_stackSt, _stdSt = stackTR(_df,
 								  sacname=savefile,win=window,
 								  mindis=self.dis[_i]['mindis'],
@@ -1448,7 +1482,7 @@ class stackArray(QtWidgets.QMainWindow):
 				self._drawStack()
 			else:
 				self._drawFig()
-			
+
 
 	def _updateRegion(self):
 		self.regcb.clear()
@@ -1458,7 +1492,7 @@ class stackArray(QtWidgets.QMainWindow):
 		self.regcb.addItem('Create new region')
 
 	def _resetReg(self):
-		self._region = [{'name':'global', 
+		self._region = [{'name':'global',
 						 'latmin':-90.0, 'latmax':90.0,
 						 'lonmin': -180.0, 'lonmax': 180.0}]
 		self._updateRegion()
@@ -1631,7 +1665,7 @@ class stackArray(QtWidgets.QMainWindow):
 
 def codaStrip(eve, beamtype='beam', method='all',
 			  siglen=200, noise=200,beamphase='PKiKP',
-			  phase_list=['P','PP','PcP','ScP','PKiKP','SP','ScS'], 
+			  phase_list=['P','PP','PcP','ScP','PKiKP','SP','ScS'],
 			  model='ak135', stime=400.0, etime=1800.0,
 			  window=10, write=False):
 	"""
@@ -1641,7 +1675,7 @@ def codaStrip(eve, beamtype='beam', method='all',
 		phase_list = eve.phase_list
 	if not hasattr(eve, 'arrivals'):
 		eve.getArrival(phase_list=phase_list,model=model)
-		
+
 	if beamtype == 'beam':
 		st = eve.beam
 	elif beamtype == 'slide':
@@ -1670,10 +1704,10 @@ def codaStrip(eve, beamtype='beam', method='all',
 	sig_ind = int(tari/delta)
 	noi_ind2 = int(tt2/delta)
 	time_before = tt1 + np.arange(int(noise/delta)+1) * delta
-	
+
 	# data_before = np.empty((n_tr, noi_pts))
 	data_before = data[:, noi_ind1: noi_ind1 + noi_pts]
-	
+
 	data_sig = data[:, sig_ind:sig_ind + sig_pts]
 
 	time_after = tt2 + np.arange(int(noise/delta)+1) * delta
@@ -1681,13 +1715,15 @@ def codaStrip(eve, beamtype='beam', method='all',
 	sind = int(stime/delta)
 	npts = int((etime - stime)/delta) + 1
 	time = np.matrix(np.linspace(stime, etime, npts))
-	obs_data = data[:, sind: sind+npts] 
+	obs_data = data[:, sind: sind+npts]
 	ind = int((tari - stime)/delta)
+	res_ind = int((tt1 - stime)/delta)
+	pts = int((noise*2+siglen)/delta)+1
 	if method == 'all':
 		#fitting coda model
 		coda_par = codaFit(np.append(time_before,time_after),np.append(data_before,data_after,axis=1))
 		#getting predict noise signal in linear scale
-		coda_data = np.asarray(np.exp(np.transpose(coda_par[0,:]) - np.transepose(coda_par[1,:]) \
+		coda_data = np.asarray(np.exp(np.transpose(coda_par[0,:]) - np.transpose(coda_par[1,:]) \
 					*np.log(time) - np.transpose(coda_par[2,:])*time))
 		# coda_data = np.asarray(coda_data)
 		#getting residual signal after removing the predict noise
@@ -1705,8 +1741,6 @@ def codaStrip(eve, beamtype='beam', method='all',
 		eve.codaMod = _df
 		codaSt = obspy.core.stream.Stream()
 		resSt = obspy.core.stream.Stream()
-		res_ind = int((tt1 - stime)/delta)
-		pts = int((noise*2+siglen)/delta)+1
 		for i in range(n_tr):
 			_tr = obspy.core.trace.Trace()
 			_tr.stats.delta = delta
@@ -1729,26 +1763,28 @@ def codaStrip(eve, beamtype='beam', method='all',
 		#all np.matrix are converted back to np.array to store
 		twoline_par_before = twoLineFit(time_before, data_before)
 		twoline_par_after = twoLineFit(time_after, data_after)
-		y1 = twoline_par_before[0,:] + twoline_par_before[0,:] * tari
+		y1 = twoline_par_before[0,:] + twoline_par_before[1,:] * tari
 		y2 = twoline_par_after[0,:] + twoline_par_after[1,:] * tt2
 		k = (y2 - y1)/(tt2 - tari)
+		print(k)
 		b = y2 - k * tt2
+		print(b)
 		t1 = np.matrix(np.linspace(tt1,tari, int(noise/delta)+1))
-		d1 = np.asaaray(np.transpose(twoline_par_before[0,:]) + np.tanspose(twoline_par_before[1,:]) * t1)
+		d1 = np.asarray(np.transpose(twoline_par_before[0,:]) + np.transpose(twoline_par_before[1,:]) * t1)
 		t2 = np.matrix(np.linspace(tari+delta, tt2, int(siglen/delta)))
-		d2 = np.asarray(k * t2 + b)
+		d2 = np.asarray(np.transpose(k) * t2 + np.transpose(b))
 		t3 = np.matrix(np.linspace(tt2+delta,tt2+noise, int(noise/delta)))
 		d3 = np.asarray(np.transpose(twoline_par_after[0,:]) + np.transpose(twoline_par_after[1,:]) * t3)
 		two_data = np.append(d1,d2,axis=-1)
 		two_data = np.append(two_data,d3,axis=-1)
 		two_res = moving_ave(obs_data[:,res_ind: res_ind+pts], window) - 10**two_data
-		res = np.mean(two_res[int(int(noise)/delta):int(int(noise)/delta)+sig_pts],axis=-1)
+		res = np.mean(two_res[:,int(int(noise)/delta):int(int(noise)/delta)+sig_pts],axis=-1)
 		_df = pd.DataFrame(columns=['FILT','kn1','bn1','kn2','bn2','RMS'])
 		_df['FILT'] = filts
-		_df['kn1'] = np.asarray(twoline_par_before)[0]
-		_df['bn1'] = np.asarray(twoline_par_before)[1]
-		_df['kn2'] = np.asarray(twoline_par_after)[0]
-		_df['bn2'] = np.asarray(twoline_par_after)[1]
+		_df['kn1'] = np.asarray(twoline_par_before)[1]
+		_df['bn1'] = np.asarray(twoline_par_before)[0]
+		_df['kn2'] = np.asarray(twoline_par_after)[1]
+		_df['bn2'] = np.asarray(twoline_par_after)[0]
 		_df['RMS'] = res
 		# twomod = {'kn1':twoline_par_before[1][0],'bn1':twoline_par_before[0][0],
 		# 		  'kn2':twoline_par_after[1][0],'bn2':twoline_par_after[0][0],'RMS':res}
@@ -1757,7 +1793,7 @@ def codaStrip(eve, beamtype='beam', method='all',
 		resSt = obspy.core.stream.Stream()
 		pts = int((noise*2+siglen)/delta)+1
 		# res_ind = int((tt1 - stime)/delta)
-		for i in n_tr:
+		for i in range(n_tr):
 			_tr = obspy.core.trace.Trace()
 			_tr.stats.delta = delta
 			_tr.stats.starttime = starttime + tt1
@@ -1769,15 +1805,15 @@ def codaStrip(eve, beamtype='beam', method='all',
 			_trr.stats.starttime = eve.arrivals[beamphase]['UTC'] - noise
 			_trr.stats.channel = filts[i]
 			_trr.stats.npts = pts
-			_trr.data = two_res
+			_trr.data = two_res[i]
 			resSt.append(_trr)
 		eve.twoSt = twoSt
-		eve.twoResSt = resSt	
+		eve.twoResSt = resSt
 	elif method == 'coda':
 		#fitting coda model
 		coda_par = codaFit(np.append(time_before,time_after),np.append(data_before,data_after,axis=1))
 		#getting predict noise signal in linear scale
-		coda_data = np.asarray(np.exp(np.transpose(coda_par[0,:]) - np.transepose(coda_par[1,:]) \
+		coda_data = np.asarray(np.exp(np.transpose(coda_par[0,:]) - np.transpose(coda_par[1,:]) \
 					*np.log(time) - np.transpose(coda_par[2,:])*time))
 		#getting residual signal after removing the predict noise
 		coda_res = moving_ave(obs_data, window) - coda_data
@@ -1792,8 +1828,8 @@ def codaStrip(eve, beamtype='beam', method='all',
 		eve.codaMod = _df
 		codaSt = obspy.core.stream.Stream()
 		resSt = obspy.core.stream.Stream()
-		res_ind = int((tt1 - stime)/delta)
-		pts = int((noise*2+siglen)/delta)+1
+		# res_ind = int((tt1 - stime)/delta)
+		# pts = int((noise*2+siglen)/delta)+1
 		for i in range(n_tr):
 			_tr = obspy.core.trace.Trace()
 			_tr.stats.delta = delta
@@ -1815,33 +1851,35 @@ def codaStrip(eve, beamtype='beam', method='all',
 		#fittint twoline model
 		twoline_par_before = twoLineFit(time_before, data_before)
 		twoline_par_after = twoLineFit(time_after, data_after)
-		y1 = twoline_par_before[0,:] + twoline_par_before[0,:] * tari
+		y1 = twoline_par_before[0,:] + twoline_par_before[1,:] * tari
 		y2 = twoline_par_after[0,:] + twoline_par_after[1,:] * tt2
 		k = (y2 - y1)/(tt2 - tari)
 		b = y2 - k * tt2
 		t1 = np.matrix(np.linspace(tt1,tari, int(noise/delta)+1))
-		d1 = np.asaaray(np.transpose(twoline_par_before[0,:]) + np.tanspose(twoline_par_before[1,:]) * t1)
+		d1 = np.asarray(np.transpose(twoline_par_before[0,:]) + np.transpose(twoline_par_before[1,:]) * t1)
 		t2 = np.matrix(np.linspace(tari+delta, tt2, int(siglen/delta)))
-		d2 = np.asarray(k * t2 + b)
+		d2 = np.asarray(np.transpose(k) * t2 + np.transpose(b))
 		t3 = np.matrix(np.linspace(tt2+delta,tt2+noise, int(noise/delta)))
 		d3 = np.asarray(np.transpose(twoline_par_after[0,:]) + np.transpose(twoline_par_after[1,:]) * t3)
 		two_data = np.append(d1,d2,axis=-1)
 		two_data = np.append(two_data,d3,axis=-1)
 		two_res = moving_ave(obs_data[:,res_ind: res_ind+pts], window) - 10**two_data
-		res = np.mean(two_res[int(int(noise)/delta):int(int(noise)/delta)+sig_pts],axis=-1)
+		res = np.mean(two_res[:,int(int(noise)/delta):int(int(noise)/delta)+sig_pts],axis=-1)
 		_df = pd.DataFrame(columns=['FILT','kn1','bn1','kn2','bn2','RMS'])
 		_df['FILT'] = filts
-		_df['kn1'] = np.asarray(twoline_par_before)[0]
-		_df['bn1'] = np.asarray(twoline_par_before)[1]
-		_df['kn2'] = np.asarray(twoline_par_after)[0]
-		_df['bn2'] = np.asarray(twoline_par_after)[1]
+		_df['kn1'] = np.asarray(twoline_par_before)[1]
+		_df['bn1'] = np.asarray(twoline_par_before)[0]
+		_df['kn2'] = np.asarray(twoline_par_after)[1]
+		_df['bn2'] = np.asarray(twoline_par_after)[0]
 		_df['RMS'] = res
+		# twomod = {'kn1':twoline_par_before[1][0],'bn1':twoline_par_before[0][0],
+		# 		  'kn2':twoline_par_after[1][0],'bn2':twoline_par_after[0][0],'RMS':res}
 		eve.twoMod = _df
 		twoSt = obspy.core.stream.Stream()
 		resSt = obspy.core.stream.Stream()
 		pts = int((noise*2+siglen)/delta)+1
 		# res_ind = int((tt1 - stime)/delta)
-		for i in n_tr:
+		for i in range(n_tr):
 			_tr = obspy.core.trace.Trace()
 			_tr.stats.delta = delta
 			_tr.stats.starttime = starttime + tt1
@@ -1853,10 +1891,10 @@ def codaStrip(eve, beamtype='beam', method='all',
 			_trr.stats.starttime = eve.arrivals[beamphase]['UTC'] - noise
 			_trr.stats.channel = filts[i]
 			_trr.stats.npts = pts
-			_trr.data = two_res
+			_trr.data = two_res[i]
 			resSt.append(_trr)
 		eve.twoSt = twoSt
-		eve.twoResSt = resSt	
+		eve.twoResSt = resSt
 	return eve
 
 
@@ -1920,7 +1958,7 @@ def moving_ave(x, window=5):
 	return y
 
 def norm(data,sind, eind):
-	
+
 	peak = np.max(np.absolute(data[sind:eind]))
 	data = data/peak
 
@@ -1986,7 +2024,7 @@ def stackTR(obsdf, sacname=None,win=[200.0,200.0],
 			st_std.append(tr_std)
 			continue
 		stack_obs,std_obs = stack(_df,[sind, eind])
-		tr_obs.data = stack_obs	
+		tr_obs.data = stack_obs
 		tr_std.data = std_obs
 		st_obs.append(tr_obs)
 		st_std.append(tr_std)

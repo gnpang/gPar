@@ -4,9 +4,9 @@ from __future__ import with_statement, nested_scopes, division, generators
 import os
 import gc
 import time
-import numpy as np 
-import pandas as pd 
-import obspy 
+import numpy as np
+import pandas as pd
+import obspy
 import scipy
 from obspy.core import UTCDateTime
 from obspy.core import AttribDict
@@ -20,6 +20,8 @@ try:
 	import cPickle
 except ImportError:
 	import pickle as cPickle
+
+from memory_profiler import profile
 
 from gpar.util.rolling_window import rolling_window
 
@@ -39,8 +41,8 @@ class Array(object):
 	Array object that contains multiple earthquake objects
 	"""
 
-	def __init__(self,arrayName,refPoint,eqDF,staDf, 
-				 coordsys='lonlat',beamphase='PKiKP', 
+	def __init__(self,arrayName,refPoint,eqDF,staDf,
+				 coordsys='lonlat',beamphase='PKiKP',
 				 isDoublet=False,
 				 phase_list=['P','PP','PcP','ScP','PKiKP','SP','ScS']
 				 ,**kwargs):
@@ -107,7 +109,7 @@ class Array(object):
 	def getTimeTable(self,sll_x=-15.0,sll_y=-15.0,sl_s=0.1,grdpts_x=301,grdpts_y=301,unit='deg'):
 		"""
 		Return timeshift table for given array geometry, modified from obsy
-		
+
 		"""
 		geometry = self.geometry
 
@@ -129,18 +131,18 @@ class Array(object):
 				  sll_x=-15.0,sll_y=-15.0,sl_s=0.1,refine=True,
 				  starttime=400.0,endtime=1400.0, unit='deg',
 				  winlen=2.0,overlap=0.5,write=False, **kwargs):
-		
+
 		for eq in self.events:
 			eq.slideBeam(geometry=self.geometry,timeTable=self.timeTable,arrayName=self.name,
 						 grdpts_x=grdpts_x,grdpts_y=grdpts_y,
-						 filts=filts, 
+						 filts=filts,
 						 sflag=sflag,stack=stack,
 						 sll_x=sll_x,sll_y=sll_y,sl_s=sl_s,refine=refine,
 						 starttime=starttime,endtime=endtime, unit=unit,
 						 winlen=winlen,overlap=overlap,write=write, **kwargs)
 
 	def vespectrum(self,grdpts=401,
-					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]}, 
+					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
 					sflag='log10',stack='linear',
 					sl_s=0.1, vary='slowness',sll=-20.0,
 					starttime=400.0,endtime=1400.0, unit='deg',
@@ -264,7 +266,7 @@ class Earthquake(object):
 		delta = self.delta
 		st.detrend('demean')
 
-		
+
 		# st.detrend('demean')
 		DT = tsDF.TimeShift - (tsDF.TimeShift/delta).astype(int)*delta
 		lag = (tsDF.TimeShift/delta).astype(int)+1
@@ -376,12 +378,12 @@ class Earthquake(object):
 			beamSt.append(beamTr)
 
 		self.beam = beamSt
-		
+
 		# etime = time.time()
 		# print(etime - stime)
 
 	def slideBeam(self,geometry,timeTable,arrayName,grdpts_x=301,grdpts_y=301,
-					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]}, 
+					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
 					sflag=1,stack='linear',
 					sll_x=-15.0,sll_y=-15.0,sl_s=0.3,refine=True,
 					starttime=400.0,endtime=1400.0, unit='deg',
@@ -392,7 +394,7 @@ class Earthquake(object):
 		Parameters:
 		-------------------
 			geometry: DataFrame that contains geometry infromation for the array, as returns by getGeometry
-			timeTable: 3D numpy array that contain time shift for select slowness grids for all stations in the array, 
+			timeTable: 3D numpy array that contain time shift for select slowness grids for all stations in the array,
 						created by getTimeTable
 			arrayName: str, name of array
 			sflag: int, options for calculating maximum value of the beamforming traces.
@@ -427,7 +429,7 @@ class Earthquake(object):
 		for name, filt in filts.items():
 			msg = ('Calculating slide beamforming for earthquake %s in array %s in filter %s - %s' % (self.ID, arrayName, name, filt))
 			gpar.log(__name__,msg,level='info',pri=True)
-			rel = slideBeam(self.stream, self.ntr, self.delta, 
+			rel = slideBeam(self.stream, self.ntr, self.delta,
 							geometry,timeTable,arrayName,grdpts_x,grdpts_y,
 						filt, sflag,stack,sll_x,sll_y,sl_s,refine,
 						starttime,endtime, unit,
@@ -459,7 +461,7 @@ class Earthquake(object):
 				name = 'slide.' + self.ID + '.'+stack+'.'+bpfilt+'.pkl'
 				name = os.path.join('./',arrayName,'Data',self.ID,name)
 				st.write(name,format='PICKLE')
-
+	# @profile
 	def vespectrum(self,geometry,arrayName,grdpts=401,
 					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
 					sflag='log10',stack='linear',
@@ -468,20 +470,21 @@ class Earthquake(object):
 					**kwargs ):
 		msg = ('Calculating vespetrum for earthquake %s' % self.ID)
 		gpar.log(__name__,msg,level='info',pri=True)
+		self.slantType = vary
 		if vary == 'slowness':
-			times, k, abspow = slantBeam(self.stream, self.ntr, self.delta,
+			self.slantTime, self.slantK, self.energy = slantBeam(self.stream, self.ntr, self.delta,
 									geometry, arrayName, grdpts,
 									filts, sflag, stack, sl_s, vary, sll,starttime,
 									endtime, unit, bakAzimuth=self.bakAzimuth)
 		elif vary == 'theta':
-			times, k, abspow = slantBeam(self.stream, self.ntr, self.delta,
+			self.slantTime, self.slantK, self.energy = slantBeam(self.stream, self.ntr, self.delta,
 									geometry,  arrayName, grdpts,
 									filts, sflag, stack, sl_s, vary, sll,starttime,
 									endtime, unit, rayParameter=self.rayParameter)
-		self.slantTime = times
-		self.slantType = vary
-		self.slantK = k
-		self.energy = abspow
+		# self.slantTime = times
+		
+		# self.slantK = k
+		# self.energy = abspow
 
 	def plotves(self, show=True, saveName=False,**kwargs):
 
@@ -498,7 +501,7 @@ class Earthquake(object):
 		elif self.slantType == 'theta':
 			unit = 'deg'
 			title = 'Slant Stack at a slowness of %.2f s/deg'%(self.rayParameter)
-		
+
 		ax[0].set_ylabel(self.slantType)
 		fig.suptitle(title)
 		if saveName:
@@ -511,7 +514,7 @@ class Doublet(object):
 	Earthquake doublets object
 	"""
 
-	def __init__(self, array, row, 
+	def __init__(self, array, row,
 				 resample=0.01, method='resample',
 				 filt=[1.33, 2.67,3,True],
 				 cstime=20.0, cetime=20.0,
@@ -607,7 +610,7 @@ class Doublet(object):
 		if len(self.st1) != len(self.st2):
 			msg = ('station records for two events are not equal, remove the additional station')
 			gpar.log(__name__,msg,level='info',pri=True)
-			
+
 			sta = list(set(sta1) & set(sta2))
 			st1 = obspy.Stream()
 			st2 = obspy.Stream()
@@ -682,8 +685,8 @@ class Doublet(object):
 		self.use_st1 = st1
 		self.use_st2 = st2
 
-	def codaInter(self, delta=0.01, 
-				  winlen=5, step=0.05, 
+	def codaInter(self, delta=0.01,
+				  winlen=5, step=0.05,
 				  starttime=100.0,
 				  domain='freq',fittype='cos'):
 		# rrate = 1.0/resample
@@ -731,14 +734,14 @@ class Doublet(object):
 						starttime=starttime,endtime=endtime)
 		self.codaInter(delta=None, winlen=winlen, step=step,starttime=starttime)
 
-	def plotCoda(self,tstart=20, tend=10, 
+	def plotCoda(self,tstart=20, tend=10,
 				 sta_id='CN.YKR9..SHZ',
 				 stime=100, etime=300,
 				 lim=[1100, 1450],
 				 filt=[1.33, 2.67, 3, True]):
 		# fig = plt.figure()
 
-		# 
+		#
 		plt.subplot(5,1,1)
 		st1 = self.use_st1.copy()
 		st2 = self.use_st2.copy()
@@ -749,8 +752,8 @@ class Doublet(object):
 		tr2.trim(starttime=self.arr2-tstart, endtime=self.arr2+tend)
 		data1 = tr1.data / np.max(np.absolute(tr1.data))
 		data2 = tr2.data / np.max(np.absolute(tr2.data))
-		# t1 = self.tt1 - tstart + np.arange(len(data1)) * st1[0].stats.delta 
-		t2 = self.tt2 - tstart + np.arange(len(data2)) * tr2.stats.delta 
+		# t1 = self.tt1 - tstart + np.arange(len(data1)) * st1[0].stats.delta
+		t2 = self.tt2 - tstart + np.arange(len(data2)) * tr2.stats.delta
 		plt.plot(t2, data1, 'b', t2, data2, 'r')
 		# plt.xlabel('Time (s)')
 		plt.ylabel('Normalized Amp')
@@ -790,7 +793,7 @@ def getTimeShift(rayParameter,bakAzimuth,geometry,unit='deg'):
 
 	Parameters:
 		rayParameter: ray parameters or horizontal slowness to calculate the time shift.
-		azimuth: 
+		azimuth:
 		geometry: Dataframe containing the arrays geometry, does not consider the elevation
 	"""
 	if unit == 'deg':
@@ -823,7 +826,7 @@ def getTimeShift(rayParameter,bakAzimuth,geometry,unit='deg'):
 def getTimeTable(geometry,sll_x=-15.0,sll_y=-15.0,sl_s=0.1,grdpts_x=301,grdpts_y=301,unit='deg'):
 	"""
 	Return timeshift table for given array geometry, modified from obsy
-	
+
 	"""
 	sx = sll_x + np.arange(grdpts_x)*sl_s
 	sy = sll_y + np.arange(grdpts_x)*sl_s
@@ -844,7 +847,7 @@ def getTimeTable(geometry,sll_x=-15.0,sll_y=-15.0,sl_s=0.1,grdpts_x=301,grdpts_y
 	mx = np.outer(geometry.X, sx)
 	my = np.outer(geometry.Y, sy)
 
-	timeTable = np.require(mx[:,:,np.newaxis].repeat(grdpts_y,axis=2) + 
+	timeTable = np.require(mx[:,:,np.newaxis].repeat(grdpts_y,axis=2) +
 				my[:,np.newaxis,:].repeat(grdpts_x,axis=1))
 
 	# timeIndexTable = {}
@@ -854,7 +857,7 @@ def getTimeTable(geometry,sll_x=-15.0,sll_y=-15.0,sl_s=0.1,grdpts_x=301,grdpts_y
 
 	return timeTable
 def getSlantTime(geometry, grdpts=401, sl_s=0.1, sll_k=-20.0,vary='slowness',unit='deg',**kwargs):
-	
+
 	k = sll_k + np.arange(grdpts)*sl_s
 	if vary == 'slowness':
 		rayParameter = k
@@ -915,7 +918,7 @@ def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdp
 			data = tr.data
 			data = np.pad(data,(0,dn),'edge')
 		else:
-			data = tr.data 
+			data = tr.data
 		hilbertTd[ind,:] = scipy.signal.hilbert(data)
 	if stack == 'linear':
 		order = -1
@@ -975,9 +978,9 @@ def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdp
 			baz = baz +360.0
 		bakaz[ind] = baz
 			# get coherence for the maximum stack slowness
-		
+
 		cohere[ind] = getCoherence(hilbertTd,begtime,tmpTimeTable,winpts,delta)
-		
+
 	rel = np.empty((4,bnpts))
 	# rel = np.empty((3,bnpts))
 	rel[0,:] = np.log10(abspow)
@@ -987,8 +990,10 @@ def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdp
 
 	return rel
 
+
+# @profile
 def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
-					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]}, 
+					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
 					sflag='log',stack='linear',
 					sl_s=0.1, vary='slowness',sll=-20.0,
 					starttime=400.0,endtime=1400.0, unit='deg',
@@ -1016,7 +1021,7 @@ def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
 				data = tr.data
 				data = np.pad(data,(0,dn),'edge')
 			else:
-				data = tr.data 
+				data = tr.data
 			hilbertTd[ind,:] = scipy.signal.hilbert(data)
 		if stack == 'linear':
 			order = -1
@@ -1030,7 +1035,7 @@ def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
 		else:
 			msg = 'Not available stack method, please choose from linear, psw or root\n'
 			gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
-	
+
 		abspow = np.empty((grdpts,winpts))
 		errorcode = clibarray.slant(ntr,grdpts,
 					iflag,npts,delta,
@@ -1039,19 +1044,20 @@ def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
 		if errorcode != 0:
 			msg = 'slantbeam stack for %dth segment in filter %s-%s exited with error %d\n' % (ind, name, filt,errorcode)
 			gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
-		if sflag == 'beam':
-			envel[name] = abspow
-		else:
-			env = np.abs(scipy.signal.hilbert(abspow))
-			if sflag == 'log':
-				envel[name] = np.log(env)
-			elif sflag == 'log10':
-				envel[name] = np.log10(env)
-			elif sflag == 'sqrt':
-				envel[name] = np.sqrt(env)
-			else:
-				msg = 'Not available option, please choose from beam, log, log10 or sqrt\n'
-				gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
+		envel[name] = abspow
+		# if sflag == 'beam':
+		# 	envel[name] = abspow
+		# else:
+		# 	env = np.abs(scipy.signal.hilbert(abspow))
+		# 	if sflag == 'log':
+		# 		envel[name] = np.log(env)
+		# 	elif sflag == 'log10':
+		# 		envel[name] = np.log10(env)
+		# 	elif sflag == 'sqrt':
+		# 		envel[name] = np.sqrt(env)
+		# 	else:
+		# 		msg = 'Not available option, please choose from beam, log, log10 or sqrt\n'
+		# 		gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
 	return [times, k, envel]
 
 def codaInt(st1, st2, delta, npts, domain='freq', fittype='cos'):
@@ -1192,7 +1198,7 @@ def _corr(Mptd1, Mptd2, domain):
 		cor = c/denorm
 	elif domain == 'time':
 		c = np.convolve(Mptd1[..., ::-1], Mptd2)
-		c = np.subtract(np.sqrt(n*m)*c, np.sum(Mptd1, axis=1)*np.sum(Mptd2, axis=1)) 
+		c = np.subtract(np.sqrt(n*m)*c, np.sum(Mptd1, axis=1)*np.sum(Mptd2, axis=1))
 		cor = c/denorm
 	else:
 		msg = ('Not a valid option for correlation, choose from freq or time')
@@ -1207,7 +1213,7 @@ def _getLag(Mptd1, Mptd2, delta, domain='freq', fittype='cos'):
 	_dump, n = cc.shape
 	dt = (np.arange(n) - (ndt-1)) * delta
 	_ind = np.arange(ntr) * n
-	_index = np.argmax(cc, axis=-1) 
+	_index = np.argmax(cc, axis=-1)
 	_indexpre = _index - 1
 	_indexnxt = _index + 1
 
@@ -1254,20 +1260,3 @@ def cosinfit(x, y, delta):
 	# ymax = np.cos(w*xmax+O)
 
 	return [xmax, ymax]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
