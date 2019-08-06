@@ -379,7 +379,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self._eventInfo(self._current_id)
 		self._current_strip = True
 		codaStrip(self._current_event,beamtype=self._btype,method=_method,
-				 	  siglen=self.trinWin[_j]['coda'], noise=self.trinWin[_j]['noise'],phase='PKiKP',
+				 	  siglen=self.trinWin[_j]['coda'], noise=self.trinWin[_j]['noise'],beamphase=self.beamphase,
 			  		  model=self.trinWin[_j]['model'], stime=self.trinWin[_j]['stime'], etime=self.trinWin[_j]['etime'],)
 		self._btype = 'strip'
 		self.sbcb.setCurrentIndex(3)
@@ -417,7 +417,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 		if level == 'D':
 			self._setCodaStrip()
 		else:
-			existDF = self._stripDF[(self._stripDF.ID == _id)]
+			if len(self._stripDF) != 0:
+				existDF = self._stripDF[(self._stripDF.ID == _id)]
+			else:
+				existDF = pd.DataFrame()
 			if len(existDF) == 0:
 				choice = QMessageBox.question(self, 'Stripping?',
 							"Haven't stripping yet, want to do it?",
@@ -570,9 +573,11 @@ class glanceEQ(QtWidgets.QMainWindow):
 				ax.vlines(arrival, ax.get_ylim()[0],ax.get_ylim()[1],'r', label=self.beamphase)
 				if self.ttbtn.isChecked():
 					_arr = self._current_event.arrivals
-					del _arr[self.beamphase]
+					# del _arr[self.beamphase]
 					for name, tt in _arr.items():
-						ax.vlines(tt, ax.get_xlim()[0],ax.get_ylim()[1],'k',label=name)
+						if name is self.beamphase:
+							continue
+						ax.vlines(tt['TT'], ax.get_ylim()[0],ax.get_ylim()[1],'b',label=name)
 				ax.legend()
 				if _i == 0:
 					ax.set_xlabel('Seconds')
@@ -594,11 +599,13 @@ class glanceEQ(QtWidgets.QMainWindow):
 					ax[_i,ind].vlines(arrival, ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'r',label=self.beamphase)
 					if self.ttbtn.isChecked():
 						_arr = self._current_event.arrivals
-						del _arr[self.beamphase]
+						# del _arr[self.beamphase]
 						for name, tt in _arr.items():
-							ax[_i,ind].vlines(tt, ax.get_xlim()[0],ax.get_ylim()[1],'k',label=name)
+							if name is self.beamphase:
+								continue
+							ax[_i,ind].vlines(tt['TT'], ax.get_ylim()[0],ax.get_ylim()[1],'b',label=name)
 					ax[_i,ind].legend()
-					ax[_i,ind].set_aspect(aspect=0.3)
+					# ax[_i,ind].set_aspect(aspect=0.3)
 					if _i == 3:
 						ax[_i,ind].set_xlabel('Seconds')
 					if ind == 0:
@@ -608,21 +615,24 @@ class glanceEQ(QtWidgets.QMainWindow):
 			extent=[np.min(self._current_time),np.max(self._current_time),np.min(self._current_K),np.max(self._current_K)]
 			vmin = float(self.ampmin.cleanText())
 			vmax = float(self.ampmax.cleanText())
-			for _i, (name, abspow) in enumerate(self._current_energy.item()):
-				if self.vepcb.currentText == 'log10':
+			for _i, (name, abspow) in enumerate(self._current_energy.items()):
+				if self.vepcb.currentText() == 'log10':
 					abspow = np.log10(abspow)
-				elif self.vepcb.currentText == 'log':
+				elif self.vepcb.currentText() == 'log':
 					abspow = np.log(abspow)
-				elif self.vepcb.currentText == 'sqrt':
+				elif self.vepcb.currentText() == 'sqrt':
 					abspow = np.sqrt(abspow)
 				ax = self.fig.add_subplot(1, num, _i+1)
 				ax.imshow(abspow, extent=extent, aspect='auto', cmap='Reds', vmin=vmin, vmax=vmax)
-				ax.vlines(arrival, ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'r',label=self.beamphase)
+				arrival = self._current_event.arrivals[self.beamphase]['TT']
+				ax.vlines(arrival, ax.get_ylim()[0],ax.get_ylim()[1],'k',label=self.beamphase)
 				if self.ttbtn.isChecked():
 					_arr = self._current_event.arrivals
-					del _arr[self.beamphase]
+						# del _arr[self.beamphase]
 					for name, tt in _arr.items():
-						ax.vlines(tt, ax.get_xlim()[0],ax.get_ylim()[1],'k',label=name)
+						if name is self.beamphase:
+							continue
+						ax.vlines(tt['TT'], ax.get_ylim()[0],ax.get_ylim()[1],'b',label=name)
 				ax.legend()
 				ax.set_title(name)
 			if self._current_type == 'slowness':
@@ -632,8 +642,14 @@ class glanceEQ(QtWidgets.QMainWindow):
 				title = 'Slant Stack at a slowness of %.2f s/deg'%(self._current_event.rayParameter)
 			self.fig.suptitle(title)
 		elif self._btype == 'strip':
-			existDF = self._stripDF[(self._stripDF.ID == self._current_event.ID)]
-			_badDF = self._badDF[self._badDF.ID == self._current_event.ID]
+			if len(self._stripDF) != 0:
+				existDF = self._stripDF[(self._stripDF.ID == self._current_event.ID)]
+			else:
+				existDF = pd.DataFrame()
+			if len(self._badDF) != 0:
+				_badDF = self._badDF[self._badDF.ID == self._current_event.ID]
+			else:
+				_badDF = pd.DataFrame()
 			if len(existDF) == 0 and len(_badDF) == 0:
 				choice = QMessageBox.question(self, 'Stripping?',
 						"Haven't stripping yet, want to do it?",
@@ -644,7 +660,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 					self._btype = 'beam'
 					self.sbcb.setCurrentIndex(3)
 					self._updatePlot()
-			elif len(existDF == 0) and len(_badDF) != 0:
+			elif len(_badDF) != 0:
 				choice = QMessageBox.question(self, 'Bad event!',
 						 "Want to reevalua it?",
 						 QMessageBox.Yes | QMessageBox.No)
@@ -667,20 +683,19 @@ class glanceEQ(QtWidgets.QMainWindow):
 				
 				sind = int(stime / delta)
 				eind = int(etime / delta)
-				data = data[sind:sind+npts]
 				if self._method == 'all':
-					codemode = existDF.crms.iloc[0]
+					codamode = existDF.crms.iloc[0]
 					twomode = existDF.trms.iloc[0]
 					nfilter = len(codamode)
 					codaSt = self._current_event.codaSt
 					twoSt = self._current_event.twoSt
 					cRes = self._current_event.codaResSt
 					tRes = self._current_event.twoResSt
-					timeR = np.arange(cRes[0].stats.npts)*cRes.stats.delta - trinwin['noise']
+					timeR = np.arange(cRes[0].stats.npts)*cRes[0].stats.delta - trinwin['noise']
 					data_time = np.arange(twoSt[0].stats.npts) * delta + (twoSt[0].stats.starttime - self._current_beam[0].stats.starttime)
-					ax = self.fig.subplots(2, nfilter,sharex='col', sharey='row')
+					ax = self.fig.subplots(2, nfilter)
 					for ind in range(nfilter):
-						data = np.abs(scipy.signal.hilbert(self._current_beam[ind].data))
+						data = np.abs(scipy.signal.hilbert(self._current_beam[ind].data))[sind:sind+npts]
 						ax[0,ind].plot(time,np.log10(data),'k', label='beam')
 						data_coda = codaSt[ind].data
 						ax[0,ind].plot(time,np.log10(data_coda),'r', label='coda')
@@ -692,8 +707,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 						ax[0,ind].legend()
 						label_c = "Coda: Mean RMS = %s"%(codamode['RMS'].iloc[ind])
 						label_t = "Twoline: Mean RMS = %s"%(twomode['RMS'].iloc[ind])
-						ax[1,ind].plot(timeR,cRes[ind].data, 'r', \
-										timeR, tRes[ind.data], 'b',data=[label_c,label_t])
+						ax[1,ind].plot(timeR,cRes[ind].data, 'r', label=label_c)
+						ax[1,ind].plot(timeR, tRes[ind].data, 'b',label=label_t)
 						ax[1,ind].legend()
 						ax[1,ind].set_xlabel('Seconds')
 						ax[0,ind].set_title('Filter: %s'%twomode['FILT'].iloc[ind])
@@ -702,14 +717,14 @@ class glanceEQ(QtWidgets.QMainWindow):
 							ax[1,ind].set_ylabel('Amp')
 					
 				elif self._method == 'coda':
-					codemode = existDF.crms.iloc[0]
+					codamode = existDF.crms.iloc[0]
 					nfilter = len(codamode)
 					codaSt = self._current_event.codaSt
 					cRes = self._current_event.codaResSt
-					timeR = np.arange(cRes[0].stats.npts)*cRes.stats.delta - trinwin['noise']
-					ax = self.fig.subplots(2, nfilter,sharex='col', sharey='row')
+					timeR = np.arange(cRes[0].stats.npts)*cRes[0].stats.delta - trinwin['noise']
+					ax = self.fig.subplots(2, nfilter)
 					for ind in range(nfilter):
-						data = np.abs(scipy.signal.hilbert(self._current_beam[ind].data))
+						data = np.abs(scipy.signal.hilbert(self._current_beam[ind].data))[sind:sind+npts]
 						ax[0,ind].plot(time,np.log10(data),'k', label='beam')
 						data_coda = codaSt[ind].data
 						ax[0,ind].plot(time,np.log10(data_coda),'r', label='coda')
@@ -730,11 +745,11 @@ class glanceEQ(QtWidgets.QMainWindow):
 					nfilter = len(twomode)
 					twoSt = self._current_event.twoSt
 					tRes = self._current_event.twoResSt
-					timeR = np.arange(cRes[0].stats.npts)*cRes.stats.delta - trinwin['noise']
+					timeR = np.arange(tRes[0].stats.npts)*tRes[0].stats.delta - trinwin['noise']
 					data_time = np.arange(twoSt[0].stats.npts) * delta + (twoSt[0].stats.starttime - self._current_beam[0].stats.starttime)
-					ax = self.fig.subplots(2, nfilter,sharex='col', sharey='row')
+					ax = self.fig.subplots(2, nfilter)
 					for ind in range(nfilter):
-						data = np.abs(scipy.signal.hilbert(self._current_beam[ind].data))
+						data = np.abs(scipy.signal.hilbert(self._current_beam[ind].data))[sind:sind+npts]
 						ax[0,ind].plot(time,np.log10(data),'k', label='beam')
 						data_two = twoSt[ind].data
 						ax[0,ind].plot(data_time, data_two,'b', label='twoline')
@@ -743,7 +758,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 						ax[0,ind].set_xlabel('Seconds')
 						ax[0,ind].legend()
 						label_t = "Twoline: Mean RMS = %s"%(twomode['RMS'].iloc[ind])
-						ax[1,ind].plot(timeR, tRes[ind.data], 'b',label=label_t)
+						ax[1,ind].plot(timeR, tRes[ind].data, 'b',label=label_t)
 						ax[1,ind].legend()
 						ax[1,ind].set_xlabel('Seconds')
 						ax[0,ind].set_title('Filter: %s'%twomode['FILT'].iloc[ind])
@@ -761,6 +776,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 	def _updatePlot(self):
 
+		self._activeAmp()
 		self._btype = self.sbcb.currentText()
 		self._drawFig()
 
@@ -1787,9 +1803,7 @@ def codaStrip(eve, beamtype='beam', method='all',
 		y1 = twoline_par_before[0,:] + twoline_par_before[1,:] * tari
 		y2 = twoline_par_after[0,:] + twoline_par_after[1,:] * tt2
 		k = (y2 - y1)/(tt2 - tari)
-		print(k)
 		b = y2 - k * tt2
-		print(b)
 		t1 = np.matrix(np.linspace(tt1,tari, int(noise/delta)+1))
 		d1 = np.asarray(np.transpose(twoline_par_before[0,:]) + np.transpose(twoline_par_before[1,:]) * t1)
 		t2 = np.matrix(np.linspace(tari+delta, tt2, int(siglen/delta)))
