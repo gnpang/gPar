@@ -17,7 +17,7 @@ def createEqList(arrayList='array.list',
 				formats='ndk',
 				mindis=50.0, maxdis=75, mag=None,
 				model='ak135',
-				phase=['PKiKP'],
+				beamphase=['PKiKP'],
 				savefile='array.list.e'):
 
 	ardf = util.readList(arrayList, list_type='array', sep='\s+')
