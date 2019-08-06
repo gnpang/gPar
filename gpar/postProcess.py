@@ -246,7 +246,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self.btnbar2.addWidget(QLabel('TYPE'))
 		self.btnbar2.addWidget(self.sbcb)
 		self.btnbar2.addWidget(vline)
-		self.btnbars.addWidget(Qlabel('Scale'))
+		self.btnbar2.addWidget(QLabel('Scale'))
 		self.btnbar2.addWidget(self.vepcb)
 		self.btnbar2.addWidget(QLabel('AMP'))
 		self.btnbar2.addWidget(self.ampmin)
@@ -443,13 +443,14 @@ class glanceEQ(QtWidgets.QMainWindow):
 			if eve.ID == eqid:
 				event = eve
 		self._current_event = event
+		self.beamphase = event.beamphase
 		self._current_id = eqid
 		if not hasattr(event, 'beam'):
 			return
 		self._current_beam = event.beam
 		filts = {}
 		for tr in self._current_beam:
-			filts[tr.stat.station] = tr.stats.channel
+			filts[tr.stats.station] = tr.stats.channel
 		self._current_filts = filts
 		self._current_ID = event.ID
 		self._current_dis = event.Del
