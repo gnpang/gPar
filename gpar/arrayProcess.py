@@ -89,10 +89,16 @@ class Array(object):
 		if coordsys == 'lonlat':
 			dis_in_degree, baz, az = gpar.getdata.calc_Dist_Azi(staDF.LAT, staDF.LON, refPoint[0], refPoint[1])
 			dis_in_km = dis_in_degree * deg2km
+			staDF['DEL'] = dis_in_degree
+			staDF['DIS'] = dis_in_km
+			RX = dis_in_degree * np.sin(az*deg2rad)
+			RY = dis_in_degree * np.cos(az*deg2rad)
 			X = dis_in_km * np.sin(az*deg2rad)
 			Y = dis_in_km * np.cos(az*deg2rad)
 			staDF['X'] = X
 			staDF['Y'] = Y
+			staDF['RX'] = X
+			staDF['RY'] = Y
 			geometry = staDF
 		elif coordsys == 'xy':
 			X = staDF.X - refPoint[0]
@@ -105,6 +111,56 @@ class Array(object):
 			gpar.log(__name__, msg, level='error', pri=True)
 
 		self.geometry = geometry
+
+	def calARF(self,tsx, tsy,
+			  freq=1.0,sll_x=-15,sll_y=-15, 
+			  sl_s=0.1,grdpts_x=301,grdpts_y=301,
+			  ):
+		'''
+		Function to calculate certain array response for certain frequency
+		Parameters:
+			tsx: float, target x slowness, s/deg
+			tsy: float, target y slowness, s/deg
+			freq: float, target frequency in Hz
+			sll_x: float, minimum x slowness, s/deg
+			sll_y: float, minimum y slowness, s/deg
+			sl_s: float, increment in slowness, s/deg
+			grdpts_x: int, total points in x slowness
+			grdpts_y: ind, total points in y slowness 
+		'''
+
+		sx = sll_x + np.arange(grdpts_x)
+		sy = sll_y + np.arange(grdpts_y)
+		delta_x = sx - tsx
+		delta_y = sy - tsy
+		mx = np.outer(self.geometry['RX'],delta_x)
+		my = np.outer(self.geometry['RY'],delta_y)
+		timeTable = np.require(mx[:,:,np.newaxis].repeat(grdpts_y,axis=2) + 
+							   my[:,np.newaxis,:].repeat(grdpts_x,axis=1))
+		tcos = np.mean(np.cos(2.0*PI*freq*timeTable),axis=0)
+		tsin = np.mean(np.sin(2.0*PI*freq*timeTable),axis=0)
+
+		val = 10.0*np.log10(tcos**2 + tsin**2)
+
+		arf = {'tsx':tsx, 'tsy':tsy,'freq':freq,
+			   'sll_x':sll_x, 'sll_y':sll_y,'sl_s':sl_s,
+			   'grdpts_x':grdpts_x,'grdpts_y':grdpts_y,
+			   'arf':val}
+
+		self.arf = arf
+
+	def plotARF(self):
+		arf = self.arf
+		xmax = arf['sll_x'] + arf['sl_s'] * arf['grdpts_x']
+		ymax = arf['sll_y'] + arf['sl_s'] * arf['grdpts_y']
+		extent = [arf['sll_x'], xmax, arf['sll_y'], ymax]
+		fig, ax = plt.subplots(figsize=(8,6))
+		ax.imshow(arf['arf'], extent=extent, aspect='auto', cmap='Reds_r')
+		ax.set_title('Array response for %s in frequency %s\ntargeting sx=%.2f, sy=%.2f'
+					%(self.name, arf['freq'], arf['tsx'],arf['tsy']))
+		ax.set_ylabel('Slowness Y')
+		ax.set_xlabel('Slowness X')
+		plt.show()
 
 	def getTimeTable(self,sll_x=-15.0,sll_y=-15.0,sl_s=0.1,grdpts_x=301,grdpts_y=301,unit='deg'):
 		"""

@@ -204,7 +204,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self.vepcb = QComboBox(self)
 		for scale in ['log10', 'log','sqrt','beam']:
 			self.vepcb.addItem(scale)
-		self.vepcb.activated.connect(self._updatePlot)
+		self.vepcb.activated.connect(self._updatePlot )
 		self.vepcb.setEnabled(False)
 
 		self.codacb.setMaximumWidth(100)
@@ -217,9 +217,9 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self.ampmax.setEnabled(False)
 		self.sbcb.activated.connect(self._activeAmp)
 
-		self.ttbtn = QtWidgets.QPushButton('Strip', parent=self.main_widget)
+		self.ttbtn = QtWidgets.QPushButton('Phases', parent=self.main_widget)
 		self.ttbtn.setCheckable(True)
-		self.ttbtn.clicked.connect(self._plotTT)
+		self.ttbtn.clicked.connect(self._updatePlot)
 		# Arrange buttons
 		vline = QFrame()
 		vline.setFrameStyle(QFrame.VLine | QFrame.Raised)
@@ -246,10 +246,14 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self.btnbar2.addWidget(QLabel('TYPE'))
 		self.btnbar2.addWidget(self.sbcb)
 		self.btnbar2.addWidget(vline)
+		self.btnbars.addWidget(Qlabel('Scale'))
+		self.btnbar2.addWidget(self.vepcb)
 		self.btnbar2.addWidget(QLabel('AMP'))
 		self.btnbar2.addWidget(self.ampmin)
 		self.btnbar2.addWidget(self.ampmax)
-		self.btnbar2.addStretch(2)
+		self.btnbar2.addWidget(vline)
+		self.btnbar2.addWidget(self.ttbtn)
+		self.btnbar2.addStretch(1)
 
 		#Menubar
 		menubar = self.menuBar()
@@ -562,7 +566,12 @@ class glanceEQ(QtWidgets.QMainWindow):
 				if not hasattr(self._current_event, 'arrivals'):
 					self._current_event.getArrival()
 				arrival = self._current_event.arrivals[self.beamphase]['TT']# - self._current_event.time
-				ax.vlines(arrival, ax.get_ylim()[0],ax.get_ylim()[1],'r')
+				ax.vlines(arrival, ax.get_ylim()[0],ax.get_ylim()[1],'r', label=self.beamphase)
+				if self.ttbtn.isChecked():
+					_arr = self._current_event.arrivals
+					del _arr[self.beamphase]
+					for name, tt in _arr.items():
+						ax.vlines(tt, ax.get_xlim()[0],ax.get_ylim()[1],'k',label=name)
 				ax.legend()
 				if _i == 0:
 					ax.set_xlabel('Seconds')
@@ -582,6 +591,11 @@ class glanceEQ(QtWidgets.QMainWindow):
 						self._current_event.getArrival()
 					arrival = self._current_event.arrivals[self.beamphase]['TT']# - self._current_event.time
 					ax[_i,ind].vlines(arrival, ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'r',label=self.beamphase)
+					if self.ttbtn.isChecked():
+						_arr = self._current_event.arrivals
+						del _arr[self.beamphase]
+						for name, tt in _arr.items():
+							ax[_i,ind].vlines(tt, ax.get_xlim()[0],ax.get_ylim()[1],'k',label=name)
 					ax[_i,ind].legend()
 					ax[_i,ind].set_aspect(aspect=0.3)
 					if _i == 3:
@@ -602,6 +616,13 @@ class glanceEQ(QtWidgets.QMainWindow):
 					abspow = np.sqrt(abspow)
 				ax = self.fig.add_subplot(1, num, _i+1)
 				ax.imshow(abspow, extent=extent, aspect='auto', cmap='Reds', vmin=vmin, vmax=vmax)
+				ax.vlines(arrival, ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'r',label=self.beamphase)
+				if self.ttbtn.isChecked():
+					_arr = self._current_event.arrivals
+					del _arr[self.beamphase]
+					for name, tt in _arr.items():
+						ax.vlines(tt, ax.get_xlim()[0],ax.get_ylim()[1],'k',label=name)
+				ax.legend()
 				ax.set_title(name)
 			if self._current_type == 'slowness':
 				a = u"\u00b0"
@@ -639,96 +660,95 @@ class glanceEQ(QtWidgets.QMainWindow):
 				trinwin = existDF.win.iloc[0]
 				stime = trinwin['stime']
 				etime = trinwin['etime']
-				delta = self._current_beam.stats.delta
+				delta = self._current_beam[0].stats.delta
 				npts = int((etime - stime)/delta) + 1
 				time = np.linspace(stime, etime, npts)
-				data = np.abs(scipy.signal.hilbert(self._current_beam.data))
+				
 				sind = int(stime / delta)
 				eind = int(etime / delta)
 				data = data[sind:sind+npts]
 				if self._method == 'all':
 					codemode = existDF.crms.iloc[0]
 					twomode = existDF.trms.iloc[0]
-					ax1 = self.fig.add_subplot(2,2,1)
-					ax1.plot(time, np.log10(data), 'k')
-					codaTr = existDF.codaTr.iloc[0]
-					data_coda = codaTr.data
-					ax1.plot(time, np.log10(data_coda), 'r')
-					ax1.set_xlim([stime, etime])
-					ax1.set_ylim([-1, 5])
-					ax1.set_xlabel('Seconds')
-					ax1.set_ylabel('log10(Amp)')
-
-					ax2 = self.fig.add_subplot(2,2,2)
-					ax2.plot(time, np.log10(data), 'k')
-					twoTr = existDF.twoTr.iloc[0]
-					data_two = twoTr.data
-					data_time = np.arange(twoTr.stats.npts) * delta + (twoTr.stats.starttime - self._current_beam.stats.starttime)
-					ax2.plot(data_time,data_two,'r')
-					ax2.set_xlabel('Seconds')
-					ax2.set_xlim([stime, etime])
-					ax2.set_ylim([-1, 5])
-					ax2.set_ylabel('log10(Amp)')
-
-					ax3 = self.fig.add_subplot(2,2,3)
-					cRes = existDF.codaResTr.iloc[0]
-					timeR = np.arange(cRes.stats.npts)*cRes.stats.delta - trinwin['noise']
-					label = "Mean RMS= %s"%(codemode['RMS'])
-					ax3.plot(timeR, cRes.data, label=label)
-					ax3.set_xlim([-trinwin['noise'], trinwin['noise']+trinwin['coda']])
-					ax3.hlines(0,ax3.get_xlim()[0],ax3.get_xlim()[1])
-					ax3.legend()
-					ax3.set_xlabel('Seconds')
-
-					ax4 = self.fig.add_subplot(2,2,4)
-					tRes = existDF.twoResTr.iloc[0]
-					label = "Mean RMS = %s"%(twomode['RMS'])
-					ax4.plot(timeR, tRes.data, label=label)
-					ax4.set_xlim([-trinwin['noise'], trinwin['noise']+trinwin['coda']])
-					ax4.hlines(0,ax3.get_xlim()[0],ax3.get_xlim()[1])
-					ax4.legend()
-					ax4.set_xlabel('Seconds')
+					nfilter = len(codamode)
+					codaSt = self._current_event.codaSt
+					twoSt = self._current_event.twoSt
+					cRes = self._current_event.codaResSt
+					tRes = self._current_event.twoResSt
+					timeR = np.arange(cRes[0].stats.npts)*cRes.stats.delta - trinwin['noise']
+					data_time = np.arange(twoSt[0].stats.npts) * delta + (twoSt[0].stats.starttime - self._current_beam[0].stats.starttime)
+					ax = self.fig.subplots(2, nfilter,sharex='col', sharey='row')
+					for ind in range(nfilter):
+						data = np.abs(scipy.signal.hilbert(self._current_beam[ind].data))
+						ax[0,ind].plot(time,np.log10(data),'k', label='beam')
+						data_coda = codaSt[ind].data
+						ax[0,ind].plot(time,np.log10(data_coda),'r', label='coda')
+						data_two = twoSt[ind].data
+						ax[0,ind].plot(data_time, data_two,'b', label='twoline')
+						ax[0,ind].set_xlim([stime, etime])
+						ax[0,ind].set_ylim([-1, 5])
+						ax[0,ind].set_xlabel('Seconds')
+						ax[0,ind].legend()
+						label_c = "Coda: Mean RMS = %s"%(codamode['RMS'].iloc[ind])
+						label_t = "Twoline: Mean RMS = %s"%(twomode['RMS'].iloc[ind])
+						ax[1,ind].plot(timeR,cRes[ind].data, 'r', \
+										timeR, tRes[ind.data], 'b',data=[label_c,label_t])
+						ax[1,ind].legend()
+						ax[1,ind].set_xlabel('Seconds')
+						ax[0,ind].set_title('Filter: %s'%twomode['FILT'].iloc[ind])
+						if ind is 0:
+							ax[0,ind].set_ylabel('log10(Amp)')
+							ax[1,ind].set_ylabel('Amp')
+					
 				elif self._method == 'coda':
 					codemode = existDF.crms.iloc[0]
-					ax1 = self.fig.add_subplot(2,1,1)
-					ax1.plot(time, np.log10(data), 'k')
-					data_coda = self._current_event.codaTr.data
-					ax1.plot(time, np.log10(data_coda), 'r')
-					ax1.set_xlim([stime, etime])
-					ax1.set_ylim([-1,5])
-					ax1.set_xlabel('Seconds')
-					ax1.set_ylabel('log10(Amp)')
-					ax3 = self.fig.add_subplot(2,1,2)
-					cRes = self._current_event.codaResTr
-					timeR = np.arange(cRes.stats.npts)*cRes.stats.delta - trinwin['noise']
-					label = "Mean RMS= %s"%(codemode['RMS'])
-					ax3.plot(timeR, cRes.data, label=label)
-					ax3.set_xlim([-trinwin['noise'], trinwin['noise']+trinwin['coda']])
-					ax3.hlines(0,ax3.get_xlim()[0],ax3.get_xlim()[1])
-					ax3.legend()
-					ax3.set_xlabel('Seconds')
+					nfilter = len(codamode)
+					codaSt = self._current_event.codaSt
+					cRes = self._current_event.codaResSt
+					timeR = np.arange(cRes[0].stats.npts)*cRes.stats.delta - trinwin['noise']
+					ax = self.fig.subplots(2, nfilter,sharex='col', sharey='row')
+					for ind in range(nfilter):
+						data = np.abs(scipy.signal.hilbert(self._current_beam[ind].data))
+						ax[0,ind].plot(time,np.log10(data),'k', label='beam')
+						data_coda = codaSt[ind].data
+						ax[0,ind].plot(time,np.log10(data_coda),'r', label='coda')
+						ax[0,ind].set_xlim([stime, etime])
+						ax[0,ind].set_ylim([-1, 5])
+						ax[0,ind].set_xlabel('Seconds')
+						ax[0,ind].legend()
+						label_c = "Coda: Mean RMS = %s"%(codamode['RMS'].iloc[ind])
+						ax[1,ind].plot(timeR,cRes[ind].data, 'r', label=label_c)
+						ax[1,ind].legend()
+						ax[1,ind].set_xlabel('Seconds')
+						ax[0,ind].set_title('Filter: %s'%codamode['FILT'].iloc[ind])
+						if ind is 0:
+							ax[0,ind].set_ylabel('log10(Amp)')
+							ax[1,ind].set_ylabel('Amp')
 				elif self._method == 'twoline':
 					twomode = existDF.trms.iloc[0]
-					ax1 = self.fig.add_subplot(2,1,1)
-					ax1.plot(time, np.log10(data), 'k')
-					twoTr = self._current_event.twoTr
-					data_two = twoTr.data
-					data_time = np.arange(twoTr.stats.npts) * delta + (twoTr.stats.starttime - self._current_beam.stats.starttime)
-					ax1.plot(data_time,data_two,'r')
-					ax1.set_xlabel('Seconds')
-					ax1.set_xlim([stime, etime])
-					ax1.set_ylim([-1,5])
-					ax1.set_ylabel('log10(Amp)')
-
-					ax4 = self.fig.add_subplot(2,1,2)
-					tRes = self._current_event.twoResTr
-					timeR = np.arange(tRes.stats.npts)*tRes.stats.delta - trinwin['noise']
-					label = "Mean RMS = %s"%(twomode['RMS'])
-					ax4.plot(timeR, tRes.data,label=label)
-					ax4.legend()
-					ax4.set_xlim([-trinwin['noise'], trinwin['noise']+trinwin['coda']])
-					ax4.hlines(0,ax4.get_xlim()[0],ax4.get_xlim()[1])
-					ax4.set_xlabel('Seconds')
+					nfilter = len(twomode)
+					twoSt = self._current_event.twoSt
+					tRes = self._current_event.twoResSt
+					timeR = np.arange(cRes[0].stats.npts)*cRes.stats.delta - trinwin['noise']
+					data_time = np.arange(twoSt[0].stats.npts) * delta + (twoSt[0].stats.starttime - self._current_beam[0].stats.starttime)
+					ax = self.fig.subplots(2, nfilter,sharex='col', sharey='row')
+					for ind in range(nfilter):
+						data = np.abs(scipy.signal.hilbert(self._current_beam[ind].data))
+						ax[0,ind].plot(time,np.log10(data),'k', label='beam')
+						data_two = twoSt[ind].data
+						ax[0,ind].plot(data_time, data_two,'b', label='twoline')
+						ax[0,ind].set_xlim([stime, etime])
+						ax[0,ind].set_ylim([-1, 5])
+						ax[0,ind].set_xlabel('Seconds')
+						ax[0,ind].legend()
+						label_t = "Twoline: Mean RMS = %s"%(twomode['RMS'].iloc[ind])
+						ax[1,ind].plot(timeR, tRes[ind.data], 'b',label=label_t)
+						ax[1,ind].legend()
+						ax[1,ind].set_xlabel('Seconds')
+						ax[0,ind].set_title('Filter: %s'%twomode['FILT'].iloc[ind])
+						if ind is 0:
+							ax[0,ind].set_ylabel('log10(Amp)')
+							ax[1,ind].set_ylabel('Amp')
 				self.fig.suptitle('Coda Strip for %s using %s method in win %s'%(self._current_event.ID, self._method, trinwin['name']))
 
 
