@@ -3,8 +3,8 @@ from __future__ import with_statement, nested_scopes, division, generators
 
 import os
 import time
-import numpy as np 
-import pandas as pd 
+import numpy as np
+import pandas as pd
 from obspy.core import UTCDateTime
 import obspy
 
@@ -19,7 +19,7 @@ def createEqList(arrayList='array.list',
 				model='ak135',
 				phase=['PKiKP'],
 				savefile='array.list.e'):
-	
+
 	ardf = util.readList(arrayList, list_type='array', sep='\s+')
 	msg = ('reading ndk file %s'%ndkfile)
 	gpar.log(__name__, msg, level='info', pri=True)
@@ -39,7 +39,7 @@ def createEqList(arrayList='array.list',
 		msg = ('Generating Eq list for array %s'%name)
 		gpar.log(__name__, msg, level='info', pri=True)
 		evedf = gpar.getdata.makeEventList(ndk=ndk, array=name,
-						Olat=row.LAT, Olon=row.LON, 
+						Olat=row.LAT, Olon=row.LON,
 						mindis=mindis, maxdis=maxdis, minmag=mag,
 						model=model, phase=beamphase,
 						)
@@ -70,7 +70,7 @@ def createArray(arrayList='array.list',
 				**kwargs):
 
 	"""
-	Function to create the Array instance 
+	Function to create the Array instance
 	"""
 
 	arraydf = util.readList(arrayList, list_type='array', sep='\s+')
@@ -128,7 +128,7 @@ def createArray(arrayList='array.list',
 
 					array.getTimeTable(sll_x=sll_x,sll_y=sll_y,sl_s=sl_s,grdpts_x=grdpts_x,grdpts_y=grdpts_y,unit=unit)
 		elif mode =='db':
-			array = gpar.arrayProcess.Array(row.NAME, refpoint, eqdf, stadf, coordsys, beamphase, 
+			array = gpar.arrayProcess.Array(row.NAME, refpoint, eqdf, stadf, coordsys, beamphase,
 											isDoublet=True,starttime=kwargs['starttime'],endtime=kwargs['endtime'],
 											cstime=kwargs['cstime'], cetime=kwargs['cetime'],
 											filt=kwargs['filt'],domain=kwargs['domain'],fittype=kwargs['fittype'])
@@ -145,7 +145,7 @@ def createArray(arrayList='array.list',
 	return arDF
 
 
-def upDateArray(array, beamtype='beam', 
+def upDateArray(array, beamtype='beam',
 			    filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
 				starttime=0,endtime=1800,unit='deg', stack='linear',
 				save=True,write=True,**kwargs):
@@ -156,7 +156,7 @@ def upDateArray(array, beamtype='beam',
 	beamtype: str. Array processing that need to be done, avaliable now:
 		'beam': normal beamforming
 		'slide': sliding window beamforming.
-		'vespectrum': vespectrum for seleceted array. If choose, vary for slowness or back azimuth needs to be choose either. Default vary ="slowness" 
+		'vespectrum': vespectrum for seleceted array. If choose, vary for slowness or back azimuth needs to be choose either. Default vary ="slowness"
 	"""
 
 	if isinstance(array, gpar.arrayProcess.Array):
@@ -202,7 +202,7 @@ def upDateArray(array, beamtype='beam',
 			ar.write(fileName)
 	elif beamtype == 'vespectrum':
 
-		req_pa = set(['sl_s','grdpts','sflag','vary','sll'])
+		req_pa = set(['sl_s','grdpts','vary','sll'])
 		if not req_pa.issubset(kwargs.keys()):
 			msg = ('Required parameters %s for vespectrum are missing'%req_pa)
 			gpar.log(__name__,msg,level='error',pri=True)
@@ -217,4 +217,3 @@ def upDateArray(array, beamtype='beam',
 		gpar.log(__name__,msg,level='error',pri=True)
 
 	return ar
-
