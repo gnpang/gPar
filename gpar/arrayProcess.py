@@ -113,7 +113,7 @@ class Array(object):
 		self.geometry = geometry
 
 	def calARF(self,tsx, tsy,
-			  freq=1.0,sll_x=-15,sll_y=-15, 
+			  freq=1.0,sll_x=-15,sll_y=-15,
 			  sl_s=0.1,grdpts_x=301,grdpts_y=301,
 			  ):
 		'''
@@ -126,7 +126,7 @@ class Array(object):
 			sll_y: float, minimum y slowness, s/deg
 			sl_s: float, increment in slowness, s/deg
 			grdpts_x: int, total points in x slowness
-			grdpts_y: ind, total points in y slowness 
+			grdpts_y: ind, total points in y slowness
 		'''
 
 		sx = sll_x + np.arange(grdpts_x)
@@ -135,7 +135,7 @@ class Array(object):
 		delta_y = sy - tsy
 		mx = np.outer(self.geometry['RX'],delta_x)
 		my = np.outer(self.geometry['RY'],delta_y)
-		timeTable = np.require(mx[:,:,np.newaxis].repeat(grdpts_y,axis=2) + 
+		timeTable = np.require(mx[:,:,np.newaxis].repeat(grdpts_y,axis=2) +
 							   my[:,np.newaxis,:].repeat(grdpts_x,axis=1))
 		tcos = np.mean(np.cos(2.0*PI*freq*timeTable),axis=0)
 		tsin = np.mean(np.sin(2.0*PI*freq*timeTable),axis=0)
@@ -199,13 +199,13 @@ class Array(object):
 
 	def vespectrum(self,grdpts=401,
 					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
-					sflag='log10',stack='linear',
+					stack='linear',
 					sl_s=0.1, vary='slowness',sll=-20.0,
 					starttime=400.0,endtime=1400.0, unit='deg',
 					**kwargs ):
 		for eq in self.events:
 			eq.vespectrum(geometry=self.geometry,arrayName=self.name,grdpts=grdpts,
-					filts=filts, sflag=sflag,stack=stack,
+					filts=filts, stack=stack,
 					sl_s=sl_s, vary=vary,sll=sll,
 					starttime=starttime,endtime=endtime, unit=unit,
 					**kwargs)
@@ -517,28 +517,33 @@ class Earthquake(object):
 				name = 'slide.' + self.ID + '.'+stack+'.'+bpfilt+'.pkl'
 				name = os.path.join('./',arrayName,'Data',self.ID,name)
 				st.write(name,format='PICKLE')
-	# @profile
+	#@profile
 	def vespectrum(self,geometry,arrayName,grdpts=401,
 					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
-					sflag='log10',stack='linear',
+					stack='linear',
 					sl_s=0.1, vary='slowness',sll=-20.0,
 					starttime=400.0,endtime=1400.0, unit='deg',
 					**kwargs ):
 		msg = ('Calculating vespetrum for earthquake %s' % self.ID)
 		gpar.log(__name__,msg,level='info',pri=True)
 		self.slantType = vary
+		self.slantK = sll + np.arange(grdpts)*sl_s
+		winlen = endtime - starttime
+		delta = self.delta
+		winpts = int(winlen/delta) + 1
+		self.slantTime = delta * np.arange(winpts) + starttime
 		if vary == 'slowness':
-			self.slantTime, self.slantK, self.energy = slantBeam(self.stream, self.ntr, self.delta,
+			self.energy = slantBeam(self.stream, self.ntr, delta,
 									geometry, arrayName, grdpts,
-									filts, sflag, stack, sl_s, vary, sll,starttime,
+									filts, stack, sl_s, vary, sll,starttime,
 									endtime, unit, bakAzimuth=self.bakAzimuth)
 		elif vary == 'theta':
-			self.slantTime, self.slantK, self.energy = slantBeam(self.stream, self.ntr, self.delta,
+			self.energy = slantBeam(self.stream, self.ntr, delta,
 									geometry,  arrayName, grdpts,
-									filts, sflag, stack, sl_s, vary, sll,starttime,
+									filts, stack, sl_s, vary, sll,starttime,
 									endtime, unit, rayParameter=self.rayParameter)
 		# self.slantTime = times
-		
+
 		# self.slantK = k
 		# self.energy = abspow
 
@@ -1047,11 +1052,10 @@ def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdp
 	return rel
 
 
-# @profile
+#@profile
 def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
 					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
-					sflag='log',stack='linear',
-					sl_s=0.1, vary='slowness',sll=-20.0,
+					stack='linear',sl_s=0.1, vary='slowness',sll=-20.0,
 					starttime=400.0,endtime=1400.0, unit='deg',
 					**kwargs):
 	st = stream.copy()
@@ -1060,10 +1064,10 @@ def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
 	npts = st[0].stats.npts
 	winlen = endtime - starttime
 	winpts = int(winlen/delta) + 1
-	times = starttime + np.arange(winpts) * delta
+	#times = starttime + np.arange(winpts) * delta
 	timeTable = getSlantTime(geometry,grdpts,sl_s,sll,vary,unit,**kwargs)
-	k = sll + np.arange(grdpts)*sl_s
-	envel = {}
+	#k = sll + np.arange(grdpts)*sl_s
+	envel = pd.DataFrame(columns=['FILT','POWER'])
 	for name, filt in filts.items():
 		tmp_st = st.copy()
 		tmp_st.filter('bandpass',freqmin=filt[0],freqmax=filt[1],corners=filt[2],zerophase=filt[3])
@@ -1100,7 +1104,8 @@ def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
 		if errorcode != 0:
 			msg = 'slantbeam stack for %dth segment in filter %s-%s exited with error %d\n' % (ind, name, filt,errorcode)
 			gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
-		envel[name] = abspow
+		#envel[name] = abspow
+		envel = envel.append({'FILT': name, 'POWER': abspow}, ignore_index=True)
 		# if sflag == 'beam':
 		# 	envel[name] = abspow
 		# else:
@@ -1114,7 +1119,7 @@ def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
 		# 	else:
 		# 		msg = 'Not available option, please choose from beam, log, log10 or sqrt\n'
 		# 		gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
-	return [times, k, envel]
+	return envel
 
 def codaInt(st1, st2, delta, npts, domain='freq', fittype='cos'):
 

@@ -611,11 +611,13 @@ class glanceEQ(QtWidgets.QMainWindow):
 					if ind == 0:
 						ax[_i,ind].set_ylabel(label)
 		elif self._btype == 'vespetrum':
-			num = len(self._current_energy.keys())
+			num = len(self._current_energy)
 			extent=[np.min(self._current_time),np.max(self._current_time),np.min(self._current_K),np.max(self._current_K)]
 			vmin = float(self.ampmin.cleanText())
 			vmax = float(self.ampmax.cleanText())
-			for _i, (name, abspow) in enumerate(self._current_energy.items()):
+			for ind, _row in self._current_energy.iterrows():
+				abspow = _row.POWER
+				name = _row.FILT
 				if self.vepcb.currentText() == 'log10':
 					abspow = np.log10(abspow)
 				elif self.vepcb.currentText() == 'log':
@@ -680,7 +682,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 				delta = self._current_beam[0].stats.delta
 				npts = int((etime - stime)/delta) + 1
 				time = np.linspace(stime, etime, npts)
-				
+
 				sind = int(stime / delta)
 				eind = int(etime / delta)
 				if self._method == 'all':
@@ -715,7 +717,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 						if ind is 0:
 							ax[0,ind].set_ylabel('log10(Amp)')
 							ax[1,ind].set_ylabel('Amp')
-					
+
 				elif self._method == 'coda':
 					codamode = existDF.crms.iloc[0]
 					nfilter = len(codamode)
