@@ -395,6 +395,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		while next(self._eventCycle) != self._eqlist[_i]:
 			pass
 		self._eventInfo(self._eqlist[_i])
+		self._chkExistStrip()
 		self._drawFig()
 
 	def _pltPrevEvent(self):
@@ -405,6 +406,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		for _i in range(len(self._eqlist) - 1):
 			prevEvent = next(self._eventCycle)
 		self._eventInfo(prevEvent)
+		self._chkExistStrip()
 		self.evecb.setCurrentIndex(_j-1)
 		if self._btype == 'strip':
 			self._btype = 'beam'
@@ -413,29 +415,87 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 	def _pltNextEvent(self):
 		_id = self._current_event.ID
-		level = self.eve_type[self.levelGrp.checkedId()]
-		if level == 'D':
-			self._setCodaStrip()
-		else:
-			if len(self._stripDF) != 0:
-				existDF = self._stripDF[(self._stripDF.ID == _id)]
+		if self.levelGrp.checkedButton() is None:
+			choice = QMessageBox.question(self, 'Skipping?',
+						"Haven't evaluate this event yet, skipping?",
+						QMessageBox.Yes | QMessageBox.No)
+			if choice == QMessageBox.Yes:
+				self._eventInfo(next(self._eventCycle))
+				_i = self.evecb.currentIndex()
+				if _i == len(self.evecb)-1:
+					self.evecb.setCurrentIndex(0)
+				else:
+					self.evecb.setCurrentIndex(_i+1)
+				if self._btype == 'strip':
+					self._btype = 'beam'
+					self.sbcb.setCurrentIndex(0)
+				self._drawFig()
 			else:
-				existDF = pd.DataFrame()
-			if len(existDF) == 0:
-				choice = QMessageBox.question(self, 'Stripping?',
-							"Haven't stripping yet, want to do it?",
-							QMessageBox.Yes | QMessageBox.No)
-				if choice is QMessageBox.Yes:
-					self._setCodaStrip()
-					self._updatePlot()
+				return
+		else:
+			level = self.eve_type[self.levelGrp.checkedId()]
+
+			if level == 'D':
+				self._current_strip = True
+				self._setCodaStrip()
+			else:
+				if len(self._stripDF) != 0:
+					existDF = self._stripDF[(self._stripDF.ID == _id)]
+				else:
+					existDF = pd.DataFrame()
+				if len(existDF) == 0:
+					choice = QMessageBox.question(self, 'Stripping?',
+								"Haven't stripping yet, want to do it?",
+								QMessageBox.Yes | QMessageBox.No)
+					if choice == QMessageBox.Yes:
+						self._setCodaStrip()
+						self._updatePlot()
+						return
+			self._eventInfo(next(self._eventCycle))
+			self._chkExistStrip()
+			_i = self.evecb.currentIndex()
+			if _i == len(self.evecb)-1:
+				self.evecb.setCurrentIndex(0)
+			else:
+				self.evecb.setCurrentIndex(_i+1)
+			if self._btype == 'strip':
+				self._btype = 'beam'
+				self.sbcb.setCurrentIndex(0)
+			self._drawFig()
+
+	def _chkExistStrip(self):
+
+		if len(self._stripDF) ==0 and len(self._badDF) == 0:
+			return
+		_id = self._current_ID
+
+		if len(self._stripDF) != 0 and len(self._badDF) !=0:
+
+			_df = self._stripDF[self._stripDF.ID == _id]
+			if len(_df) != 0:
+				level = _df.Level.iloc[0]
+				_i = self.eve_type.index(level)
+				self.levelGrp.button(_i).setChecked(True)
+			else:
+				_df = self._badDF[self._badDF.ID == _id]
+				if len(_df) == 0:
 					return
-		self._eventInfo(next(self._eventCycle))
-		_i = self.evecb.currentIndex()
-		self.evecb.setCurrentIndex(_i+1)
-		if self._btype == 'strip':
-			self._btype = 'beam'
-			self.sbcb.setCurrentIndex(0)
-		self._drawFig()
+				else:
+					self.levelGrp.button(3).setChecked(True)
+		elif len(self._stripDF) == 0:
+			_df = self._badDF[self._badDF.ID == _id]
+			if len(_df) == 0:
+				return
+			else:
+				self.levelGrp.button(3).setChecked(True)
+		elif len(self._badDF) == 0:
+			_df = self._stripDF[self._stripDF.ID == _id]
+			if len(_df) == 0:
+				return
+			level = _df.Level.iloc[0]
+			_i = self.eve_type.index(level)
+			self.levelGrp.button(_i).setChecked(True)
+
 
 	def _eventInfo(self, eqid):
 		"""
@@ -478,7 +538,6 @@ class glanceEQ(QtWidgets.QMainWindow):
 		win = self.trinWin[_i]
 		if len(self._stripDF) != 0:
 			existDF = self._stripDF[(self._stripDF.ID == self._current_event.ID) & (self._stripDF.winName == win['name'])]
-			_badDF = self._badDF[self._badDF.ID == self._current_event.ID]
 			if len(existDF) !=0:
 				choice = QMessageBox.question(self, 'Replace stripping',
 							"Do you want to replace existed stripping?",
@@ -489,9 +548,11 @@ class glanceEQ(QtWidgets.QMainWindow):
 					self._stripDF.reset_index()
 				else:
 					return
+		elif len(self._badDF) != 0:
+			_badDF = self._badDF[self._badDF.ID == self._current_event.ID]
 			if len(_badDF) != 0:
 				choice = QMessageBox.question(self, 'Bad Event',
-						 "Want to replace it?",
+						 "Want to review it again?",
 						 QMessageBox.Yes | QMessageBox.No)
 				if choice == QMessageBox.Yes:
 					index = _badDF.index
@@ -676,6 +737,9 @@ class glanceEQ(QtWidgets.QMainWindow):
 					self.sbcb.setCurrentIndex(0)
 					self._updatePlot()
 			elif len(existDF) != 0:
+				_i = self.wincb.currentIndex()
+				win = self.trinWin[_i]
+				existDF = existDF[existDF.winName == win['name']]
 				trinwin = existDF.win.iloc[0]
 				stime = trinwin['stime']
 				etime = trinwin['etime']
@@ -686,13 +750,15 @@ class glanceEQ(QtWidgets.QMainWindow):
 				sind = int(stime / delta)
 				eind = int(etime / delta)
 				if self._method == 'all':
+					#poteintal bug for multi-windows
 					codamode = existDF.crms.iloc[0]
 					twomode = existDF.trms.iloc[0]
 					nfilter = len(codamode)
-					codaSt = self._current_event.codaSt
-					twoSt = self._current_event.twoSt
-					cRes = self._current_event.codaResSt
-					tRes = self._current_event.twoResSt
+					# codaSt = self._current_event.codaSt
+					codaSt = existDF.codaSt.iloc[0]
+					twoSt = existDF.twoSt.iloc[0]
+					cRes = existDF.codaResSt.iloc[0]
+					tRes = existDF.twoResSt.iloc[0]
 					timeR = np.arange(cRes[0].stats.npts)*cRes[0].stats.delta - trinwin['noise']
 					data_time = np.arange(twoSt[0].stats.npts) * delta + (twoSt[0].stats.starttime - self._current_beam[0].stats.starttime)
 					ax = self.fig.subplots(2, nfilter)
@@ -721,8 +787,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 				elif self._method == 'coda':
 					codamode = existDF.crms.iloc[0]
 					nfilter = len(codamode)
-					codaSt = self._current_event.codaSt
-					cRes = self._current_event.codaResSt
+					codaSt = existDF.codaSt.iloc[0]
+					cRes = existDF.codaResSt.iloc[0]
 					timeR = np.arange(cRes[0].stats.npts)*cRes[0].stats.delta - trinwin['noise']
 					ax = self.fig.subplots(2, nfilter)
 					for ind in range(nfilter):
@@ -745,8 +811,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 				elif self._method == 'twoline':
 					twomode = existDF.trms.iloc[0]
 					nfilter = len(twomode)
-					twoSt = self._current_event.twoSt
-					tRes = self._current_event.twoResSt
+					twoSt = existDF.twoSt.iloc[0]
+					tRes = existDF.twoResSt.iloc[0]
 					timeR = np.arange(tRes[0].stats.npts)*tRes[0].stats.delta - trinwin['noise']
 					data_time = np.arange(twoSt[0].stats.npts) * delta + (twoSt[0].stats.starttime - self._current_beam[0].stats.starttime)
 					ax = self.fig.subplots(2, nfilter)
@@ -897,11 +963,19 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 	def _savePickle(self, filename):
 		self._stripDF.to_pickle(filename)
+		if len(self._badDF) != 0:
+			dfile = od.path.splitext(filename)
+			name = dfile[0]+'.D'+dfile[1]
+			self._badDF.to_pickle(name)
 
 	def _saveCSV(self, filename):
 		_stripDF = self._stripDF
-		_stripDF.drop(['codaTr','twoTr','twoResTr','codaResTr'])
+		_stripDF.drop(['codaSt','twoSt','twoResSt','codaResSt'])
 		_stripDF.to_csv(filename,index=False,sep=',')
+		if len(self._badDF) != 0:
+			dfile = od.path.splitext(filename)
+			name = dfile[0]+'.D'+dfile[1]
+			self._badDF.to_csv(name,index=False,sep=',')
 
 	def _openFile(self):
 		filename,_ = QFileDialog.getOpenFileName(self,'Load Pickle File',
@@ -910,6 +984,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 			filename = str(filename)
 			self._stripDF = pd.read_pickle(filename)
 			self.savefile = str(filename)
+			self._chkExistStrip()
 
 	def _openArray(self):
 		filename,_ = QFileDialog.getOpenFileName(self, 'Load array',
