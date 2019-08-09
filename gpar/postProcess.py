@@ -965,7 +965,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 	def _savePickle(self, filename):
 		self._stripDF.to_pickle(filename)
 		if len(self._badDF) != 0:
-			dfile = od.path.splitext(filename)
+			dfile = os.path.splitext(filename)
 			name = dfile[0]+'.D'+dfile[1]
 			self._badDF.to_pickle(name)
 
@@ -974,7 +974,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		_stripDF.drop(['codaSt','twoSt','twoResSt','codaResSt'])
 		_stripDF.to_csv(filename,index=False,sep=',')
 		if len(self._badDF) != 0:
-			dfile = od.path.splitext(filename)
+			dfile = os.path.splitext(filename)
 			name = dfile[0]+'.D'+dfile[1]
 			self._badDF.to_csv(name,index=False,sep=',')
 
