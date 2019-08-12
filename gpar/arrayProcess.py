@@ -524,7 +524,7 @@ class Earthquake(object):
 					sl_s=0.1, vary='slowness',sll=-20.0,
 					starttime=400.0,endtime=1400.0, unit='deg',
 					**kwargs ):
-		msg = ('Calculating vespetrum for earthquake %s' % self.ID)
+		msg = ('Calculating vespetrum for earthquake %s in array %s' % self.ID, arrayName)
 		gpar.log(__name__,msg,level='info',pri=True)
 		self.slantType = vary
 		self.slantK = sll + np.arange(grdpts)*sl_s
