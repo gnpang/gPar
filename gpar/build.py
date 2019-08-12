@@ -190,10 +190,7 @@ def upDateArray(array, beamtype='beam',
 		sl_s = kwargs['sl_s']
 		grdpts_x = kwargs['grdpts_x']
 		grdpts_y = kwargs['grdpts_y']
-		if not hasattr(ar, 'timeTable'):
-			msg = ('Shift time table is not calculated before for array %s, now calculating the shift time table first'%(ar.name))
-			gpar.log(__name__,msg,level='info',pri=True)
-			ar.getTimeTable(sll_x=sll_x,sll_y=sll_y,sl_s=sl_s,grdpts_x=grdpts_x,grdpts_y=grdpts_y,unit=unit)
+		ar.getTimeTable(sll_x=sll_x,sll_y=sll_y,sl_s=sl_s,grdpts_x=grdpts_x,grdpts_y=grdpts_y,unit=unit)
 		ar.slideBeam(filts=filts, stack=stack,
 					 starttime=starttime, endtime=endtime,
 					 write=write,**kwargs)

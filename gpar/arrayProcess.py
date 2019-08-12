@@ -494,7 +494,7 @@ class Earthquake(object):
 			otime = self.time
 			ndel = winlen*(1-overlap)
 			bnpts = int((endtime-starttime)/ndel)
-			label = ['Amplitude','Slowness','Back Azimuzh','coherence']
+			label = ['Amplitude','Slowness','Back Azimuth','coherence']
 		# print(label)
 			for i in range(4):
 				tr = obspy.core.trace.Trace()

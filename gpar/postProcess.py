@@ -654,6 +654,16 @@ class glanceEQ(QtWidgets.QMainWindow):
 						label=None
 					time = np.arange(tr.stats.npts) * tr.stats.delta + tr.stats.sac.b
 					ax[_i,ind].plot(time, tr.data, 'k', label=None)
+					if label == 'Amplitude':
+						upx = int(np.max(tr.data))+1
+						ax[_i,ind].set_ylim([0,upx])
+					elif label == 'Slowness':
+						ax[_i,ind].set_ylim([0, 15])
+					elif label == 'Back Azimuth':
+						ax[_i, ind].set_ylim([0, 360])
+					elif label == 'coherence':
+						ax[_i,ind].set_ylim([0,1])
+
 					if not hasattr(self._current_event, 'arrivals'):
 						self._current_event.getArrival()
 					arrival = self._current_event.arrivals[self.beamphase]['TT']# - self._current_event.time
@@ -672,6 +682,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 						ax[_i,ind].set_xlabel('Seconds')
 					if ind == 0:
 						ax[_i,ind].set_ylabel(label)
+				self.fig.suptitle('%s - %s'%(self._current_event.ID, self._btype))
 		elif self._btype == 'vespetrum':
 			num = len(self._current_energy)
 			extent=[np.min(self._current_time),np.max(self._current_time),np.min(self._current_K),np.max(self._current_K)]
@@ -701,9 +712,9 @@ class glanceEQ(QtWidgets.QMainWindow):
 				ax.set_title(name)
 			if self._current_type == 'slowness':
 				a = u"\u00b0"
-				title = 'Slant Stack at a Backazimuth of %.1f %sN'%(self._current_event.bakAzimuth,a)
+				title = 'Earthquake: $s\nSlant Stack at a Backazimuth of %.1f %sN'%(self.current_event.ID,self._current_event.bakAzimuth,a)
 			elif self._current_type == 'theta':
-				title = 'Slant Stack at a slowness of %.2f s/deg'%(self._current_event.rayParameter)
+				title = 'Earthquake: %s\nSlant Stack at a slowness of %.2f s/deg'%(self.current_event.ID,self._current_event.rayParameter)
 			self.fig.suptitle(title)
 		elif self._btype == 'strip':
 			if len(self._stripDF) != 0:
@@ -726,7 +737,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 					self._updatePlot()
 			elif len(_badDF) != 0:
 				choice = QMessageBox.question(self, 'Bad event!',
-						 "Want to reevalua it?",
+						 "Want to reevaluate it?",
 						 QMessageBox.Yes | QMessageBox.No)
 				if choice == QMessageBox.Yes:
 					index = _badDF.index
