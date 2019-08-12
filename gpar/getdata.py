@@ -9,8 +9,8 @@ from six import string_types
 import os
 import glob
 import obspy
-import pandas as pd 
-import numpy as np 
+import pandas as pd
+import numpy as np
 import json
 import itertools
 
@@ -20,7 +20,7 @@ import gpar
 from gpar.util import util
 
 
-# client imports 
+# client imports
 import obspy.clients.fdsn
 import obspy.clients.neic
 import obspy.clients.earthworm
@@ -60,7 +60,7 @@ def makeEventList(ndk='gcmt_1976_2017.ndk',array='ILAR',
 				model='ak135',phase=['PKiKP']):
 	"""
 	Function to generate a event list form gcmt.ndk
-	
+
 	Parameters
 	-----------
 	ndkfile: str
@@ -72,8 +72,8 @@ def makeEventList(ndk='gcmt_1976_2017.ndk',array='ILAR',
 	Olon: float
 		Longitude for the reference point in the array processing
 	model: str
-		model for calculate the ray parameter 
-	
+		model for calculate the ray parameter
+
 	Return
 	----------
 	catdf: DataFrame
@@ -108,7 +108,7 @@ def makeEventList(ndk='gcmt_1976_2017.ndk',array='ILAR',
 			myy = tensor.m_pp
 			mxy = -tensor.m_tp
 			myz = -tensor.m_rp
-			mzx = tensor.m_rt 
+			mzx = tensor.m_rt
 			mzz = tensor.m_rr
 
 			newRow = {'TIME':time, 'LAT':lat,'LON':lon,'DEP':dep,
@@ -122,14 +122,14 @@ def makeEventList(ndk='gcmt_1976_2017.ndk',array='ILAR',
 	else:
 		msg = 'Not a valid type of ndk, must be a path to a ndk file or a obspy Catalog instance'%(ndk)
 		gpar.log(__name__,msg,level='error',pri=True)
-	
+
 	# Great circle distance from events to array
 	msg = 'Calculating distance for earthquakes to array %s'%(array)
 	gpar.log(__name__, msg, level='info',pri=True)
 	great_circle_distance_in_degree, azimuth, bakAzimuth = calc_Dist_Azi(evedf.LAT,evedf.LON,Olat,Olon)
 
 	evedf['Del'] = np.around(great_circle_distance_in_degree, decimals=2)
-	evedf['Az'] = np.around(azimuth, decimals=2) 
+	evedf['Az'] = np.around(azimuth, decimals=2)
 	evedf['Baz'] = np.around(bakAzimuth, decimals=2)
 	msg = 'Selecting distance from %.2f to %.2f'%(mindis, maxdis)
 	gpar.log(__name__, msg, level='info',pri=True)
@@ -177,7 +177,7 @@ def makeEventList(ndk='gcmt_1976_2017.ndk',array='ILAR',
 	return evedf
 
 
-	
+
 def calc_Dist_Azi(source_latitude_in_deg, source_longitude_in_deg,
 				  receiver_latitude_in_deg, receiver_longitude_in_deg):
 	"""
@@ -214,7 +214,7 @@ def calc_Dist_Azi(source_latitude_in_deg, source_longitude_in_deg,
 	e1 = np.cos(source_longitude) * np.cos(source_latitude)
 	e2 = np.sin(source_longitude) * np.cos(source_latitude)
 	e3 = np.sin(source_latitude)
-	
+
 	source_vector = np.transpose(np.array([e1,e2,e3]))
 	# receiver vector unnder spherical coordinates
 	s1 = np.cos(receiver_longitude) * np.cos(receiver_latitude)
@@ -270,8 +270,8 @@ def calc_Dist_Azi(source_latitude_in_deg, source_longitude_in_deg,
 				bakazi = bakazi + 360.0
 				bakAzimuth_in_degree[ind] = bakazi
 
-	
-				
+
+
 	return great_circle_distance_in_degree,azimuth_in_degree,bakAzimuth_in_degree
 
 
@@ -324,7 +324,7 @@ def makeDataDirectory(arraylist='array.list', fetch='IRIS',
 		fetcher = gpar.getdata.DataFetcher(fetch, timeBeforeOrigin=timeBeforeOrigin, timeAfterOrigin=timeAfterOrigin, minlen=minlen)
 
 	for ind, row in ardf.iterrows():
-		edf, stadf = fetcher.getEqData(row)
+		edf, stadf = fetcher.getEqData(row,channel='*')
 		edf.dropna(inplace=True)
 		edf.reset_index(drop=True, inplace=True)
 		arDir = os.path.join(row.NAME, 'Data')
@@ -340,7 +340,7 @@ def makeDataDirectory(arraylist='array.list', fetch='IRIS',
 				sacname = _id + '.' + tr.stats.station + '.' + tr.stats.channel + '.sac'
 				sacname = os.path.join(eDir, sacname)
 				tr.write(sacname, format='SAC')
-		
+
 		if buildArray :
 			refpoint = [row.LAT, row.LON]
 			array = gpar.arrayProcess.Array(row.NAME, refpoint, edf, coordsys=kwargs['coordsys'], phase=kwargs['phase'])
@@ -465,7 +465,7 @@ class DataFetcher(object):
 
 			df['Stream'] = stream
 
-		return df, stadf		
+		return df, stadf
 
 
 # Functions to get stream data based on selected method
@@ -509,7 +509,7 @@ def _loadDirectoryData(arrayName, df, mode,minlen,channel='Z'):
 					st.remove(tr)
 					gpar.log(__name__,msg,level='warning',e=ValueError)
 					continue
-			
+
 				staDf = _checkSta(tr, staDf)
 
 			if len(st) == 0:
@@ -606,4 +606,3 @@ def _checkSta(tr, stadf):
 		stadf = stadf.append(newSta, ignore_index=True)
 
 	return stadf
-
