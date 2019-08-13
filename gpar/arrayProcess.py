@@ -524,7 +524,7 @@ class Earthquake(object):
 					sl_s=0.1, vary='slowness',sll=-20.0,
 					starttime=400.0,endtime=1400.0, unit='deg',
 					**kwargs ):
-		msg = ('Calculating vespetrum for earthquake %s in array %s' % self.ID, arrayName)
+		msg = ('Calculating vespetrum for earthquake %s in array %s' % (self.ID, arrayName))
 		gpar.log(__name__,msg,level='info',pri=True)
 		self.slantType = vary
 		self.slantK = sll + np.arange(grdpts)*sl_s
@@ -599,6 +599,7 @@ class Doublet(object):
 		self.st2 = row.ST2
 		self._checkInput()
 		self._resample(resample,method)
+		self._getDel(array)
 		if hasattr(row, 'TT1') and hasattr(row, 'TT2'):
 			self.tt1 = row.TT1
 			self.tt2 = row.TT2
@@ -629,6 +630,12 @@ class Doublet(object):
 		else:
 			msg = ('Not a valid option for waveform resampling, choose from resample and interpolate')
 			gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
+
+	def _getDel(self, array):
+		olat = (self.ev1['LAT'] + self.ev2['LAT'])/2.0
+		olon = (self.ev1['LON'] + self.ev2['LON'])/2.0
+		dis, az, bakAzi = gpar.getdata.calc_Dist_Azi(olat, olon, array.refPoint[0], array.refPoint[1])
+		self.dis = {'DEL': dis, 'AZ':az,'bakAzi':bakAzi}
 
 	def getArrival(self,array, phase=None, model='ak135'):
 		"""
@@ -711,8 +718,9 @@ class Doublet(object):
 		for ind, tr1, tr2 in zip_longest(inds, tmp_st1, tmp_st2):
 
 			if tr1.stats.station != tr2.stats.station:
-				msg = ('Orders of the traces are not right')
-				gpar.log(__name__, msg, level='error',pri=True)
+				msg = ('Orders of the traces are not right for Doublet %s'%self.ID)
+				gpar.log(__name__, msg, level='warning',pri=True)
+				return
 			data1 = tr1.data
 			data2 = tr2.data
 

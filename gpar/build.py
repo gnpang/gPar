@@ -61,7 +61,7 @@ def createArray(arrayList='array.list',
 				channel='Z',
 				beamphase='PKiKP',
 				coordsys='lonlat',
-				calTime=True,
+				calTime=False,
 				save=True,
 				saveName=False,
 				mode='eq',
@@ -128,6 +128,11 @@ def createArray(arrayList='array.list',
 
 					array.getTimeTable(sll_x=sll_x,sll_y=sll_y,sl_s=sl_s,grdpts_x=grdpts_x,grdpts_y=grdpts_y,unit=unit)
 		elif mode =='db':
+			req_pa = set(['starttime', 'endtime', 'cstime','cetime',
+						  'filt', 'domain', 'fittype'])
+			if not req_pa.issubset(kwargs.keys()):
+				msg = ('Required parameters %s for doublets are missing'%req_pa)
+				gpar.log(__name__,msg,level='error',pri=True)
 			array = gpar.arrayProcess.Array(row.NAME, refpoint, eqdf, stadf, coordsys, beamphase,
 											isDoublet=True,starttime=kwargs['starttime'],endtime=kwargs['endtime'],
 											cstime=kwargs['cstime'], cetime=kwargs['cetime'],
