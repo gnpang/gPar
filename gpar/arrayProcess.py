@@ -585,6 +585,7 @@ class Doublet(object):
 				 phase=['PKIKP']):
 
 		self.ID = row.DoubleID
+		print("%s,%s",(row.TIME1, row.TIME2))
 		self.ev1 = {'TIME': UTCDateTime(row.TIME1), 'LAT': row.LAT1,
 					'LON': row.LON1, 'DEP': row.DEP1,
 					'MAG': row.M1}
