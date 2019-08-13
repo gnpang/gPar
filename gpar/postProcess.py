@@ -713,9 +713,9 @@ class glanceEQ(QtWidgets.QMainWindow):
 				ax.set_title(name)
 			if self._current_type == 'slowness':
 				a = u"\u00b0"
-				title = 'Earthquake: $s\nSlant Stack at a Backazimuth of %.1f %sN'%(self.current_event.ID,self._current_event.bakAzimuth,a)
+				title = 'Earthquake: $s\nSlant Stack at a Backazimuth of %.1f %sN'%(self._current_event.ID,self._current_event.bakAzimuth,a)
 			elif self._current_type == 'theta':
-				title = 'Earthquake: %s\nSlant Stack at a slowness of %.2f s/deg'%(self.current_event.ID,self._current_event.rayParameter)
+				title = 'Earthquake: %s\nSlant Stack at a slowness of %.2f s/deg'%(self._current_event.ID,self._current_event.rayParameter)
 			self.fig.suptitle(title)
 		elif self._btype == 'strip':
 			if len(self._stripDF) != 0:
