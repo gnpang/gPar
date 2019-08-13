@@ -670,51 +670,38 @@ class Doublet(object):
 				   domain='freq', fittype='cos'):
 		sta1 = []
 		sta2 = []
-		for tr1, tr2 in zip_longest(self.st1, self.st2):
+		tmp_st1 = self.st1.copy()
+		tmp_st2 = self.st2.copy()
+		stime1 = self.arr1 - cstime
+		etime1 = self.arr1 + cetime
+		tmp_st1.trim(starttime=stime1, endtime=etime1)
+		stime2 = self.arr2 - cstime
+		etime2 = self.arr2 + cetime
+		tmp_st2.trim(starttime=stime2, endtime=etime2)
+		for tr1, tr2 in zip_longest(tmp_st1, tmp_st2):
 			if tr1 is not None:
 				sta1.append(tr1.stats.network+'.'+tr1.stats.station+'..'+tr1.stats.channel)
 			if tr2 is not None:
 				sta2.append(tr2.stats.network+'.'+tr2.stats.station+'..'+tr2.stats.channel)
-		if len(self.st1) != len(self.st2):
-			msg = ('station records for two events are not equal, remove the additional station')
-			gpar.log(__name__,msg,level='info',pri=True)
-
-			sta = list(set(sta1) & set(sta2))
-			st1 = obspy.Stream()
-			st2 = obspy.Stream()
-			for s in sta:
-				_tr1 = self.st1.select(id=s).copy()[0]
-				_tr2 = self.st2.select(id=s).copy()[0]
-				st1.append(_tr1)
-				st2.append(_tr2)
-			st1.sort(keys=['station'])
-			st2.sort(keys=['station'])
-			st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
-			st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
-			sta.sort()
-		else:
-			st1 = self.st1.copy()
-			st2 = self.st2.copy()
-			st1.sort(keys=['station'])
-			st2.sort(keys=['station'])
-			st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
-			st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
-			sta1.sort()
-			sta = sta1
-
-		stime1 = self.arr1 - cstime
-		etime1 = self.arr1 + cetime
-		tmp_st1 = st1.copy()
-		tmp_st1.trim(starttime=stime1, endtime=etime1)
-		stime2 = self.arr2 - cstime
-		etime2 = self.arr2 + cetime
-		tmp_st2 = st2.copy()
-		tmp_st2.trim(starttime=stime2, endtime=etime2)
-
+		sta = list(set(sta1) & set(sta2))
+		sta.sort()
+		st1 = obspy.Stream()
+		st2 = obspy.Stream()
+		for s in sta:
+			_tr1 = self.st1.select(id=s).copy()[0]
+			_tr2 = self.st2.select(id=s).copy()[0]
+			st1.append(_tr1)
+			st2.append(_tr2)
+		# st1.sort(keys=['station'])
+		# st2.sort(keys=['station'])
+		st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
+		st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
+		tmp_st1 = st1.copy().trim(starttime=stime1, endtime=etime1)
+		tmp_st2 = st2.copy().trim(starttime=stime2, endtime=etime2)
 		npts = int((cetime + cstime)/delta) + 1
 		Mptd1 = np.zeros([len(st1), npts])
 		Mptd2 = np.zeros([len(st2), npts])
-		inds = range(len(st1))
+		inds = range(len(sta))
 		for ind, tr1, tr2 in zip_longest(inds, tmp_st1, tmp_st2):
 
 			if tr1.stats.station != tr2.stats.station:
