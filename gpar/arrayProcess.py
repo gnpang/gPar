@@ -585,7 +585,8 @@ class Doublet(object):
 				 phase=['PKIKP']):
 
 		self.ID = row.DoubleID
-		print("%s,%s",(row.TIME1, row.TIME2))
+		msg = ("Building %s: EV1: %s; EV2: %s"%(self.ID,row.TIME1, row.TIME2))
+		gpar.log(__name__, msg, level='info', pri=True)
 		self.ev1 = {'TIME': UTCDateTime(row.TIME1), 'LAT': row.LAT1,
 					'LON': row.LON1, 'DEP': row.DEP1,
 					'MAG': row.M1}
@@ -669,8 +670,8 @@ class Doublet(object):
 				   cstime=20.0, cetime=20.0,
 				   starttime=100.0, endtime=300.0,
 				   domain='freq', fittype='cos'):
-		msg = ('Aligning waveforms for doublet %s'%(self.ID))
-		gpar.log(__name__, msg, level='info', pri=True)
+		# msg = ('Aligning waveforms for doublet %s'%(self.ID))
+		# gpar.log(__name__, msg, level='info', pri=True)
 		sta1 = []
 		sta2 = []
 		tmp_st1 = self.st1.copy()
