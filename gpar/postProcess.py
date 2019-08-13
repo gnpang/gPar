@@ -668,7 +668,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 						self._current_event.getArrival()
 					arrival = self._current_event.arrivals[self.beamphase]['TT']# - self._current_event.time
 					ax[_i,ind].vlines(arrival, ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'r',label=self.beamphase)
-					ax[_i,ind].set_title(name)
+					if _i == 0:
+						ax[_i,ind].set_title(name)
 					if self.ttbtn.isChecked():
 						_arr = self._current_event.arrivals
 						# del _arr[self.beamphase]

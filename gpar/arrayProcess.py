@@ -668,6 +668,8 @@ class Doublet(object):
 				   cstime=20.0, cetime=20.0,
 				   starttime=100.0, endtime=300.0,
 				   domain='freq', fittype='cos'):
+		msg = ('Aligning waveforms for doublet %s'%(self.ID))
+		gpar.log(__name__, msg, level='info', pri=True)
 		sta1 = []
 		sta2 = []
 		tmp_st1 = self.st1.copy()
@@ -675,9 +677,19 @@ class Doublet(object):
 		stime1 = self.arr1 - cstime
 		etime1 = self.arr1 + cetime
 		tmp_st1.trim(starttime=stime1, endtime=etime1)
+		if len(tmp_st1) == 0:
+			msg = ('Earthquake %s does not have waveform in %s period'%(self.ev1['TIME'], self.phase))
+			gpar.log(__name__, msg, level='warning', pri=True)
+			self._qual = False
+			return
 		stime2 = self.arr2 - cstime
 		etime2 = self.arr2 + cetime
 		tmp_st2.trim(starttime=stime2, endtime=etime2)
+		if len(tmp_st2) == 0:
+			msg = ('Earthquake %s does not have waveform in %s period'%(self.ev2['TIME'], self.phase))
+			gpar.log(__name__, msg, level='warning', pri=True)
+			self._qual = False
+			return
 		for tr1, tr2 in zip_longest(tmp_st1, tmp_st2):
 			if tr1 is not None:
 				sta1.append(tr1.stats.network+'.'+tr1.stats.station+'..'+tr1.stats.channel)
@@ -740,6 +752,7 @@ class Doublet(object):
 			tr.trim(starttime=stime, endtime=stime+starttime+endtime)
 		self.use_st1 = st1
 		self.use_st2 = st2
+		self._qual = True
 
 	def codaInter(self, delta=0.01,
 				  winlen=5, step=0.05,
@@ -759,6 +772,10 @@ class Doublet(object):
 
 		# npts = int((endtime - starttime)/shift)
 		# stalist = self.geometry.STA.tolist()
+		if not self._qual:
+			msg = ('Waveforms for this doublet %s have quality issure, stop calculating'%self.ID)
+			gpar.log(__name__, msg, level='warning', pri=True)
+			return
 		if winlen is None:
 			winlen = self.winlen
 		if step is None:
