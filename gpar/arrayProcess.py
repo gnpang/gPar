@@ -724,6 +724,7 @@ class Doublet(object):
 			if tr1.stats.station != tr2.stats.station:
 				msg = ('Orders of the traces are not right for Doublet %s'%self.ID)
 				gpar.log(__name__, msg, level='warning',pri=True)
+				self._qual = False
 				return
 			data1 = tr1.data
 			data2 = tr2.data
@@ -748,6 +749,11 @@ class Doublet(object):
 		_df['TS'] = taup
 		_df['CC'] = cc
 		_df = _df[_df.CC >= threshold]
+		if len(_df) == 0:
+			msg = ('Correlation for doublet %s is too bad, maybe due to SNR, dropping'%self.ID)
+			gpar.log(__name__, msg, level='info', pri=True)
+			self._qual=False
+			return
 		_df.sort_values('STA',inplace=True)
 		_df.reset_index(inplace=True)
 		self.align = _df
