@@ -599,8 +599,10 @@ class Doublet(object):
 		self.step = step
 		self.st1 = row.ST1
 		self.st2 = row.ST2
+		self.st1.detrend('demean')
+		self.st2.detrend('demean')
 		self._checkInput()
-		self._resample(resample,method)
+		# self._resample(resample,method)
 		self._getDel(array)
 		if hasattr(row, 'TT1') and hasattr(row, 'TT2'):
 			self.tt1 = row.TT1
@@ -619,19 +621,19 @@ class Doublet(object):
 		if not isinstance(self.st2, obspy.core.stream.Stream):
 			msg = ('Waveform data for %s is not stream, stop running' % self.ID)
 			gpar.log(__name__,msg,level='error',pri=True)
-	def _resample(self, resample, method):
-		self.st1.detrend('demean')
-		self.st2.detrend('demean')
+	def _resample(self, st1, st2,resample, method):
 		rrate = 1.0/resample
 		if method == 'resample':
-			self.st1.resample(sampling_rate=rrate)
-			self.st2.resample(sampling_rate=rrate)
+			st1.resample(sampling_rate=rrate)
+			st2.resample(sampling_rate=rrate)
 		elif method == 'interpolate':
-			self.st1.interpolate(sampling_rate=rrate)
-			self.st2.interpolate(sampling_rate=rrate)
+			st1.interpolate(sampling_rate=rrate)
+			st2.interpolate(sampling_rate=rrate)
 		else:
 			msg = ('Not a valid option for waveform resampling, choose from resample and interpolate')
 			gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
+
+		return st1, st2
 
 	def _getDel(self, array):
 		olat = (self.ev1['LAT'] + self.ev2['LAT'])/2.0
@@ -665,11 +667,11 @@ class Doublet(object):
 		self.tt2 = arr2.time
 		# msg = ('Travel time for %s for earthquake %s in depth of %.2f in distance of %.2f is %s' % (phase, self.ID, self.dep, self.Del, self.arrival))
 		# gpar.log(__name__,msg,level='info',pri=True)
-
 	def _alignWave(self,filt=[1.33, 2.67,3,True],delta=0.01,
-				   cstime=20.0, cetime=20.0,
+				   cstime=20.0, cetime=20.0, method='resample',
 				   starttime=100.0, endtime=300.0,
-				   domain='freq', fittype='cos'):
+				   domain='freq', fittype='cos',
+				   threshold=0.4):
 		# msg = ('Aligning waveforms for doublet %s'%(self.ID))
 		# gpar.log(__name__, msg, level='info', pri=True)
 		sta1 = []
@@ -712,6 +714,7 @@ class Doublet(object):
 		st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
 		tmp_st1 = st1.copy().trim(starttime=stime1, endtime=etime1)
 		tmp_st2 = st2.copy().trim(starttime=stime2, endtime=etime2)
+		tmp_st1, tmpe_st2 = self._resample(tmp_st1,tmp_st2,delta, method)
 		npts = int((cetime + cstime)/delta) + 1
 		Mptd1 = np.zeros([len(st1), npts])
 		Mptd2 = np.zeros([len(st2), npts])
@@ -744,18 +747,37 @@ class Doublet(object):
 		_df['STA'] = sta
 		_df['TS'] = taup
 		_df['CC'] = cc
+		_df = _df[_df.CC >= threshold]
+		_df.sort_values('STA',inplace=True)
+		_df.reset_index(inplace=True)
 		self.align = _df
-		# self.initTS = np.array(taup)
-		# self.alignCC = np.array(cc)
-		thiftBT = - starttime - np.array(taup)
-		st2.trim(starttime = self.arr2-starttime, endtime=self.arr2+endtime)
-		for ind, tr in enumerate(st1):
-			stime = self.arr1 + thiftBT[ind]
-			tr.trim(starttime=stime, endtime=stime+starttime+endtime)
-		self.use_st1 = st1
-		self.use_st2 = st2
+		# selective trace
+		refTime = np.min(-starttime - _df.TS)
+		self.refTime = self.arr1 + refTime
+		use_st1 = obspy.Stream()
+		use_st2 = obspy.Stream()
+		for ind, row in _df.iterrows():
+			sta = row.STA
+			_tr1 = st1.select(id=sta)[0].copy()
+			_tr2 = st2.select(id=sta)[0].copy()
+			_tr2.trim(starttime=self.arr2-starttime, endtime=self.arr2+endtime)
+			use_st2.append(_tr2)
+			thiftBT = -starttime - row.TS
+			stime = self.arr1 + thiftBT
+			_tr1.trim(starttime=stime, endtime=stime+starttime+endtime)
+			use_st1.append(_tr1)
+		use_st1, use_st2 = self._resample(use_st1, use_st2, delta, method)
+		# refTime = self.arr2 - starttime
+		# st2.trim(starttime = self.arr2-starttime, endtime=self.arr2+endtime)
+		# for ind, tr in enumerate(st1):
+		# 	stime = self.arr1 + thiftBT[ind]
+		# 	tr.trim(starttime=stime, endtime=stime+starttime+endtime)
+			# tr.stats.starttime = refTime
+		use_st1.sort(keys=['station'])
+		use_st2.sort(keys=['station'])
+		self.use_st1 = use_st1
+		self.use_st2 = use_st2
 		self._qual = True
-
 	def codaInter(self, delta=0.01,
 				  winlen=5, step=0.05,
 				  starttime=100.0,
@@ -778,6 +800,7 @@ class Doublet(object):
 			msg = ('Waveforms for this doublet %s have quality issure, stop calculating'%self.ID)
 			gpar.log(__name__, msg, level='warning', pri=True)
 			return
+		msg = ('Calculating Coda Interferometry for doublet %s'%self.ID)
 		if winlen is None:
 			winlen = self.winlen
 		if step is None:
@@ -786,6 +809,9 @@ class Doublet(object):
 			delta = self.delta
 		st1 = self.use_st1.copy()
 		st2 = self.use_st2.copy()
+		#set starttime to be consistent in st1
+		for tr in st1:
+			tr.stats.starttime = self.refTime
 		npts = int(winlen / delta)
 		taup = []
 		cc = []
@@ -836,9 +862,9 @@ class Doublet(object):
 		plt.subplot(5,1,2)
 		tr1 = st1.select(id=sta_id).copy()[0]
 		tr2 = st2.select(id=sta_id).copy()[0]
-		tr1.trim(starttime=self.arr1-stime-_ts, endtime=self.arr1+etime-_ts)
-		tr2.trim(starttime=self.arr2-stime, endtime=self.arr2+etime)
-		t = self.ts.min() + np.arange(len(st1[0].data))*st1[0].stats.delta
+		# tr1.trim(starttime=self.arr1-stime-_ts, endtime=self.arr1+etime-_ts)
+		# tr2.trim(starttime=self.arr2-stime, endtime=self.arr2+etime)
+		t = self.ts.min() + np.arange(len(st1[0].data))*tr1.stats.delta
 		plt.plot(t, tr1.data)
 		plt.ylabel('Event 1')
 		plt.xlim(lim)
