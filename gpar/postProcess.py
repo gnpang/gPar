@@ -685,6 +685,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 						ax[_i,ind].set_ylabel(label)
 				self.fig.suptitle('%s - %s'%(self._current_event.ID, self._btype))
 		elif self._btype == 'vespetrum':
+			if not hasattr(self._current_event, 'arrivals'):
+					self._current_event.getArrival()
 			num = len(self._current_energy)
 			extent=[np.min(self._current_time),np.max(self._current_time),np.min(self._current_K),np.max(self._current_K)]
 			vmin = float(self.ampmin.cleanText())
@@ -983,7 +985,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 	def _saveCSV(self, filename):
 		_stripDF = self._stripDF
-		_stripDF.drop(['codaSt','twoSt','twoResSt','codaResSt'])
+		_stripDF.drop(columns=['codaSt','twoSt','twoResSt','codaResSt'])
 		_stripDF.to_csv(filename,index=False,sep=',')
 		if len(self._badDF) != 0:
 			dfile = os.path.splitext(filename)
@@ -996,6 +998,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 		if filename:
 			filename = str(filename)
 			self._stripDF = pd.read_pickle(filename)
+			dfile = os.path.splitext(filename)
+			name = dfile[0]+'.D'+dfile[1]
+			if os.path.exists(name):
+				self._badDF = pd.read_pickle(name)
 			self.savefile = str(filename)
 			self._chkExistStrip()
 
@@ -1805,11 +1811,19 @@ def codaStrip(eve, beamtype='beam', method='all',
 
 	if beamtype == 'beam':
 		st = eve.beam
-	elif beamtype == 'slide':
-		tr = eve.slideSt
 	else:
-		msg = ('Not a valid option for codastrip')
-		gpar.log(__name__,msg,level='error',pri=True)
+		msg = ('Not a support option for codaStrip yet, select beamforming')
+		gpar.log(__name__,msg,level='warning', pri=True)
+		if hasattr(eve, 'beam'):
+			st = eve.beam
+		else:
+			msg = ('Do not have beamforming trace, do the beamforming fisrt')
+			gpar.log(__name__, msg, level='error', pri=True)
+	# elif beamtype == 'slide':
+	# 	tr = eve.slideSt
+	# else:
+	# 	msg = ('Not a valid option for codastrip')
+	# 	gpar.log(__name__,msg,level='error',pri=True)
 
 	filts=[]
 	delta = st[0].stats.delta
