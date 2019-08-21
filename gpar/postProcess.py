@@ -1208,7 +1208,7 @@ class stackArray(QtWidgets.QMainWindow):
 		window = [win['noise'], win['coda']]
 		self.regDf = {'global':self._current_array_df}
 		_stackSt, _stdSt = stackTR(self._current_array_df,
-								  sacname=None,win=window,
+								  pklname=None,win=window,
 								  mindis=self.dis[0]['mindis'],
 								  maxdis=self.dis[0]['maxdis'],
 								  step=self.dis[0]['step'],
@@ -1333,7 +1333,7 @@ class stackArray(QtWidgets.QMainWindow):
 		self.regDf[_reg['name']] = _df
 
 		_stackSt, _stdSt = stackTR(_df,
-								  sacname=savefile,win=window,
+								  pklname=savefile,win=window,
 								  mindis=self.dis[_i]['mindis'],
 								  maxdis=self.dis[_i]['maxdis'],
 								  step=self.dis[_i]['step'],
@@ -2094,8 +2094,8 @@ def stackTR(obsdf, pklname=None,win=[200.0,200.0],
 			st_std.append(tr_std)
 
 	if write:
-		if sacname is None:
+		if pklname is None:
 			pklname = 'stack.pkl'
-		st_obs.write(sacname,format='PICKLE')
+		st_obs.write(pklname,format='PICKLE')
 
 	return st_obs, st_std
