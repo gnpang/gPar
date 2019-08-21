@@ -2054,7 +2054,7 @@ def stackTR(obsdf, pklname=None,win=[200.0,200.0],
 	DATA = [''] * len(obsdf)
 	for ind, row in obsdf.iterrows():
 		codaResSt = row.codaResSt
-		tmp_data = np.empty((len(filter), npt))
+		tmp_data = np.empty((len(filters), npt))
 		for i, tr in enumerate(codaResSt):
 			tmp_data[i] = norm(tr.data, sind, eind)
 		DATA[ind] = tmp_data
