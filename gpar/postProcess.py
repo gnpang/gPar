@@ -1223,7 +1223,7 @@ class stackArray(QtWidgets.QMainWindow):
 		array = {'name':ardf.NAME,'lat':ardf.LAT,'lon':ardf.LON}
 		self._current_array = array
 		self._current_array_df = ardf.DF
-		self._current_filter = self._current_array_df.crms.FILT
+		self._current_filter = self._current_array_df.iloc[0].crms.FILT
 
 	def _createStatusBar(self):
 		sb = QStatusBar()
