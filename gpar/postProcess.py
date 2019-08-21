@@ -1,8 +1,8 @@
 """
 GUI code modified based on https://github.com/miili/StreamPick
 
-Need updates:
-Need to reformat the strip dataframe, add in stripping information when previous stripping is loaded
+For earthquake PKiKP coda quality evaluation and stack
+
 """
 
 import os
@@ -395,7 +395,6 @@ class glanceEQ(QtWidgets.QMainWindow):
 		while next(self._eventCycle) != self._eqlist[_i]:
 			pass
 		self._eventInfo(self._eqlist[_i])
-		self._chkExistStrip()
 		self._drawFig()
 
 	def _pltPrevEvent(self):
@@ -406,7 +405,6 @@ class glanceEQ(QtWidgets.QMainWindow):
 		for _i in range(len(self._eqlist) - 1):
 			prevEvent = next(self._eventCycle)
 		self._eventInfo(prevEvent)
-		self._chkExistStrip()
 		self.evecb.setCurrentIndex(_j-1)
 		if self._btype == 'strip':
 			self._btype = 'beam'
@@ -415,87 +413,29 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 	def _pltNextEvent(self):
 		_id = self._current_event.ID
-		if self.levelGrp.checkedButton() is None:
-			choice = QMessageBox.question(self, 'Skipping?',
-						"Haven't evaluate this event yet, skipping?",
-						QMessageBox.Yes | QMessageBox.No)
-			if choice == QMessageBox.Yes:
-				self._eventInfo(next(self._eventCycle))
-				_i = self.evecb.currentIndex()
-				if _i == len(self.evecb)-1:
-					self.evecb.setCurrentIndex(0)
-				else:
-					self.evecb.setCurrentIndex(_i+1)
-				if self._btype == 'strip':
-					self._btype = 'beam'
-					self.sbcb.setCurrentIndex(0)
-				self._drawFig()
-			else:
-				return
+		level = self.eve_type[self.levelGrp.checkedId()]
+		if level == 'D':
+			self._setCodaStrip()
 		else:
-			level = self.eve_type[self.levelGrp.checkedId()]
-
-			if level == 'D':
-				self._current_strip = True
-				self._setCodaStrip()
+			if len(self._stripDF) != 0:
+				existDF = self._stripDF[(self._stripDF.ID == _id)]
 			else:
-				if len(self._stripDF) != 0:
-					existDF = self._stripDF[(self._stripDF.ID == _id)]
-				else:
-					existDF = pd.DataFrame()
-				if len(existDF) == 0:
-					choice = QMessageBox.question(self, 'Stripping?',
-								"Haven't stripping yet, want to do it?",
-								QMessageBox.Yes | QMessageBox.No)
-					if choice == QMessageBox.Yes:
-						self._setCodaStrip()
-						self._updatePlot()
-						return
-			self._eventInfo(next(self._eventCycle))
-			self._chkExistStrip()
-			_i = self.evecb.currentIndex()
-			if _i == len(self.evecb)-1:
-				self.evecb.setCurrentIndex(0)
-			else:
-				self.evecb.setCurrentIndex(_i+1)
-			if self._btype == 'strip':
-				self._btype = 'beam'
-				self.sbcb.setCurrentIndex(0)
-			self._drawFig()
-
-	def _chkExistStrip(self):
-
-		if len(self._stripDF) ==0 and len(self._badDF) == 0:
-			return
-		_id = self._current_ID
-
-		if len(self._stripDF) != 0 and len(self._badDF) !=0:
-
-			_df = self._stripDF[self._stripDF.ID == _id]
-			if len(_df) != 0:
-				level = _df.Level.iloc[0]
-				_i = self.eve_type.index(level)
-				self.levelGrp.button(_i).setChecked(True)
-			else:
-				_df = self._badDF[self._badDF.ID == _id]
-				if len(_df) == 0:
+				existDF = pd.DataFrame()
+			if len(existDF) == 0:
+				choice = QMessageBox.question(self, 'Stripping?',
+							"Haven't stripping yet, want to do it?",
+							QMessageBox.Yes | QMessageBox.No)
+				if choice is QMessageBox.Yes:
+					self._setCodaStrip()
+					self._updatePlot()
 					return
-				else:
-					self.levelGrp.button(3).setChecked(True)
-		elif len(self._stripDF) == 0:
-			_df = self._badDF[self._badDF.ID == _id]
-			if len(_df) == 0:
-				return
-			else:
-				self.levelGrp.button(3).setChecked(True)
-		elif len(self._badDF) == 0:
-			_df = self._stripDF[self._stripDF.ID == _id]
-			if len(_df) == 0:
-				return
-			level = _df.Level.iloc[0]
-			_i = self.eve_type.index(level)
-			self.levelGrp.button(_i).setChecked(True)
-
+		self._eventInfo(next(self._eventCycle))
+		_i = self.evecb.currentIndex()
+		self.evecb.setCurrentIndex(_i+1)
+		if self._btype == 'strip':
+			self._btype = 'beam'
+			self.sbcb.setCurrentIndex(0)
+		self._drawFig()
 
 	def _eventInfo(self, eqid):
 		"""
@@ -520,6 +460,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self._current_p = event.rayParameter
 		self._current_bb = event.pattern
 		self._current_bakAz = event.bakAzimuth
+		self._current_delta = event.delta
 		if hasattr(event, 'slideSt'):
 			self._current_slide = event.slideSt
 		if hasattr(event, 'energy'):
@@ -538,6 +479,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		win = self.trinWin[_i]
 		if len(self._stripDF) != 0:
 			existDF = self._stripDF[(self._stripDF.ID == self._current_event.ID) & (self._stripDF.winName == win['name'])]
+			_badDF = self._badDF[self._badDF.ID == self._current_event.ID]
 			if len(existDF) !=0:
 				choice = QMessageBox.question(self, 'Replace stripping',
 							"Do you want to replace existed stripping?",
@@ -548,11 +490,9 @@ class glanceEQ(QtWidgets.QMainWindow):
 					self._stripDF.reset_index()
 				else:
 					return
-		elif len(self._badDF) != 0:
-			_badDF = self._badDF[self._badDF.ID == self._current_event.ID]
 			if len(_badDF) != 0:
 				choice = QMessageBox.question(self, 'Bad Event',
-						 "Want to review it again?",
+						 "Want to replace it?",
 						 QMessageBox.Yes | QMessageBox.No)
 				if choice == QMessageBox.Yes:
 					index = _badDF.index
@@ -569,6 +509,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		dis = event.Del
 		bb = event.pattern
 		bakAzi = event.bakAzimuth
+		delta = event.delta
 
 		if level =='D':
 			newRow = {'ID': ID, 'lat':lat,
@@ -583,7 +524,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 						  'Mw':mw,'Del':dis,
 						  'BB':bb,'bakAzi':bakAzi,
 						  'winName':win['name'], 'win':win,
-						  'Level':level,
+						  'Level':level, 'delta': delta,
 						  'codaResSt':event.codaResSt,
 						  'codaSt':event.codaSt,
 						  'crms':event.codaMod,
@@ -597,7 +538,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 						  'Mw':mw,'Del':dis,
 						  'winName':win['name'], 'win':win,
 						  'BB':bb,'bakAzi':bakAzi,
-						  'Level':level,
+						  'Level':level, 'delta': delta,
 						  'codaResSt':event.codaResSt,
 						  'codaSt':event.codaSt,
 						  'crms':event.codaMod,
@@ -608,7 +549,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 						  'lon':lon,'dep':dep,
 						  'Mw':mw,'Del':dis,
 						  'BB':bb,'bakAzi':bakAzi,
-						  'Level':level,
+						  'Level':level, 'delta': delta,
 						  'winName':win['name'], 'win':win,
 						  'twoResSt':event.twoResSt,
 						  'twoSt':event.twoSt,
@@ -654,39 +595,24 @@ class glanceEQ(QtWidgets.QMainWindow):
 						label=None
 					time = np.arange(tr.stats.npts) * tr.stats.delta + tr.stats.sac.b
 					ax[_i,ind].plot(time, tr.data, 'k', label=None)
-					if label == 'Amplitude':
-						upx = int(np.max(tr.data))+1
-						ax[_i,ind].set_ylim([0,upx])
-					elif label == 'Slowness':
-						ax[_i,ind].set_ylim([0, 15])
-					elif label == 'Back Azimuth':
-						ax[_i, ind].set_ylim([0, 360])
-					elif label == 'coherence':
-						ax[_i,ind].set_ylim([0,1])
-
 					if not hasattr(self._current_event, 'arrivals'):
 						self._current_event.getArrival()
 					arrival = self._current_event.arrivals[self.beamphase]['TT']# - self._current_event.time
 					ax[_i,ind].vlines(arrival, ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'r',label=self.beamphase)
-					if _i == 0:
-						ax[_i,ind].set_title(name)
 					if self.ttbtn.isChecked():
 						_arr = self._current_event.arrivals
 						# del _arr[self.beamphase]
 						for name, tt in _arr.items():
 							if name is self.beamphase:
 								continue
-							ax[_i,ind].vlines(tt['TT'], ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'b',label=name)
+							ax[_i,ind].vlines(tt['TT'], ax.get_ylim()[0],ax.get_ylim()[1],'b',label=name)
 					ax[_i,ind].legend()
 					# ax[_i,ind].set_aspect(aspect=0.3)
 					if _i == 3:
 						ax[_i,ind].set_xlabel('Seconds')
 					if ind == 0:
 						ax[_i,ind].set_ylabel(label)
-				self.fig.suptitle('%s - %s'%(self._current_event.ID, self._btype))
 		elif self._btype == 'vespetrum':
-			if not hasattr(self._current_event, 'arrivals'):
-					self._current_event.getArrival()
 			num = len(self._current_energy)
 			extent=[np.min(self._current_time),np.max(self._current_time),np.min(self._current_K),np.max(self._current_K)]
 			vmin = float(self.ampmin.cleanText())
@@ -700,7 +626,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 					abspow = np.log(abspow)
 				elif self.vepcb.currentText() == 'sqrt':
 					abspow = np.sqrt(abspow)
-				ax = self.fig.add_subplot(1, num, ind+1)
+				ax = self.fig.add_subplot(1, num, _i+1)
 				ax.imshow(abspow, extent=extent, aspect='auto', cmap='Reds', vmin=vmin, vmax=vmax)
 				arrival = self._current_event.arrivals[self.beamphase]['TT']
 				ax.vlines(arrival, ax.get_ylim()[0],ax.get_ylim()[1],'k',label=self.beamphase)
@@ -715,9 +641,9 @@ class glanceEQ(QtWidgets.QMainWindow):
 				ax.set_title(name)
 			if self._current_type == 'slowness':
 				a = u"\u00b0"
-				title = 'Earthquake: %s\nSlant Stack at a Backazimuth of %.1f %sN'%(self._current_event.ID,self._current_event.bakAzimuth,a)
+				title = 'Slant Stack at a Backazimuth of %.1f %sN'%(self._current_event.bakAzimuth,a)
 			elif self._current_type == 'theta':
-				title = 'Earthquake: %s\nSlant Stack at a slowness of %.2f s/deg'%(self._current_event.ID,self._current_event.rayParameter)
+				title = 'Slant Stack at a slowness of %.2f s/deg'%(self._current_event.rayParameter)
 			self.fig.suptitle(title)
 		elif self._btype == 'strip':
 			if len(self._stripDF) != 0:
@@ -740,7 +666,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 					self._updatePlot()
 			elif len(_badDF) != 0:
 				choice = QMessageBox.question(self, 'Bad event!',
-						 "Want to reevaluate it?",
+						 "Want to reevalua it?",
 						 QMessageBox.Yes | QMessageBox.No)
 				if choice == QMessageBox.Yes:
 					index = _badDF.index
@@ -752,9 +678,6 @@ class glanceEQ(QtWidgets.QMainWindow):
 					self.sbcb.setCurrentIndex(0)
 					self._updatePlot()
 			elif len(existDF) != 0:
-				_i = self.wincb.currentIndex()
-				win = self.trinWin[_i]
-				existDF = existDF[existDF.winName == win['name']]
 				trinwin = existDF.win.iloc[0]
 				stime = trinwin['stime']
 				etime = trinwin['etime']
@@ -765,15 +688,13 @@ class glanceEQ(QtWidgets.QMainWindow):
 				sind = int(stime / delta)
 				eind = int(etime / delta)
 				if self._method == 'all':
-					#poteintal bug for multi-windows
 					codamode = existDF.crms.iloc[0]
 					twomode = existDF.trms.iloc[0]
 					nfilter = len(codamode)
-					# codaSt = self._current_event.codaSt
-					codaSt = existDF.codaSt.iloc[0]
-					twoSt = existDF.twoSt.iloc[0]
-					cRes = existDF.codaResSt.iloc[0]
-					tRes = existDF.twoResSt.iloc[0]
+					codaSt = self._current_event.codaSt
+					twoSt = self._current_event.twoSt
+					cRes = self._current_event.codaResSt
+					tRes = self._current_event.twoResSt
 					timeR = np.arange(cRes[0].stats.npts)*cRes[0].stats.delta - trinwin['noise']
 					data_time = np.arange(twoSt[0].stats.npts) * delta + (twoSt[0].stats.starttime - self._current_beam[0].stats.starttime)
 					ax = self.fig.subplots(2, nfilter)
@@ -802,8 +723,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 				elif self._method == 'coda':
 					codamode = existDF.crms.iloc[0]
 					nfilter = len(codamode)
-					codaSt = existDF.codaSt.iloc[0]
-					cRes = existDF.codaResSt.iloc[0]
+					codaSt = self._current_event.codaSt
+					cRes = self._current_event.codaResSt
 					timeR = np.arange(cRes[0].stats.npts)*cRes[0].stats.delta - trinwin['noise']
 					ax = self.fig.subplots(2, nfilter)
 					for ind in range(nfilter):
@@ -826,8 +747,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 				elif self._method == 'twoline':
 					twomode = existDF.trms.iloc[0]
 					nfilter = len(twomode)
-					twoSt = existDF.twoSt.iloc[0]
-					tRes = existDF.twoResSt.iloc[0]
+					twoSt = self._current_event.twoSt
+					tRes = self._current_event.twoResSt
 					timeR = np.arange(tRes[0].stats.npts)*tRes[0].stats.delta - trinwin['noise']
 					data_time = np.arange(twoSt[0].stats.npts) * delta + (twoSt[0].stats.starttime - self._current_beam[0].stats.starttime)
 					ax = self.fig.subplots(2, nfilter)
@@ -978,19 +899,11 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 	def _savePickle(self, filename):
 		self._stripDF.to_pickle(filename)
-		if len(self._badDF) != 0:
-			dfile = os.path.splitext(filename)
-			name = dfile[0]+'.D'+dfile[1]
-			self._badDF.to_pickle(name)
 
 	def _saveCSV(self, filename):
 		_stripDF = self._stripDF
-		_stripDF.drop(columns=['codaSt','twoSt','twoResSt','codaResSt'])
+		_stripDF.drop(['codaTr','twoTr','twoResTr','codaResTr'])
 		_stripDF.to_csv(filename,index=False,sep=',')
-		if len(self._badDF) != 0:
-			dfile = os.path.splitext(filename)
-			name = dfile[0]+'.D'+dfile[1]
-			self._badDF.to_csv(name,index=False,sep=',')
 
 	def _openFile(self):
 		filename,_ = QFileDialog.getOpenFileName(self,'Load Pickle File',
@@ -998,12 +911,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		if filename:
 			filename = str(filename)
 			self._stripDF = pd.read_pickle(filename)
-			dfile = os.path.splitext(filename)
-			name = dfile[0]+'.D'+dfile[1]
-			if os.path.exists(name):
-				self._badDF = pd.read_pickle(name)
 			self.savefile = str(filename)
-			self._chkExistStrip()
 
 	def _openArray(self):
 		filename,_ = QFileDialog.getOpenFileName(self, 'Load array',
@@ -1315,6 +1223,7 @@ class stackArray(QtWidgets.QMainWindow):
 		array = {'name':ardf.NAME,'lat':ardf.LAT,'lon':ardf.LON}
 		self._current_array = array
 		self._current_array_df = ardf.DF
+		self._current_filter = self._current_array_df.crms.FILT
 
 	def _createStatusBar(self):
 		sb = QStatusBar()
@@ -1442,18 +1351,19 @@ class stackArray(QtWidgets.QMainWindow):
 		if self.stbtn.isChecked() is False:
 			self._drawFig()
 		# self.fig.add_subplot(121)
-		# _i = self.discb.currentIndex()
-		# this_dis = self.dis[_i]
-		# step_forward = this_dis['step'] * (1 - this_dis['overlap'])
-		# n = int((this_dis['maxdis'] - this_dis['mindis'])/step_forward) + 1
+		_i = self.discb.currentIndex()
+		this_dis = self.dis[_i]
+		step_forward = this_dis['step'] * (1 - this_dis['overlap'])
+		n = int((this_dis['maxdis'] - this_dis['mindis'])/step_forward) + 1
+		n_filt = len(self._current_filter)
 		if self.allbtn.isChecked() is False or len(self._region) < 2:
 			_i = self.regcb.currentIndex()
 			_name = self._region[_i]['name']
 			_stackSt = self.stackSt[_name]
 			_stdSt = self.stdSt[_name]
-			n = len(_stackSt)
+			#n = len(_stackSt)
 			# gs = self.fig.add_gridspec(n,2)
-			gs = gridspec.GridSpec(ncols=2, nrows=n, figure=self.fig)
+			gs = gridspec.GridSpec(ncols=n_filter+1, nrows=n, figure=self.fig)
 			_ax = self.fig.add_subplot(gs[:,0])
 			m = Basemap(projection='cyl', lon_0=-180.0, lat_0=0.0,
 						area_thresh=10000,ax=_ax)
@@ -1477,23 +1387,28 @@ class stackArray(QtWidgets.QMainWindow):
 			delta = _stackSt[0].stats.delta
 			npts = _stackSt[0].stats.npts
 			time = np.arange(npts)*delta + _stackSt[0].stats.sac.b
-			for i in range(n):
-				_ax_st = self.fig.add_subplot(gs[i,1])
-				if i == n-1:
-					_ax_st.set_xlabel('Time (s)')
-				_ax_st.plot(time, _stackSt[i].data,'darkred')
-				_ax_st.hlines(0,time[0],time[-1],'k')
-				_ax_st.errorbar(time, _stackSt[i].data, yerr=2*_stdSt[i].data,
-							 marker='.',mew=0.1, ecolor='red', linewidth=0.2, markersize=0.2,
-							 capsize=0.1, alpha=0.5)
+			for ind, f in enumerate(self._current_filter):
+				_st = _stackSt.select(station=f).copy()
+				_st.sort('channel')
+				_std_st = _stdSt.select(station=f).copy()
+				_std_st.sort('channel')
+				for i in range(n):
+					_ax_st = self.fig.add_subplot(gs[i,ind+1])
+					if i == n-1:
+						_ax_st.set_xlabel('Time (s)')
+					_ax_st.plot(time, _st[i].data,'darkred', label=st[i].stats.channel)
+					_ax_st.hlines(0,time[0],time[-1],'k')
+					_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
+								 marker='.',mew=0.1, ecolor='red', linewidth=0.2, markersize=0.2,
+								 capsize=0.1, alpha=0.5)
 		else:
 			_region = self._region[1:]
 			_current_df = self._current_array_df
-			_i = self.discb.currentIndex()
-			this_dis = self.dis[_i]
-			step_forward = this_dis['step'] * (1 - this_dis['overlap'])
-			n = int((this_dis['maxdis'] - this_dis['mindis'])/step_forward) + 1
-			gs = self.fig.add_gridspec(n,2)
+			#_i = self.discb.currentIndex()
+			#this_dis = self.dis[_i]
+			#step_forward = this_dis['step'] * (1 - this_dis['overlap'])
+			#n = int((this_dis['maxdis'] - this_dis['mindis'])/step_forward) + 1
+			gs = self.fig.add_gridspec(n,n_filter+1)
 			_ax = self.fig.add_subplot(gs[:,0])
 			m = Basemap(projection='cyl', lon_0=-180.0, lat_0=0.0,
 						area_thresh=10000,ax=_ax)
@@ -1509,28 +1424,30 @@ class stackArray(QtWidgets.QMainWindow):
 			x0, y0 = m(self._current_array['lon'], self._current_array['lat'])
 			m.scatter(x0, y0, marker='*',c='r',s=100,alpha=0.7,ax=_ax,zorder=10)
 
-			for i in range(n):
-				_ax_st = self.fig.add_subplot(gs[i,1])
-				if i == n-1:
-					_ax_st.set_xlabel('Time (s)')
-
-				for _i, _reg in enumerate(_region):
-					_name = _reg['name']
-					_df = self.regDf[_name]
-					x, y = m(_df.lon.tolist(), _df.lat.tolist())
-					m.scatter(x, y, marker='o', c=color[_i], s=50, alpha=0.7,ax=_ax,zorder=10)
-					_stackSt = self.stackSt[_name]
-					_stdSt = self.stdSt[_name]
-					delta = _stackSt[0].stats.delta
-					npts = _stackSt[0].stats.npts
-					time = np.arange(npts)*delta + _stackSt[0].stats.sac.b
-					_ax_st.plot(time, _stackSt[i].data,color=color[_i])
-					_ax_st.errorbar(time, _stackSt[i].data, yerr=2*_stdSt[i].data,
-							 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
-							 capsize=0.1, alpha=0.5)
-				_ax_st.hlines(0,time[0],time[-1],'k')
-
-
+			for _i, _reg in enumerate(_region):
+				_name = _reg['name']
+				_df = self.regDf[_name]
+				x, y = m(_df.lon.tolist(), _df.lat.tolist())
+				m.scatter(x, y, marker='o', c=color[_i], s=50, alpha=0.7,ax=_ax,zorder=10)
+				_stackSt = self.stackSt[_name]
+				_stdSt = self.stdSt[_name]
+				delta = _stackSt[0].stats.delta
+				npts = _stackSt[0].stats.npts
+				time = np.arange(npts)*delta + _stackSt[0].stats.sac.b
+				for ind, f in enumerate(self._current_filter):
+					_st = _stackSt.select(station=f).copy()
+					_st.sort('channel')
+					_std_st = _stdSt.select(station=f).copy()
+					_std_st.sort('channel')
+					for i in range(n):
+						_ax_st = self.fig.add_subplot(gs[i,ind+1])
+						if i == n-1:
+							_ax_st.set_xlabel('Time (s)')
+						_ax_st.plot(time, _st[i].data,color=color[_i])
+						_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
+									 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
+									 capsize=0.1, alpha=0.5)
+						_ax_st.hlines(0,time[0],time[-1],'k')
 		self._canvasDraw()
 
 	def _stackAll(self):
@@ -1811,19 +1728,11 @@ def codaStrip(eve, beamtype='beam', method='all',
 
 	if beamtype == 'beam':
 		st = eve.beam
+	elif beamtype == 'slide':
+		tr = eve.slideSt
 	else:
-		msg = ('Not a support option for codaStrip yet, select beamforming')
-		gpar.log(__name__,msg,level='warning', pri=True)
-		if hasattr(eve, 'beam'):
-			st = eve.beam
-		else:
-			msg = ('Do not have beamforming trace, do the beamforming fisrt')
-			gpar.log(__name__, msg, level='error', pri=True)
-	# elif beamtype == 'slide':
-	# 	tr = eve.slideSt
-	# else:
-	# 	msg = ('Not a valid option for codastrip')
-	# 	gpar.log(__name__,msg,level='error',pri=True)
+		msg = ('Not a valid option for codastrip')
+		gpar.log(__name__,msg,level='error',pri=True)
 
 	filts=[]
 	delta = st[0].stats.delta
@@ -2108,7 +2017,7 @@ def stack(df,win):
 	data = df.DATA.values
 	std_data = np.std(data,axis=0)/np.sqrt(len(data))
 	#stack_data = np.sum(data,axis=0)/len(df)
-	stack_data = np.mean(data)
+	stack_data = np.mean(data,axis=0)
 	# peak = np.max(np.absolute(stack_data[win[0]:win[1]]))
 	# stack_data = stack_data/peak
 
@@ -2120,22 +2029,37 @@ def misfit(data1,data2):
 
 	return l2
 
-def stackTR(obsdf, sacname=None,win=[200.0,200.0],
+def stackTR(obsdf, pklname=None,win=[200.0,200.0],
 			mindis=50., maxdis=75.,
 		   step=5.0,overlap=0.0, write=False):
+
+	deltas = obsdf.delta.unique()
+	filters = obsdf.iloc[0].crms.FILT
+	if len(deltas) != 1:
+		delta = np.max(deltas)
+		sample = 1.0/delta
+		#npt = obsdf[obsdf.delta == delta].iloc[0].codaResSt[0].stats.npts
+		dts = deltas[deltas != delta]
+		for dt in dts:
+			index = obsdf[obsdf.delta == dt].index
+			for ind in index:
+				obsdf.iloc[ind].codeResSt.resample(sample)
+	else:
+		delta = deltas[0]
+		#npt = obsdf.iloc[0].codaResSt[0].stats.npts
+	sind = int(win[0]/delta)
+	eind = sind + int(win[1]/delta)
+	npt = int((win[0]*2 + win[1])/delta) + 1
+	time = np.arange(npt) * delta - win[0]
 	DATA = [''] * len(obsdf)
-	t = obsdf.iloc[0]
-	stats = t.codaResTr.stats
-	npt = stats.npts
-	delta = stats.delta
-	sind = int((win[0])/delta)
-	eind = sind + int((win[1])/delta)
 	for ind, row in obsdf.iterrows():
-		DATA[ind] = norm(row.codaResTr.data, sind, eind)
+		codaResSt = row.codaResSt
+		tmp_data = np.empty((len(filter), npt))
+		for i, tr in enumerate(codaResSt):
+			tmp_data[i] = norm(tr.data, sind, eind)
+		DATA[ind] = tmp_data
 	obsdf['DATA'] = DATA
 	n = len(obsdf)
-	time = np.arange(npt) * delta - win[0]
-
 	st_obs = Stream()
 	st_std = Stream()
 	step_forward = step * (1-overlap)
@@ -2144,33 +2068,34 @@ def stackTR(obsdf, sacname=None,win=[200.0,200.0],
 	ds = np.linspace(mindis, maxdis, n)[:-1]
 
 	for d in ds:
-
-		tr_obs = Trace()
-		tr_obs.stats.sac = AttribDict()
-		tr_obs.stats.delta = delta
-		tr_obs.stats.npts = npt
-		tr_obs.stats.station = n
-		tr_obs.stats.sac.delta = delta
-		tr_obs.stats.sac.b = -win[0]
-		tr_obs.stats.sac.e = win[1]
-		tr_obs.stats.sac.npts = npt
-		tr_std = tr_obs.copy()
 		_df = obsdf[(obsdf.Del >= d) & (obsdf.Del < d+step)]
-		if len(_df) == 0:
-			tr_obs.data = np.zeros(npt)
-			tr_std.data = np.zeros(npt)
+		if len(_df) != 0:
+			stack_obs, std_obs = stack(_df, [sind, eind])
+		else:
+			stack_obs = np.zeros((len(filters), npt))
+			std_obs = np.zeros((len(filters), npt))
+		for i, filt in enumerate(filters):
+			tr_obs = Trace()
+			tr_obs.stats.sac = AttribDict()
+			tr_obs.stats.delta = delta
+			tr_obs.stats.npts = npt
+			tr_obs.stats.network = 'stack'
+			tr_obs.stats.station = filt
+			tr_obs.stats.channel = d
+			tr_obs.stats.sac.delta = delta
+			tr_obs.stats.sac.b = -win[0]
+			tr_obs.stats.sac.e = win[1]
+			tr_obs.stats.sac.npts = npt
+			tr_std = tr_obs.copy()
+			tr_std.stats.network = 'std'
+			tr_obs.data = stack_obs[i]
+			tr_std.data = std_obs[i]
 			st_obs.append(tr_obs)
 			st_std.append(tr_std)
-			continue
-		stack_obs,std_obs = stack(_df,[sind, eind])
-		tr_obs.data = stack_obs
-		tr_std.data = std_obs
-		st_obs.append(tr_obs)
-		st_std.append(tr_std)
 
 	if write:
 		if sacname is None:
-			sacname = 'stack.sac'
-		st_obs.write(sacname,format='SAC')
+			pklname = 'stack.pkl'
+		st_obs.write(sacname,format='PICKLE')
 
 	return st_obs, st_std
