@@ -1428,6 +1428,7 @@ class stackArray(QtWidgets.QMainWindow):
 
 			for _i, _reg in enumerate(_region):
 				_name = _reg['name']
+				print(_name)
 				_df = self.regDf[_name]
 				x, y = m(_df.lon.tolist(), _df.lat.tolist())
 				m.scatter(x, y, marker='o', c=color[_i], s=50, alpha=0.7,ax=_ax,zorder=10)
