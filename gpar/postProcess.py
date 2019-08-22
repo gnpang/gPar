@@ -1356,7 +1356,7 @@ class stackArray(QtWidgets.QMainWindow):
 		_i = self.discb.currentIndex()
 		this_dis = self.dis[_i]
 		step_forward = this_dis['step'] * (1 - this_dis['overlap'])
-		n = int((this_dis['maxdis'] - this_dis['mindis'])/step_forward) + 1
+		n = int((this_dis['maxdis'] - this_dis['mindis'])/step_forward)
 		n_filt = len(self._current_filter)
 		if self.allbtn.isChecked() is False or len(self._region) < 2:
 			_i = self.regcb.currentIndex()
