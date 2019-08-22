@@ -1398,7 +1398,7 @@ class stackArray(QtWidgets.QMainWindow):
 					_ax_st = self.fig.add_subplot(gs[i,ind+1])
 					if i == n-1:
 						_ax_st.set_xlabel('Time (s)')
-					_ax_st.plot(time, _st[i].data,'darkred', label=st[i].stats.channel)
+					_ax_st.plot(time, _st[i].data,'darkred', label=_st[i].stats.channel)
 					_ax_st.hlines(0,time[0],time[-1],'k')
 					_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
 								 marker='.',mew=0.1, ecolor='red', linewidth=0.2, markersize=0.2,
