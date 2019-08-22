@@ -487,7 +487,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 				if choice == QMessageBox.Yes:
 					index = existDF.index
 					self._stripDF.drop(index,axis=0,inplace=True)
-					self._stripDF.reset_index()
+					self._stripDF.reset_index(inplace=True)
 				else:
 					return
 			if len(_badDF) != 0:
@@ -497,7 +497,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 				if choice == QMessageBox.Yes:
 					index = _badDF.index
 					self._badDF.drop(index,axis=0,inplace=True)
-					self._badDF.reset_index()
+					self._badDF.reset_index(inplace=True)
 				else:
 					return
 		level = self.eve_type[self.levelGrp.checkedId()]
@@ -671,7 +671,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 				if choice == QMessageBox.Yes:
 					index = _badDF.index
 					self._badDF.drop(index,axis=0,inplace=True)
-					self._badDF.reset_index()
+					self._badDF.reset_index(inplace=True)
 					self.sbcb.setCurrentIndex(0)
 					self._updatePlot()
 				else:
@@ -1329,7 +1329,7 @@ class stackArray(QtWidgets.QMainWindow):
 						  (_current_df['lat']<_reg['latmax']) &
 						  (_current_df['lon']>_reg['lonmin']) &
 						  (_current_df['lon']<_reg['lonmax'])]
-		_df.reset_index()
+		_df.reset_index(inplace=True)
 		self.regDf[_reg['name']] = _df
 
 		_stackSt, _stdSt = stackTR(_df,
@@ -2052,7 +2052,6 @@ def stackTR(obsdf, pklname=None,win=[200.0,200.0],
 	npt = int((win[0]*2 + win[1])/delta) + 1
 	time = np.arange(npt) * delta - win[0]
 	DATA = [''] * len(obsdf)
-	print(len(DATA))
 	for ind, row in obsdf.iterrows():
 		codaResSt = row.codaResSt
 		tmp_data = np.empty((len(filters), npt))
