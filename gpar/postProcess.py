@@ -48,7 +48,7 @@ from obspy.core import AttribDict
 
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-color = mcolors.cnames.values()
+color = list(mcolors.cnames.values())
 
 #class for event first evaluation
 class glanceEQ(QtWidgets.QMainWindow):
@@ -1365,7 +1365,7 @@ class stackArray(QtWidgets.QMainWindow):
 			_stdSt = self.stdSt[_name]
 			#n = len(_stackSt)
 			# gs = self.fig.add_gridspec(n,2)
-			gs = gridspec.GridSpec(ncols=n_filter+1, nrows=n, figure=self.fig)
+			gs = gridspec.GridSpec(ncols=n_filt+1, nrows=n, figure=self.fig)
 			_ax = self.fig.add_subplot(gs[:,0])
 			m = Basemap(projection='cyl', lon_0=0, lat_0=0.0,
 						area_thresh=10000,ax=_ax)
@@ -1410,7 +1410,7 @@ class stackArray(QtWidgets.QMainWindow):
 			#this_dis = self.dis[_i]
 			#step_forward = this_dis['step'] * (1 - this_dis['overlap'])
 			#n = int((this_dis['maxdis'] - this_dis['mindis'])/step_forward) + 1
-			gs = self.fig.add_gridspec(n,n_filter+1)
+			gs = self.fig.add_gridspec(n,n_filt+1)
 			_ax = self.fig.add_subplot(gs[:,0])
 			m = Basemap(projection='cyl', lon_0=0.0, lat_0=0.0,
 						area_thresh=10000,ax=_ax)
