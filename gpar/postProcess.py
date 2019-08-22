@@ -48,7 +48,8 @@ from obspy.core import AttribDict
 
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-color = list(mcolors.cnames.values())
+# color = list(mcolors.cnames.values())
+color = ['red', 'blue', 'green','yellow','cyan','magenta','purple']
 
 #class for event first evaluation
 class glanceEQ(QtWidgets.QMainWindow):
@@ -1476,19 +1477,31 @@ class stackArray(QtWidgets.QMainWindow):
 					_st.sort(['channel'])
 					_std_st = _stdSt.select(station=f).copy()
 					_std_st.sort(['channel'])
+					delta = _st[0].stats.delta
+					sind = int(window[0]/delta)
+					eind = sind + int(window[1]/delta)
 					for i in range(n):
 						_ax_st = self.fig.add_subplot(gs[i,ind+1])
 						if i == n-1:
 							_ax_st.set_xlabel('Time (s)')
 						if i == 0:
 							_ax_st.set_title('Filter: %s'%f)
-						_ax_st.plot(time, _st[i].data,color=color[_i],label=_st[i].stats.channel)
-						_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
-									 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
-									 capsize=0.1, alpha=0.5)
+						peak, data = norm(_st[i].data, sind, eind)
+						if self.nbtn.isChecked():
+							_ax_st.plot(time, data,color=color[_i],label=_st[i].stats.channel)
+							_ax_st.errorbar(time, data, yerr=2*_std_st[i].data,
+										 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
+										 capsize=0.1, alpha=0.5)
+							_ax_st.set_ylim([-0.1, 1.1])
+						else:
+							_ax_st.plot(time, _st[i].data,color='dark'+color[_i],label=_st[i].stats.channel)
+							_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
+										 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
+										 capsize=0.1, alpha=0.5)
+							peak = peak+0.1
+							_ax_st.set_ylim([-0.1, peak])
 						_ax_st.hlines(0,time[0],time[-1],'k')
 						_ax_st.set_xlim([-window[0], window[0]+window[1]])
-						_ax_st.set_ylim([-0.1, 1.0])
 						_ax_st.legend()
 		self._canvasDraw()
 
