@@ -1201,7 +1201,7 @@ class stackArray(QtWidgets.QMainWindow):
 		self.btnbar2.addWidget(vline)
 		self.btnbar2.addWidget(self.nbtn)
 		self.btnbar2.addWidget(vline)
-		self.btnbar.addWidget(QLabel('Filter'))
+		self.btnbar2.addWidget(QLabel('Filter'))
 		self.btnbar2.addWidget(self.filtcb)
 		self.btnbar2.addStretch(1)
 
