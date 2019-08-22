@@ -35,6 +35,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 
 from mpl_toolkits.basemap import Basemap
+from mpl_toolkits.basemap import shiftgrid
 # from mpl_toolkits.axesgrid1 import make_axes_locatable
 
 #obspy import
@@ -1236,7 +1237,7 @@ class stackArray(QtWidgets.QMainWindow):
 		self.fig.add_subplot(1, 1, 1)
 		_ax = self.fig.get_axes()
 
-		m = Basemap(projection='cyl', lon_0=-180.0, lat_0=0.0,
+		m = Basemap(projection='cyl', lon_0=0, lat_0=0.0,
 					area_thresh=10000,ax=_ax[0])
 		x0, y0 = m(self._current_array['lon'], self._current_array['lat'])
 
@@ -1244,9 +1245,10 @@ class stackArray(QtWidgets.QMainWindow):
 		m.drawmapboundary(ax=_ax[0])
 		m.fillcontinents(color='lightgray',lake_color='white',ax=_ax[0])
 		parallels = np.arange(-90.0, 90.0, 60)
-		m.drawparallels(parallels,ax=_ax[0])
+		# labels = [left, right, top, bottom]
+		m.drawparallels(parallels,labels=[True, False, False, False],ax=_ax[0])
 		meridians = np.arange(-180.0, 180.0, 60.0)
-		m.drawmeridians(meridians,ax=_ax[0])
+		m.drawmeridians(meridians,labels=[False, False, False, True],ax=_ax[0])
 		m.scatter(x0, y0, marker='*',c='r',s=100,alpha=0.7,ax=_ax[0],zorder=10)
 		if self.allbtn.isChecked() and len(self._region) < 2:
 			x, y = m(self._current_array_df.lon.tolist(), self._current_array_df.lat.tolist())
@@ -1365,7 +1367,7 @@ class stackArray(QtWidgets.QMainWindow):
 			# gs = self.fig.add_gridspec(n,2)
 			gs = gridspec.GridSpec(ncols=n_filter+1, nrows=n, figure=self.fig)
 			_ax = self.fig.add_subplot(gs[:,0])
-			m = Basemap(projection='cyl', lon_0=-180.0, lat_0=0.0,
+			m = Basemap(projection='cyl', lon_0=0, lat_0=0.0,
 						area_thresh=10000,ax=_ax)
 			x0, y0 = m(self._current_array['lon'], self._current_array['lat'])
 			x, y = m(self._current_array_df.lon.tolist(), self._current_array_df.lat.tolist())
@@ -1410,7 +1412,7 @@ class stackArray(QtWidgets.QMainWindow):
 			#n = int((this_dis['maxdis'] - this_dis['mindis'])/step_forward) + 1
 			gs = self.fig.add_gridspec(n,n_filter+1)
 			_ax = self.fig.add_subplot(gs[:,0])
-			m = Basemap(projection='cyl', lon_0=-180.0, lat_0=0.0,
+			m = Basemap(projection='cyl', lon_0=0.0, lat_0=0.0,
 						area_thresh=10000,ax=_ax)
 			x0, y0 = m(self._current_array['lon'], self._current_array['lat'])
 			x, y = m(self._current_array_df.lon.tolist(), self._current_array_df.lat.tolist())
