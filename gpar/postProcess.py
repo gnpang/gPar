@@ -1120,6 +1120,14 @@ class stackArray(QtWidgets.QMainWindow):
 		self.arcb.activated.connect(self._pltArray)
 		self.arcb.setMaximumWidth(1000)
 		self.arcb.setMinimumWidth(80)
+		# filter selection
+		self.filtcb = QComboBox(self)
+		self.filtcb.addItem('all')
+		for filt in self._current_filter:
+			self.filtcb.addItem(filt)
+		self.filtcb.activated.connect(self._drawStack)
+		self.filtcb.setMaximumWidth(1000)
+		self.filtcb.setMinimumWidth(80)
 
 		# Select region
 
@@ -1192,6 +1200,9 @@ class stackArray(QtWidgets.QMainWindow):
 		self.btnbar2.addWidget(self.rsbtn)
 		self.btnbar2.addWidget(vline)
 		self.btnbar2.addWidget(self.nbtn)
+		self.btnbar2.addWidget(vline)
+		self.btnbar.addWidget(QLabel('Filter'))
+		self.btnbar2.addWidget(self.filtcb)
 		self.btnbar2.addStretch(1)
 
 
@@ -1369,7 +1380,12 @@ class stackArray(QtWidgets.QMainWindow):
 		window = [win['noise'], win['coda']]
 		step_forward = this_dis['step'] * (1 - this_dis['overlap'])
 		n = int((this_dis['maxdis'] - this_dis['mindis'])/step_forward)
-		n_filt = len(self._current_filter)
+		ftype = self.filtcb.currentText()
+		if ftype == 'all':
+			current_filter = self._current_filter
+		else:
+			current_filter = [fype]
+		n_filt = len(current_filter)
 		if self.allbtn.isChecked() is False or len(self._region) < 2:
 			_i = self.regcb.currentIndex()
 			_current_df = self._current_array_df
@@ -1407,7 +1423,7 @@ class stackArray(QtWidgets.QMainWindow):
 			delta = _stackSt[0].stats.delta
 			npts = _stackSt[0].stats.npts
 			time = np.arange(npts)*delta + _stackSt[0].stats.sac.b
-			for ind, f in enumerate(self._current_filter):
+			for ind, f in enumerate(current_filter):
 				_st = _stackSt.select(station=f).copy()
 				_st.sort(['channel'])
 				_std_st = _stdSt.select(station=f).copy()
@@ -1472,7 +1488,7 @@ class stackArray(QtWidgets.QMainWindow):
 				delta = _stackSt[0].stats.delta
 				npts = _stackSt[0].stats.npts
 				time = np.arange(npts)*delta + _stackSt[0].stats.sac.b
-				for ind, f in enumerate(self._current_filter):
+				for ind, f in enumerate(current_filter):
 					_st = _stackSt.select(station=f).copy()
 					_st.sort(['channel'])
 					_std_st = _stdSt.select(station=f).copy()
