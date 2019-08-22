@@ -2052,6 +2052,7 @@ def stackTR(obsdf, pklname=None,win=[200.0,200.0],
 	npt = int((win[0]*2 + win[1])/delta) + 1
 	time = np.arange(npt) * delta - win[0]
 	DATA = [''] * len(obsdf)
+	print(len(DATA))
 	for ind, row in obsdf.iterrows():
 		codaResSt = row.codaResSt
 		tmp_data = np.empty((len(filters), npt))
