@@ -1384,7 +1384,7 @@ class stackArray(QtWidgets.QMainWindow):
 		if ftype == 'all':
 			current_filter = self._current_filter
 		else:
-			current_filter = [fype]
+			current_filter = [ftype]
 		n_filt = len(current_filter)
 		if self.allbtn.isChecked() is False or len(self._region) < 2:
 			_i = self.regcb.currentIndex()
