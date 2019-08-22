@@ -1391,9 +1391,9 @@ class stackArray(QtWidgets.QMainWindow):
 			time = np.arange(npts)*delta + _stackSt[0].stats.sac.b
 			for ind, f in enumerate(self._current_filter):
 				_st = _stackSt.select(station=f).copy()
-				_st.sort('channel')
+				_st.sort(['channel'])
 				_std_st = _stdSt.select(station=f).copy()
-				_std_st.sort('channel')
+				_std_st.sort(['channel'])
 				for i in range(n):
 					_ax_st = self.fig.add_subplot(gs[i,ind+1])
 					if i == n-1:
@@ -1438,9 +1438,9 @@ class stackArray(QtWidgets.QMainWindow):
 				time = np.arange(npts)*delta + _stackSt[0].stats.sac.b
 				for ind, f in enumerate(self._current_filter):
 					_st = _stackSt.select(station=f).copy()
-					_st.sort('channel')
+					_st.sort(['channel'])
 					_std_st = _stdSt.select(station=f).copy()
-					_std_st.sort('channel')
+					_std_st.sort(['channel'])
 					for i in range(n):
 						_ax_st = self.fig.add_subplot(gs[i,ind+1])
 						if i == n-1:
@@ -2060,7 +2060,7 @@ def stackTR(obsdf, pklname=None,win=[200.0,200.0],
 		for i, tr in enumerate(codaResSt):
 			tmp_data[i] = norm(tr.data, sind, eind)
 		DATA[ind] = tmp_data
-	obsdf['DATA'] = DATA
+	obsdf.loc[:,'DATA'] = DATA
 	n = len(obsdf)
 	st_obs = Stream()
 	st_std = Stream()
