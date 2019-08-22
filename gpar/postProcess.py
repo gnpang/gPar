@@ -1129,6 +1129,11 @@ class stackArray(QtWidgets.QMainWindow):
 		self.stbtn.setStyleSheet('QPushButton:checked {background-color: lightgreen;}')
 		self.stbtn.setToolTip('shortcut <b>s</b>')
 		self.stbtn.clicked.connect(self._drawStack)
+		self.nbtn = QtWidgets.QPushButton('Norm',
+					parent=self.main_widget)
+		self.nbtn.setCheckable(True)
+		self.nbtn.setStyleSheet('QPushButton:checked {background-color: lightgreen;}')
+		self.nbtn.clicked.connect(self._drawStack)
 		# Select distance
 		self.discb = QComboBox(self)
 		self.discb.activated.connect(self._changeStack)
@@ -1184,6 +1189,8 @@ class stackArray(QtWidgets.QMainWindow):
 		self.btnbar2.addWidget(self.allbtn)
 		self.btnbar2.addWidget(vline)
 		self.btnbar2.addWidget(self.rsbtn)
+		self.btnbar2.addWidget(vline)
+		self.btnbar2.addWidget(self.nbtn)
 		self.btnbar2.addStretch(1)
 
 
@@ -1234,25 +1241,26 @@ class stackArray(QtWidgets.QMainWindow):
 
 	def _drawFig(self):
 		self.fig.clear()
-		self.fig.add_subplot(1, 1, 1)
-		_ax = self.fig.get_axes()
+		# self.fig.add_subplot(1, 1, 1)
+		# _ax = self.fig.get_axes()
+		_ax = self.fig.add_subplot(1, 1, 1)
 
 		m = Basemap(projection='cyl', lon_0=0, lat_0=0.0,
-					area_thresh=10000,ax=_ax[0])
+					area_thresh=10000,ax=_ax)
 		x0, y0 = m(self._current_array['lon'], self._current_array['lat'])
 
-		m.drawcoastlines(ax=_ax[0])
-		m.drawmapboundary(ax=_ax[0])
-		m.fillcontinents(color='lightgray',lake_color='white',ax=_ax[0])
+		m.drawcoastlines(ax=_ax)
+		m.drawmapboundary(ax=_ax)
+		m.fillcontinents(color='lightgray',lake_color='white',ax=_ax)
 		parallels = np.arange(-90.0, 90.0, 60)
 		# labels = [left, right, top, bottom]
-		m.drawparallels(parallels,labels=[True, False, False, False],ax=_ax[0])
+		m.drawparallels(parallels,labels=[True, False, False, False],ax=_ax)
 		meridians = np.arange(-180.0, 180.0, 60.0)
-		m.drawmeridians(meridians,labels=[False, False, False, True],ax=_ax[0])
-		m.scatter(x0, y0, marker='*',c='r',s=100,alpha=0.7,ax=_ax[0],zorder=10)
+		m.drawmeridians(meridians,labels=[False, False, False, True],ax=_ax)
+		m.scatter(x0, y0, marker='*',c='r',s=100,alpha=0.7,ax=_ax,zorder=10)
 		if self.allbtn.isChecked() and len(self._region) < 2:
 			x, y = m(self._current_array_df.lon.tolist(), self._current_array_df.lat.tolist())
-			m.scatter(x, y, marker='o', c='blue', s=50, alpha=0.7,ax=_ax[0],zorder=10)
+			m.scatter(x, y, marker='o', c='blue', s=50, alpha=0.7,ax=_ax,zorder=10)
 		elif self.allbtn.isChecked() and len(self._region) >= 2:
 			_region = self._region[1:,]
 			_current_df = self._current_array_df
@@ -1265,21 +1273,21 @@ class stackArray(QtWidgets.QMainWindow):
 						  			(_rest_df['lon']>_reg['lonmin']) &
 						  			(_rest_df['lon']<_reg['lonmax']))]
 				x, y = m(_df.lon.tolist(), _df.lat.tolist())
-				m.scatter(x, y, marker='o', c=color[_i], s=50, alpha=0.7,ax=_ax[0],zorder=10)
+				m.scatter(x, y, marker='o', c=color[_i], s=50, alpha=0.7,ax=_ax,zorder=10)
 			x, y = m(_rest_df.lon.tolist(), _rest_df.lat.tolist())
-			m.scatter(x, y, marker='o', c='k', s=50, alpha=0.7,ax=_ax[0],zorder=10)
+			m.scatter(x, y, marker='o', c='k', s=50, alpha=0.7,ax=_ax,zorder=10)
 		elif self.allbtn.isChecked() is False:
 			_i = self.regcb.currentIndex()
 			if _i == 0:
 				x, y = m(self._current_array_df.lon.tolist(), self._current_array_df.lat.tolist())
-				m.scatter(x, y, marker='o', c='blue', s=50, alpha=0.7,ax=_ax[0],zorder=10)
+				m.scatter(x, y, marker='o', c='blue', s=50, alpha=0.7,ax=_ax,zorder=10)
 				self._pltRectangle()
 			else:
 				_reg = self._region[_i]
 				_name = _reg['name']
 				_df = self.regDf[_name]
 				x, y = m(_df.lon.tolist(), _df.lat.tolist())
-				m.scatter(x, y, marker='o', c=color[_i-1], s=50, alpha=0.7,ax=_ax[0],zorder=10)
+				m.scatter(x, y, marker='o', c=color[_i-1], s=50, alpha=0.7,ax=_ax,zorder=10)
 
 
 		self.fig.suptitle('Earthquakes in array %s'%self._current_array['name'])
@@ -1352,15 +1360,20 @@ class stackArray(QtWidgets.QMainWindow):
 		self.fig.clear()
 		if self.stbtn.isChecked() is False:
 			self._drawFig()
+			return
 		# self.fig.add_subplot(121)
 		_i = self.discb.currentIndex()
 		this_dis = self.dis[_i]
+		win = self._current_array_df['win'].iloc[0]
+		window = [win['noise'], win['coda']]
 		step_forward = this_dis['step'] * (1 - this_dis['overlap'])
 		n = int((this_dis['maxdis'] - this_dis['mindis'])/step_forward)
 		n_filt = len(self._current_filter)
 		if self.allbtn.isChecked() is False or len(self._region) < 2:
 			_i = self.regcb.currentIndex()
+			_current_df = self._current_array_df
 			_name = self._region[_i]['name']
+			_df = self.regDf[_name]
 			_stackSt = self.stackSt[_name]
 			_stdSt = self.stdSt[_name]
 			#n = len(_stackSt)
@@ -1370,7 +1383,10 @@ class stackArray(QtWidgets.QMainWindow):
 			m = Basemap(projection='cyl', lon_0=0, lat_0=0.0,
 						area_thresh=10000,ax=_ax)
 			x0, y0 = m(self._current_array['lon'], self._current_array['lat'])
-			x, y = m(self._current_array_df.lon.tolist(), self._current_array_df.lat.tolist())
+			alon = _current_df[(~_current_df.lon.isin(_df.lon)) & (~_current_df.lat.isin(_df.lat))].lon.tolist()
+			alat = _current_df[(~_current_df.lon.isin(_df.lon)) & (~_current_df.lat.isin(_df.lat))].lat.tolist()
+			x, y = m(alon, alat)
+			xt, yt = m(_df.lon.tolist(), _df.lat.tolist())
 			m.drawcoastlines(ax=_ax)
 			m.drawmapboundary(ax=_ax)
 			m.fillcontinents(color='lightgray',lake_color='white',ax=_ax)
@@ -1383,7 +1399,8 @@ class stackArray(QtWidgets.QMainWindow):
 			else:
 				c = color[_i-1]
 			m.scatter(x0, y0, marker='*',c='r',s=100,alpha=0.7,ax=_ax,zorder=10)
-			m.scatter(x, y, marker='o', c=c, s=50, alpha=0.7,ax=_ax,zorder=10)
+			m.scatter(x, y, marker='o', c='k', s=50, alpha=0.7,ax=_ax,zorder=10)
+			m.scatter(xt, yt, marker='o', c='r', s=50, alpha=0.7,ax=_ax,zorder=10)
 
 			# self.fig.add_subplot(122)
 			delta = _stackSt[0].stats.delta
@@ -1394,15 +1411,32 @@ class stackArray(QtWidgets.QMainWindow):
 				_st.sort(['channel'])
 				_std_st = _stdSt.select(station=f).copy()
 				_std_st.sort(['channel'])
+				delta = _st[0].stats.delta
+				sind = int(window[0]/delta)
+				eind = sind + int(window[1]/delta)
 				for i in range(n):
 					_ax_st = self.fig.add_subplot(gs[i,ind+1])
 					if i == n-1:
 						_ax_st.set_xlabel('Time (s)')
-					_ax_st.plot(time, _st[i].data,'darkred', label=_st[i].stats.channel)
-					_ax_st.hlines(0,time[0],time[-1],'k')
-					_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
+					if i == 0:
+						_ax_st.set_title('Filter: %s'%f)
+					peak, data = norm(_st[i].data, sind, eind)
+					if self.nbtn.isChecked():
+						_ax_st.plot(time, data,'darkred', label=_st[i].stats.channel)
+						_ax_st.errorbar(time, data, yerr=2*_std_st[i].data,
 								 marker='.',mew=0.1, ecolor='red', linewidth=0.2, markersize=0.2,
 								 capsize=0.1, alpha=0.5)
+						_ax_st.set_ylim([-0.1, 1.1])
+					else:
+						_ax_st.plot(time, _st[i].data,'darkred', label=_st[i].stats.channel)
+						_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
+								 marker='.',mew=0.1, ecolor='red', linewidth=0.2, markersize=0.2,
+								 capsize=0.1, alpha=0.5)
+						peak = peak + 0.1
+						_ax_st.set_ylim([-0.1, peak])
+					_ax_st.hlines(0,time[0],time[-1],'k')
+					_ax_st.set_xlim([-window[0], window[0]+window[1]])
+					_ax_st.legend()
 		else:
 			_region = self._region[1:]
 			_current_df = self._current_array_df
@@ -1428,7 +1462,7 @@ class stackArray(QtWidgets.QMainWindow):
 
 			for _i, _reg in enumerate(_region):
 				_name = _reg['name']
-				print(_name)
+				# print(_name)
 				_df = self.regDf[_name]
 				x, y = m(_df.lon.tolist(), _df.lat.tolist())
 				m.scatter(x, y, marker='o', c=color[_i], s=50, alpha=0.7,ax=_ax,zorder=10)
@@ -1446,11 +1480,16 @@ class stackArray(QtWidgets.QMainWindow):
 						_ax_st = self.fig.add_subplot(gs[i,ind+1])
 						if i == n-1:
 							_ax_st.set_xlabel('Time (s)')
-						_ax_st.plot(time, _st[i].data,color=color[_i])
+						if i == 0:
+							_ax_st.set_title('Filter: %s'%f)
+						_ax_st.plot(time, _st[i].data,color=color[_i],label=_st[i].stats.channel)
 						_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
 									 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
 									 capsize=0.1, alpha=0.5)
 						_ax_st.hlines(0,time[0],time[-1],'k')
+						_ax_st.set_xlim([-window[0], window[0]+window[1]])
+						_ax_st.set_ylim([-0.1, 1.0])
+						_ax_st.legend()
 		self._canvasDraw()
 
 	def _stackAll(self):
@@ -2013,7 +2052,7 @@ def norm(data,sind, eind):
 	peak = np.max(np.absolute(data[sind:eind]))
 	data = data/peak
 
-	return data
+	return peak, data
 
 def stack(df,win):
 
@@ -2059,9 +2098,9 @@ def stackTR(obsdf, pklname=None,win=[200.0,200.0],
 		codaResSt = row.codaResSt
 		tmp_data = np.empty((len(filters), npt))
 		for i, tr in enumerate(codaResSt):
-			tmp_data[i] = norm(tr.data, sind, eind)
+			_, tmp_data[i] = norm(tr.data, sind, eind)
 		DATA[ind] = tmp_data
-	obsdf.loc[:,'DATA'] = DATA
+	obsdf['DATA'] = DATA
 	n = len(obsdf)
 	st_obs = Stream()
 	st_std = Stream()
@@ -2072,6 +2111,7 @@ def stackTR(obsdf, pklname=None,win=[200.0,200.0],
 
 	for d in ds:
 		_df = obsdf[(obsdf.Del >= d) & (obsdf.Del < d+step)]
+		n_eq = len(_df)
 		if len(_df) != 0:
 			stack_obs, std_obs = stack(_df, [sind, eind])
 		else:
@@ -2084,7 +2124,7 @@ def stackTR(obsdf, pklname=None,win=[200.0,200.0],
 			tr_obs.stats.npts = npt
 			tr_obs.stats.network = 'stack'
 			tr_obs.stats.station = filt
-			tr_obs.stats.channel = d
+			tr_obs.stats.channel = 'd'+str(d)+'-n'+str(n_eq)
 			tr_obs.stats.sac.delta = delta
 			tr_obs.stats.sac.b = -win[0]
 			tr_obs.stats.sac.e = win[1]
