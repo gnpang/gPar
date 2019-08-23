@@ -1143,6 +1143,11 @@ class stackArray(QtWidgets.QMainWindow):
 		self.nbtn.setCheckable(True)
 		self.nbtn.setStyleSheet('QPushButton:checked {background-color: lightgreen;}')
 		self.nbtn.clicked.connect(self._drawStack)
+		self.ebtn = QtWidgets.QPushButton('ERR',
+					parent=self.main_widget)
+		self.ebtn.setCheckable(True)
+		self.ebtn.setStyleSheet('QPushButton:checked {background-color: lightgreen;}')
+		self.ebtn.clicked.connect(self._drawStack)
 		# Select distance
 		self.discb = QComboBox(self)
 		self.discb.activated.connect(self._changeStack)
@@ -1200,6 +1205,8 @@ class stackArray(QtWidgets.QMainWindow):
 		self.btnbar2.addWidget(self.rsbtn)
 		self.btnbar2.addWidget(vline)
 		self.btnbar2.addWidget(self.nbtn)
+		self.btnbar2.addWidget(vline)
+		self.btnbar2.addWidget(self.ebtn)
 		self.btnbar2.addWidget(vline)
 		self.btnbar2.addWidget(QLabel('Filter'))
 		self.btnbar2.addWidget(self.filtcb)
@@ -1440,15 +1447,17 @@ class stackArray(QtWidgets.QMainWindow):
 					peak, data = norm(_st[i].data, sind, eind)
 					if self.nbtn.isChecked():
 						_ax_st.plot(time, data,'darkred', label=_st[i].stats.channel)
-						_ax_st.errorbar(time, data, yerr=2*_std_st[i].data,
-								 marker='.',mew=0.1, ecolor='red', linewidth=0.2, markersize=0.2,
-								 capsize=0.1, alpha=0.5)
+						if self.ebtn.isChecked():
+							_ax_st.errorbar(time, data, yerr=2*_std_st[i].data,
+									 marker='.',mew=0.1, ecolor='red', linewidth=0.2, markersize=0.2,
+									 capsize=0.1, alpha=0.5)
 						_ax_st.set_ylim([-0.1, 1.1])
 					else:
 						_ax_st.plot(time, _st[i].data,'darkred', label=_st[i].stats.channel)
-						_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
-								 marker='.',mew=0.1, ecolor='red', linewidth=0.2, markersize=0.2,
-								 capsize=0.1, alpha=0.5)
+						if self.ebtn.isChecked():
+							_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
+									 marker='.',mew=0.1, ecolor='red', linewidth=0.2, markersize=0.2,
+									 capsize=0.1, alpha=0.5)
 						peak = peak + 0.1
 						_ax_st.set_ylim([-0.1, peak])
 					_ax_st.hlines(0,time[0],time[-1],'k')
@@ -1505,15 +1514,17 @@ class stackArray(QtWidgets.QMainWindow):
 						peak, data = norm(_st[i].data, sind, eind)
 						if self.nbtn.isChecked():
 							_ax_st.plot(time, data,color=color[_i],label=_st[i].stats.channel)
-							_ax_st.errorbar(time, data, yerr=2*_std_st[i].data,
-										 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
-										 capsize=0.1, alpha=0.5)
+							if self.ebtn.isChecked():
+								_ax_st.errorbar(time, data, yerr=2*_std_st[i].data,
+											 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
+											 capsize=0.1, alpha=0.5)
 							_ax_st.set_ylim([-0.1, 1.1])
 						else:
 							_ax_st.plot(time, _st[i].data,color='dark'+color[_i],label=_st[i].stats.channel)
-							_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
-										 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
-										 capsize=0.1, alpha=0.5)
+							if self.ebtn.isChecked():
+								_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
+											 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
+											 capsize=0.1, alpha=0.5)
 							peak = peak+0.1
 							_ax_st.set_ylim([-0.1, peak])
 						_ax_st.hlines(0,time[0],time[-1],'k')
