@@ -716,7 +716,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 			_i = self.wincb.currentIndex()
 			win = self.trinWin[_i]
 			if len(self._stripDF) != 0:
-				existDF = self._stripDF[(self._stripDF.ID == self._current_event.ID) & (self._striDF.winName == win['name'])]
+				existDF = self._stripDF[(self._stripDF.ID == self._current_event.ID) & (self._stripDF.winName == win['name'])]
 			else:
 				existDF = pd.DataFrame()
 			if len(self._badDF) != 0:
