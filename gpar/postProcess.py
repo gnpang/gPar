@@ -601,6 +601,11 @@ class glanceEQ(QtWidgets.QMainWindow):
 						self._current_event.getArrival()
 					arrival = self._current_event.arrivals[self.beamphase]['TT']# - self._current_event.time
 					ax[_i,ind].vlines(arrival, ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'r',label=self.beamphase)
+					if label == 'Amplitude':
+						peak = np.max(tr.data) + 1
+						ax[_i,ind].set_xlim([0, peak])
+					elif label == 'Slowness':
+						ax[_i,ind].set_xlim([0, 15])
 					if self.ttbtn.isChecked():
 						_arr = self._current_event.arrivals
 						# del _arr[self.beamphase]
@@ -901,10 +906,14 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 	def _savePickle(self, filename):
 		self._stripDF.to_pickle(filename)
+		name = os.path.slitext(filname)
+		badname = name[0]+'.D'+name[1]
+		if len(self._badDF) != 0:
+			self._badDF.to_pickle(badname)
 
 	def _saveCSV(self, filename):
 		_stripDF = self._stripDF
-		_stripDF.drop(['codaTr','twoTr','twoResTr','codaResTr'])
+		_stripDF.drop(['codaSt','twoSt','twoResSt','codaResSt'])
 		_stripDF.to_csv(filename,index=False,sep=',')
 
 	def _openFile(self):
@@ -913,6 +922,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 		if filename:
 			filename = str(filename)
 			self._stripDF = pd.read_pickle(filename)
+			name = os.path.splitext(filename)
+			badname = name[0]+'.D'+name[1]
+			if os.path.exists(badname):
+				self._badDF = pd.read_pickle(badname)
 			self.savefile = str(filename)
 
 	def _openArray(self):
