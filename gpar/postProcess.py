@@ -603,9 +603,14 @@ class glanceEQ(QtWidgets.QMainWindow):
 					ax[_i,ind].vlines(arrival, ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'r',label=self.beamphase)
 					if label == 'Amplitude':
 						peak = np.max(tr.data) + 1
-						ax[_i,ind].set_xlim([0, peak])
+						ax[_i,ind].set_ylim([0, peak])
 					elif label == 'Slowness':
-						ax[_i,ind].set_xlim([0, 15])
+						ax[_i,ind].set_ylim([0, 15])
+					elif label == 'Back Azimuth':
+						ax[_i, ind].set_ylim([0,360])
+					elif label == 'coherence':
+						ax[_i, ind].set_ylim([0,1])
+
 					if self.ttbtn.isChecked():
 						_arr = self._current_event.arrivals
 						# del _arr[self.beamphase]
@@ -633,7 +638,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 					abspow = np.log(abspow)
 				elif self.vepcb.currentText() == 'sqrt':
 					abspow = np.sqrt(abspow)
-				ax = self.fig.add_subplot(1, num, _i+1)
+				ax = self.fig.add_subplot(1, num, ind+1)
 				ax.imshow(abspow, extent=extent, aspect='auto', cmap='Reds', vmin=vmin, vmax=vmax)
 				arrival = self._current_event.arrivals[self.beamphase]['TT']
 				ax.vlines(arrival, ax.get_ylim()[0],ax.get_ylim()[1],'k',label=self.beamphase)
