@@ -460,6 +460,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 					self._updatePlot()
 					return
 		self._eventInfo(next(self._eventCycle))
+		_id = self._current_event.ID
 		if len(self._stripDF) != 0:
 			existDF = self._stripDF[self._stripDF.ID == _id]
 		else:
