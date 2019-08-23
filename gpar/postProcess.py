@@ -952,7 +952,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 	def _savePickle(self, filename):
 		self._stripDF.to_pickle(filename)
-		name = os.path.slitext(filname)
+		name = os.path.splitext(filname)
 		badname = name[0]+'.D'+name[1]
 		if len(self._badDF) != 0:
 			self._badDF.to_pickle(badname)
