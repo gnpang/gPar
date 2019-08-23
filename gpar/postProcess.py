@@ -509,27 +509,32 @@ class glanceEQ(QtWidgets.QMainWindow):
 		win = self.trinWin[_i]
 		if len(self._stripDF) != 0:
 			existDF = self._stripDF[(self._stripDF.ID == self._current_event.ID) & (self._stripDF.winName == win['name'])]
+		else:
+			existDF = pd.DataFrame()
+		if len(self._badDF) !=0:
 			_badDF = self._badDF[self._badDF.ID == self._current_event.ID]
-			if len(existDF) !=0:
-				choice = QMessageBox.question(self, 'Replace stripping',
+		else:
+			_badDF = pd.DataFrame()
+		if len(existDF) !=0:
+			choice = QMessageBox.question(self, 'Replace stripping',
 							"Do you want to replace existed stripping?",
 							QMessageBox.Yes | QMessageBox.No)
-				if choice == QMessageBox.Yes:
-					index = existDF.index
-					self._stripDF.drop(index,axis=0,inplace=True)
-					self._stripDF.reset_index(inplace=True)
-				else:
-					return
-			if len(_badDF) != 0:
-				choice = QMessageBox.question(self, 'Bad Event',
+			if choice == QMessageBox.Yes:
+				index = existDF.index
+				self._stripDF.drop(index,axis=0,inplace=True)
+				self._stripDF.reset_index(inplace=True)
+			else:
+				return
+		if len(_badDF) != 0:
+			choice = QMessageBox.question(self, 'Bad Event',
 						 "Want to replace it?",
 						 QMessageBox.Yes | QMessageBox.No)
-				if choice == QMessageBox.Yes:
-					index = _badDF.index
-					self._badDF.drop(index,axis=0,inplace=True)
-					self._badDF.reset_index(inplace=True)
-				else:
-					return
+			if choice == QMessageBox.Yes:
+				index = _badDF.index
+				self._badDF.drop(index,axis=0,inplace=True)
+				self._badDF.reset_index(inplace=True)
+			else:
+				return
 		level = self.eve_type[self.levelGrp.checkedId()]
 		ID = event.ID
 		lat = event.lat
