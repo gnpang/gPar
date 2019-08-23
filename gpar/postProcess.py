@@ -460,6 +460,19 @@ class glanceEQ(QtWidgets.QMainWindow):
 					self._updatePlot()
 					return
 		self._eventInfo(next(self._eventCycle))
+		if len(self._stripDF) != 0:
+			existDF = self._stripDF[self._stripDF.ID == _id]
+		else:
+			existDF = pd.DataFrame()
+		if len(existDF) != 0:
+			level = existDF.Level.iloc[0]
+			ind = self.eve_type.index(level)
+			self.levelGrp.button(ind).setChecked(True)
+		else:
+			if len(self._badDF) != 0:
+				_badDF = self._badDF[self._badDF.ID == _id]
+				if len(_badDF) != 0:
+					self.levelGrp.button(3).setChecked(True)
 		_i = self.evecb.currentIndex()
 		self.evecb.setCurrentIndex(_i+1)
 		if self._btype == 'strip':
