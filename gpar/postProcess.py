@@ -397,6 +397,18 @@ class glanceEQ(QtWidgets.QMainWindow):
 		while next(self._eventCycle) != self._eqlist[_i]:
 			pass
 		self._eventInfo(self._eqlist[_i])
+		_id = self._current_event.ID
+		if len(self._stripDF) != 0:
+			existDF = self._stripDF[self.stripDF.ID == _id]
+		if len(existDF) != 0:
+			level = existDF.Level.iloc[0]
+			ind = self.eve_type.index(level)
+			self.levelGrp.button(ind).setChecked(True)
+		else:
+			if len(self._badDF) != 0:
+				_badDF = self._badDF[self._badDF.ID == _id]
+				if len(_badDF) != 0:
+					self.levelGrp.button(3).setChecked(True)
 		self._drawFig()
 
 	def _pltPrevEvent(self):
@@ -407,6 +419,18 @@ class glanceEQ(QtWidgets.QMainWindow):
 		for _i in range(len(self._eqlist) - 1):
 			prevEvent = next(self._eventCycle)
 		self._eventInfo(prevEvent)
+		_id = self._current_event.ID
+		if len(self._stripDF) != 0:
+			existDF = self._stripDF[self.stripDF.ID == _id]
+		if len(existDF) != 0:
+			level = existDF.Level.iloc[0]
+			ind = self.eve_type.index(level)
+			self.levelGrp.button(ind).setChecked(True)
+		else:
+			if len(self._badDF) != 0:
+				_badDF = self._badDF[self._badDF.ID == _id]
+				if len(_badDF) != 0:
+					self.levelGrp.button(3).setChecked(True)
 		self.evecb.setCurrentIndex(_j-1)
 		if self._btype == 'strip':
 			self._btype = 'beam'
@@ -587,6 +611,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 					ax.set_xlabel('Seconds')
 				self.fig.suptitle('%s - %s'%(self._current_event.ID, self._btype))
 		elif self._btype == 'slide':
+			self.fig.suptitle('%s - %s'%(self._current_event.ID, self._btype))
 			nfilts = len(self._current_slide.keys())
 			ax = self.fig.subplots(4, nfilts, sharex='col', sharey='row')
 			for ind, (name,st) in enumerate(self._current_slide.items()):
@@ -597,6 +622,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 						label=None
 					time = np.arange(tr.stats.npts) * tr.stats.delta + tr.stats.sac.b
 					ax[_i,ind].plot(time, tr.data, 'k', label=None)
+					ax[_i, ind].set_xlim([np.min(time), np.max(time)])
 					if not hasattr(self._current_event, 'arrivals'):
 						self._current_event.getArrival()
 					arrival = self._current_event.arrivals[self.beamphase]['TT']# - self._current_event.time
@@ -610,7 +636,6 @@ class glanceEQ(QtWidgets.QMainWindow):
 						ax[_i, ind].set_ylim([0,360])
 					elif label == 'coherence':
 						ax[_i, ind].set_ylim([0,1])
-
 					if self.ttbtn.isChecked():
 						_arr = self._current_event.arrivals
 						# del _arr[self.beamphase]
@@ -622,6 +647,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 					# ax[_i,ind].set_aspect(aspect=0.3)
 					if _i == 3:
 						ax[_i,ind].set_xlabel('Seconds')
+					if _i == 0:
+						ax[_i,ind].set_title(name)
 					if ind == 0:
 						ax[_i,ind].set_ylabel(label)
 		elif self._btype == 'vespetrum':
@@ -650,6 +677,9 @@ class glanceEQ(QtWidgets.QMainWindow):
 							continue
 						ax.vlines(tt['TT'], ax.get_ylim()[0],ax.get_ylim()[1],'b',label=name)
 				ax.legend()
+				ax.set_xlabel('Seconds')
+				if ind == 0:
+					ax.set_ylabel(self._current_type)
 				ax.set_title(name)
 			if self._current_type == 'slowness':
 				a = u"\u00b0"
