@@ -400,6 +400,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 		_id = self._current_event.ID
 		if len(self._stripDF) != 0:
 			existDF = self._stripDF[self.stripDF.ID == _id]
+		else:
+			existDF = pd.DataFrame()
 		if len(existDF) != 0:
 			level = existDF.Level.iloc[0]
 			ind = self.eve_type.index(level)
@@ -422,6 +424,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 		_id = self._current_event.ID
 		if len(self._stripDF) != 0:
 			existDF = self._stripDF[self.stripDF.ID == _id]
+		else:
+			existDF = pd.DataFrame()
 		if len(existDF) != 0:
 			level = existDF.Level.iloc[0]
 			ind = self.eve_type.index(level)
@@ -656,6 +660,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 			extent=[np.min(self._current_time),np.max(self._current_time),np.min(self._current_K),np.max(self._current_K)]
 			vmin = float(self.ampmin.cleanText())
 			vmax = float(self.ampmax.cleanText())
+			if not hasattr(self._current_event, 'arrivals'):
+				self._current_event.getArrival()
 			for ind, _row in self._current_energy.iterrows():
 				abspow = _row.POWER
 				name = _row.FILT
