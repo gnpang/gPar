@@ -713,8 +713,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 				title = 'Slant Stack at a slowness of %.2f s/deg'%(self._current_event.rayParameter)
 			self.fig.suptitle(title)
 		elif self._btype == 'strip':
+			_i = self.wincb.currentIndex()
+			win = self.trinWin[_i]
 			if len(self._stripDF) != 0:
-				existDF = self._stripDF[(self._stripDF.ID == self._current_event.ID)]
+				existDF = self._stripDF[(self._stripDF.ID == self._current_event.ID) & (self._striDF.winName == win['name'])]
 			else:
 				existDF = pd.DataFrame()
 			if len(self._badDF) != 0:
@@ -758,10 +760,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 					codamode = existDF.crms.iloc[0]
 					twomode = existDF.trms.iloc[0]
 					nfilter = len(codamode)
-					codaSt = self._current_event.codaSt
-					twoSt = self._current_event.twoSt
-					cRes = self._current_event.codaResSt
-					tRes = self._current_event.twoResSt
+					codaSt = existDF.codaSt.iloc[0]
+					twoSt = existDF.twoSt.iloc[0]
+					cRes = existDF.codaResSt.iloc[0]
+					tRes = existDF.twoResSt.iloc[0]
 					timeR = np.arange(cRes[0].stats.npts)*cRes[0].stats.delta - trinwin['noise']
 					data_time = np.arange(twoSt[0].stats.npts) * delta + (twoSt[0].stats.starttime - self._current_beam[0].stats.starttime)
 					ax = self.fig.subplots(2, nfilter)
@@ -790,8 +792,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 				elif self._method == 'coda':
 					codamode = existDF.crms.iloc[0]
 					nfilter = len(codamode)
-					codaSt = self._current_event.codaSt
-					cRes = self._current_event.codaResSt
+					codaSt = existDF.codaSt.iloc[0]
+					cRes = existDF.codaResSt.iloc[0]
 					timeR = np.arange(cRes[0].stats.npts)*cRes[0].stats.delta - trinwin['noise']
 					ax = self.fig.subplots(2, nfilter)
 					for ind in range(nfilter):
@@ -814,8 +816,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 				elif self._method == 'twoline':
 					twomode = existDF.trms.iloc[0]
 					nfilter = len(twomode)
-					twoSt = self._current_event.twoSt
-					tRes = self._current_event.twoResSt
+					twoSt = existDF.twoSt.iloc[0]
+					tRes = existDF.twoResSt.iloc[0]
 					timeR = np.arange(tRes[0].stats.npts)*tRes[0].stats.delta - trinwin['noise']
 					data_time = np.arange(twoSt[0].stats.npts) * delta + (twoSt[0].stats.starttime - self._current_beam[0].stats.starttime)
 					ax = self.fig.subplots(2, nfilter)
