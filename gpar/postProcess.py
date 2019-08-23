@@ -399,7 +399,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self._eventInfo(self._eqlist[_i])
 		_id = self._current_event.ID
 		if len(self._stripDF) != 0:
-			existDF = self._stripDF[self.stripDF.ID == _id]
+			existDF = self._stripDF[self._stripDF.ID == _id]
 		else:
 			existDF = pd.DataFrame()
 		if len(existDF) != 0:
@@ -423,7 +423,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self._eventInfo(prevEvent)
 		_id = self._current_event.ID
 		if len(self._stripDF) != 0:
-			existDF = self._stripDF[self.stripDF.ID == _id]
+			existDF = self._stripDF[self._stripDF.ID == _id]
 		else:
 			existDF = pd.DataFrame()
 		if len(existDF) != 0:
@@ -961,6 +961,11 @@ class glanceEQ(QtWidgets.QMainWindow):
 		_stripDF = self._stripDF
 		_stripDF.drop(['codaSt','twoSt','twoResSt','codaResSt'])
 		_stripDF.to_csv(filename,index=False,sep=',')
+		if len(self._badDF) != 0:
+			_badDF = self._badDF
+			name = os.path.splitext(filename)
+			badname = name[0] +'.D' +name[1]
+			_badDF.to_csv(badname, index=False, sep=',')
 
 	def _openFile(self):
 		filename,_ = QFileDialog.getOpenFileName(self,'Load Pickle File',
@@ -972,6 +977,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 			badname = name[0]+'.D'+name[1]
 			if os.path.exists(badname):
 				self._badDF = pd.read_pickle(badname)
+			self._pltEvent()
 			self.savefile = str(filename)
 
 	def _openArray(self):
