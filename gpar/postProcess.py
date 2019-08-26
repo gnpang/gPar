@@ -436,7 +436,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 				if len(_badDF) != 0:
 					self.levelGrp.button(3).setChecked(True)
 		if _j == 0:
-			self.evecb.setCurrentIndex(-1)
+			_n = len(self.evecb) - 1
+			self.evecb.setCurrentIndex(_n)
 		else:
 			self.evecb.setCurrentIndex(_j-1)
 		if self._btype == 'strip':
@@ -448,18 +449,22 @@ class glanceEQ(QtWidgets.QMainWindow):
 		_id = self._current_event.ID
 		level = self.eve_type[self.levelGrp.checkedId()]
 		if level == 'D':
+			self._current_strip = True
 			self._setCodaStrip()
 		else:
-			if len(self._stripDF) != 0:
-				existDF = self._stripDF[(self._stripDF.ID == _id)]
-			else:
-				existDF = pd.DataFrame()
-			if len(existDF) == 0:
+			# if len(self._stripDF) != 0:
+			# 	existDF = self._stripDF[(self._stripDF.ID == _id)]
+			# else:
+			# 	existDF = pd.DataFrame()
+			# if len(existDF) == 0:
+			if not self._current_strip:
 				choice = QMessageBox.question(self, 'Stripping?',
 							"Haven't stripping yet, want to do it?",
 							QMessageBox.Yes | QMessageBox.No)
 				if choice is QMessageBox.Yes:
+					self._current_strip = True
 					self._setCodaStrip()
+					self._btype = 'strip'
 					self._updatePlot()
 					return
 		self._eventInfo(next(self._eventCycle))
@@ -572,7 +577,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 					  'Mw':mw,'Del':dis,
 					  'BB':bb,'bakAzi':bakAzi,'Level':'D'}
 			msg = ('%s is Bad Event'%self._current_ID)
-			gpar.log(__name, msg, level='info', pri=True)
+			gpar.log(__name__, msg, level='info', pri=True)
 			self._badDF = self._badDF.append(newRow, ignore_index=True)
 		else:
 			if self._method == 'all':
