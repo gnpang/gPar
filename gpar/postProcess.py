@@ -678,7 +678,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 						for name, tt in _arr.items():
 							if name is self.beamphase:
 								continue
-							ax[_i,ind].vlines(tt['TT'], ax.get_ylim()[0],ax.get_ylim()[1],'b',label=name)
+							ax[_i,ind].vlines(tt['TT'], ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'b',label=name)
 					ax[_i,ind].legend()
 					# ax[_i,ind].set_aspect(aspect=0.3)
 					if _i == 3:
