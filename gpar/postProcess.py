@@ -435,7 +435,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 				_badDF = self._badDF[self._badDF.ID == _id]
 				if len(_badDF) != 0:
 					self.levelGrp.button(3).setChecked(True)
-		self.evecb.setCurrentIndex(_j-1)
+		if _j == 0:
+			self.evecb.setCurrentIndex(-1)
+		else:
+			self.evecb.setCurrentIndex(_j-1)
 		if self._btype == 'strip':
 			self._btype = 'beam'
 			self.sbcb.setCurrentIndex(0)
@@ -475,7 +478,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 				if len(_badDF) != 0:
 					self.levelGrp.button(3).setChecked(True)
 		_i = self.evecb.currentIndex()
-		self.evecb.setCurrentIndex(_i+1)
+		if _i == len(self.evecb) - 1:
+			self.evecb.setCurrentIndex(0)
+		else:
+			self.evecb.setCurrentIndex(_i+1)
 		if self._btype == 'strip':
 			self._btype = 'beam'
 			self.sbcb.setCurrentIndex(0)
@@ -565,6 +571,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 					  'lon':lon,'dep':dep,
 					  'Mw':mw,'Del':dis,
 					  'BB':bb,'bakAzi':bakAzi,'Level':'D'}
+			msg = ('%s is Bad Event'%self._current_ID)
+			gpar.log(__name, msg, level='info', pri=True)
 			self._badDF = self._badDF.append(newRow, ignore_index=True)
 		else:
 			if self._method == 'all':
