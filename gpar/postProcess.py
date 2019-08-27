@@ -659,10 +659,6 @@ class glanceEQ(QtWidgets.QMainWindow):
 					time = np.arange(tr.stats.npts) * tr.stats.delta + tr.stats.sac.b
 					ax[_i,ind].plot(time, tr.data, 'k', label=None)
 					ax[_i, ind].set_xlim([np.min(time), np.max(time)])
-					if not hasattr(self._current_event, 'arrivals'):
-						self._current_event.getArrival()
-					arrival = self._current_event.arrivals[self.beamphase]['TT']# - self._current_event.time
-					ax[_i,ind].vlines(arrival, ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'r',label=self.beamphase)
 					if label == 'Amplitude':
 						peak = np.max(tr.data) + 1
 						ax[_i,ind].set_ylim([0, peak])
@@ -672,6 +668,13 @@ class glanceEQ(QtWidgets.QMainWindow):
 						ax[_i, ind].set_ylim([0,360])
 					elif label == 'coherence':
 						ax[_i, ind].set_ylim([0,1])
+					if not hasattr(self._current_event, 'arrivals'):
+						self._current_event.getArrival()
+					arrival = self._current_event.arrivals[self.beamphase]['TT']# - self._current_event.time
+					ax[_i,ind].vlines(arrival, ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'r',label=self.beamphase)
+					rp = self._current_event.rayParameter
+					ax[_i, ind].hlines(rp, np.min(time), np.max(time), 'r-.')
+					
 					if self.ttbtn.isChecked():
 						_arr = self._current_event.arrivals
 						# del _arr[self.beamphase]
@@ -707,6 +710,9 @@ class glanceEQ(QtWidgets.QMainWindow):
 				ax.imshow(abspow, extent=extent, aspect='auto', cmap='Reds', vmin=vmin, vmax=vmax)
 				arrival = self._current_event.arrivals[self.beamphase]['TT']
 				ax.vlines(arrival, ax.get_ylim()[0],ax.get_ylim()[1],'k',label=self.beamphase)
+				rp = self._current_event.rayParameter
+				ax[_i, ind].hlines(rp, ax.get_xlim()[0],ax.get_xlim()[1], 'b')
+				ax[_i, ind].hlines(-rp, ax.get_xlim()[0],ax.get_xlim()[1], 'b')
 				if self.ttbtn.isChecked():
 					_arr = self._current_event.arrivals
 						# del _arr[self.beamphase]
