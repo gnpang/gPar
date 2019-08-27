@@ -664,6 +664,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 						ax[_i,ind].set_ylim([0, peak])
 					elif label == 'Slowness':
 						ax[_i,ind].set_ylim([0, 15])
+						rp = self._current_event.rayParameter
+						ax[_i, ind].hlines(rp, np.min(time), np.max(time), 'r', 'dashed')
 					elif label == 'Back Azimuth':
 						ax[_i, ind].set_ylim([0,360])
 					elif label == 'coherence':
@@ -672,8 +674,6 @@ class glanceEQ(QtWidgets.QMainWindow):
 						self._current_event.getArrival()
 					arrival = self._current_event.arrivals[self.beamphase]['TT']# - self._current_event.time
 					ax[_i,ind].vlines(arrival, ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'r',label=self.beamphase)
-					rp = self._current_event.rayParameter
-					ax[_i, ind].hlines(rp, np.min(time), np.max(time), 'r', 'dashed')
 					
 					if self.ttbtn.isChecked():
 						_arr = self._current_event.arrivals
@@ -711,8 +711,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 				arrival = self._current_event.arrivals[self.beamphase]['TT']
 				ax.vlines(arrival, ax.get_ylim()[0],ax.get_ylim()[1],'k',label=self.beamphase)
 				rp = self._current_event.rayParameter
-				ax[_i, ind].hlines(rp, ax.get_xlim()[0],ax.get_xlim()[1], 'b')
-				ax[_i, ind].hlines(-rp, ax.get_xlim()[0],ax.get_xlim()[1], 'b')
+				ax.hlines(rp, ax.get_xlim()[0],ax.get_xlim()[1], 'b')
+				ax.hlines(-rp, ax.get_xlim()[0],ax.get_xlim()[1], 'b')
 				if self.ttbtn.isChecked():
 					_arr = self._current_event.arrivals
 						# del _arr[self.beamphase]
