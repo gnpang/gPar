@@ -673,7 +673,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 					arrival = self._current_event.arrivals[self.beamphase]['TT']# - self._current_event.time
 					ax[_i,ind].vlines(arrival, ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'r',label=self.beamphase)
 					rp = self._current_event.rayParameter
-					ax[_i, ind].hlines(rp, np.min(time), np.max(time), 'r-.')
+					ax[_i, ind].hlines(rp, np.min(time), np.max(time), 'r', 'dashed')
 					
 					if self.ttbtn.isChecked():
 						_arr = self._current_event.arrivals
