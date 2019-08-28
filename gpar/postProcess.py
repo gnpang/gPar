@@ -1179,7 +1179,7 @@ class stackArray(QtWidgets.QMainWindow):
 					 'overlap':0,
 					 'write':False}]
 		self._arrayInfo(next(self._arrayCycle))
-		self._initReg()
+		# self._initReg()
 		QMainWindow.__init__(self)
 		self.setupUI()
 
@@ -1360,6 +1360,7 @@ class stackArray(QtWidgets.QMainWindow):
 		self._current_array = array
 		self._current_array_df = ardf.DF
 		self._current_filter = self._current_array_df.iloc[0].crms.FILT
+		self._initReg()
 
 	def _createStatusBar(self):
 		sb = QStatusBar()
