@@ -680,10 +680,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 					if self.ttbtn.isChecked():
 						_arr = self._current_event.arrivals
 						# del _arr[self.beamphase]
-						for name, tt in _arr.items():
-							if name is self.beamphase:
+						for pname, tt in _arr.items():
+							if pname is self.beamphase:
 								continue
-							ax[_i,ind].vlines(tt['TT'], ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'b',label=name)
+							ax[_i,ind].vlines(tt['TT'], ax[_i,ind].get_ylim()[0],ax[_i,ind].get_ylim()[1],'b',label=pname)
 					ax[_i,ind].legend()
 					# ax[_i,ind].set_aspect(aspect=0.3)
 					if _i == 3:
@@ -805,6 +805,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 						ax[1,ind].plot(timeR, tRes[ind].data, 'b',label=label_t)
 						ax[1,ind].legend()
 						ax[1,ind].set_xlabel('Seconds')
+						ax[1,ind].set_xlim([-trinwin['noise']/2, trinwin['noise']/2+trinwin['coda']])
 						ax[0,ind].set_title('Filter: %s'%twomode['FILT'].iloc[ind])
 						if ind is 0:
 							ax[0,ind].set_ylabel('log10(Amp)')
@@ -830,6 +831,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 						ax[1,ind].plot(timeR,cRes[ind].data, 'r', label=label_c)
 						ax[1,ind].legend()
 						ax[1,ind].set_xlabel('Seconds')
+						ax[1,ind].set_xlim([-trinwin['noise']/2, trinwin['noise']/2+trinwin['coda']])
 						ax[0,ind].set_title('Filter: %s'%codamode['FILT'].iloc[ind])
 						if ind is 0:
 							ax[0,ind].set_ylabel('log10(Amp)')
@@ -855,6 +857,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 						ax[1,ind].plot(timeR, tRes[ind].data, 'b',label=label_t)
 						ax[1,ind].legend()
 						ax[1,ind].set_xlabel('Seconds')
+						ax[1,ind].set_xlim([-trinwin['noise']/2, trinwin['noise']/2+trinwin['coda']])
 						ax[0,ind].set_title('Filter: %s'%twomode['FILT'].iloc[ind])
 						if ind is 0:
 							ax[0,ind].set_ylabel('log10(Amp)')
@@ -1571,7 +1574,7 @@ class stackArray(QtWidgets.QMainWindow):
 						peak = peak + 0.1
 						_ax_st.set_ylim([-0.1, peak])
 					_ax_st.hlines(0,time[0],time[-1],'k')
-					_ax_st.set_xlim([-window[0], window[0]+window[1]])
+					_ax_st.set_xlim([-window[0]/2, window[0]/2+window[1]])
 					_ax_st.legend()
 		else:
 			_region = self._region[1:]
@@ -1622,15 +1625,16 @@ class stackArray(QtWidgets.QMainWindow):
 						if i == 0:
 							_ax_st.set_title('Filter: %s'%f)
 						peak, data = norm(_st[i].data, sind, eind)
+						label = _name+':'+_st[i].stats.channel
 						if self.nbtn.isChecked():
-							_ax_st.plot(time, data,color=color[_i],label=_st[i].stats.channel)
+							_ax_st.plot(time, data,color=color[_i],label=label)
 							if self.ebtn.isChecked():
 								_ax_st.errorbar(time, data, yerr=2*_std_st[i].data,
 											 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
 											 capsize=0.1, alpha=0.5)
 							_ax_st.set_ylim([-0.1, 1.1])
 						else:
-							_ax_st.plot(time, _st[i].data,color='dark'+color[_i],label=_st[i].stats.channel)
+							_ax_st.plot(time, _st[i].data,color='dark'+color[_i],label=label)
 							if self.ebtn.isChecked():
 								_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
 											 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
@@ -1638,7 +1642,7 @@ class stackArray(QtWidgets.QMainWindow):
 							peak = peak+0.1
 							_ax_st.set_ylim([-0.1, peak])
 						_ax_st.hlines(0,time[0],time[-1],'k')
-						_ax_st.set_xlim([-window[0], window[0]+window[1]])
+						_ax_st.set_xlim([-window[0]/2, window[0]/2+window[1]])
 						_ax_st.legend()
 		self._canvasDraw()
 
