@@ -93,7 +93,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self._btype = 'beam'
 		self._method = 'all'
 		self.trinWin = [{'name':'N200-C200','noise':200.0,'coda':200.0,
-						 'stime':400.0,'etime':1800,'model':'ak135'}]
+						 'stime':400.0,'etime':1800,
+						 'smooth':4.0,'model':'ak135'}]
 		self._current_win = None
 		self._current_strip = False
 		self._eventCycle = cycle(self._eqlist)
@@ -380,7 +381,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 		_j = self.wincb.currentIndex()
 		self._eventInfo(self._current_id)
 		self._current_strip = True
-		codaStrip(self._current_event,beamtype=self._btype,method=_method,
+		spts = int(self.trinWin[_j]['smooth'] / self._current_delta )
+		codaStrip(self._current_event,beamtype=self._btype,method=_method, window=spts,
 				 	  siglen=self.trinWin[_j]['coda'], noise=self.trinWin[_j]['noise'],beamphase=self.beamphase,
 			  		  model=self.trinWin[_j]['model'], stime=self.trinWin[_j]['stime'], etime=self.trinWin[_j]['etime'],)
 		self._btype = 'strip'
@@ -727,9 +729,9 @@ class glanceEQ(QtWidgets.QMainWindow):
 				ax.set_title(name)
 			if self._current_type == 'slowness':
 				a = u"\u00b0"
-				title = 'Slant Stack at a Backazimuth of %.1f %sN'%(self._current_event.bakAzimuth,a)
+				title = '%s - %s\nSlant Stack at a Backazimuth of %.1f %sN'%(self._btype, self._current_ID, self._current_event.bakAzimuth,a)
 			elif self._current_type == 'theta':
-				title = 'Slant Stack at a slowness of %.2f s/deg'%(self._current_event.rayParameter)
+				title = '%s - %s\nSlant Stack at a slowness of %.2f s/deg'%(self._btype, self._current_ID, self._current_event.rayParameter)
 			self.fig.suptitle(title)
 		elif self._btype == 'strip':
 			_i = self.wincb.currentIndex()
@@ -1089,6 +1091,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 			self.codawin = QDoubleSpinBox(decimals=1, maximum=400, minimum=20, singleStep=10, value=10)
 			self.stime = QDoubleSpinBox(decimals=1, maximum=600, minimum=0, singleStep=50, value=50)
 			self.etime = QDoubleSpinBox(decimals=1, maximum=2400, minimum=1600, singleStep=50, value=50)
+			self.smooth = QDoubleSpinBox(decimals=1, maximum=20, minimum=1, singleStep=1, value=4)
 
 			self.winName = QLineEdit('Window Name')
 			self.winName.selectAll()
@@ -1107,8 +1110,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 			grid.addWidget(self.stime, 3, 1)
 			grid.addWidget(QLabel('End Time.'), 4, 0)
 			grid.addWidget(self.etime, 4, 1)
-			grid.addWidget(QLabel('Model.'), 5, 0)
-			grid.addWidget(self.model, 5, 1)
+			grid.addWidget(QLabel('Smooth.'), 5, 0)
+			grid.addWidget(self.smooth, 5, 1)
+			grid.addWidget(QLabel('Model.'), 6, 0)
+			grid.addWidget(self.model, 6, 1)
 			grid.setVerticalSpacing(10)
 
 			btnbox = QDialogButtonBox(QDialogButtonBox.Ok |
@@ -1126,6 +1131,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 				self.winName.setText(windowvalue['name'])
 				self.noisewin.setValue(windowvalue['noise'])
 				self.codawin.setValue(windowvalue['coda'])
+				self.stime.setValue(windowvalue['stime'])
+				self.etime.setValue(windowvalue['etime'])
+				self.smooth.setValue(windowvalue['smooth'])
+				self.model.setText(windowvalue['model'])
 			self.setLayout(layout)
 			self.setSizeGripEnabled(False)
 
