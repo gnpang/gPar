@@ -14,8 +14,6 @@ import numpy as np
 import json
 import itertools
 
-from six import string_types
-
 import gpar
 from gpar.util import util
 
@@ -28,7 +26,6 @@ import obspy.clients.earthworm
 from obspy.core import UTCDateTime
 from obspy.core import AttribDict
 from obspy.taup import TauPyModel
-from obspy.core import AttribDict
 
 # default waveform directory
 eveDirDefault = 'Data'
@@ -39,7 +36,7 @@ PI = np.pi
 
 def read(path):
 	"""
-	Function to read a file form a path. If IOError or TypeError simply try appending os.sep to start
+	Function to read a file from a path. If IOError or TypeError simply try appending os.sep to start
 	"""
 
 	try:
