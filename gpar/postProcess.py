@@ -738,11 +738,11 @@ class glanceEQ(QtWidgets.QMainWindow):
 					ax.set_ylabel(self._current_type)
 				ax.set_title(name)
 			if self._current_type == 'slowness':
-				title = '%s - %s\nSlant Stack at a Backazimuth of %.1f %sN\nDep:%s  Distance: %s%s'
+				title = '%s - %s\nSlant Stack at a Backazimuth of %.1f %sN\nDep:%s  Distance: %s%s' \
 						%(self._btype, self._current_ID, self._current_event.bakAzimuth,a,
 							self._current_event.dep, self._current_event.Del, a)
 			elif self._current_type == 'theta':
-				title = '%s - %s\nSlant Stack at a slowness of %.2f s/deg\nDep:%s  Distance: %s%s'
+				title = '%s - %s\nSlant Stack at a slowness of %.2f s/deg\nDep:%s  Distance: %s%s' \
 						%(self._btype, self._current_ID, self._current_event.rayParameter,
 							self._current_event.dep, self._current_event.Del, a)
 			self.fig.suptitle(title)
