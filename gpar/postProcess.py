@@ -630,6 +630,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 	def _drawFig(self):
 		self.fig.clear()
+		a = u"\u00b0"
 		if self._btype == 'beam':
 			num_plots = len(self._current_beam)
 			for _i, tr in enumerate(self._current_beam):
@@ -654,9 +655,11 @@ class glanceEQ(QtWidgets.QMainWindow):
 				ax.legend()
 				if _i == 0:
 					ax.set_xlabel('Seconds')
-				self.fig.suptitle('%s - %s'%(self._current_event.ID, self._btype))
+				self.fig.suptitle('%s - %s\nDep:%s  Distance: %s%s'
+					%(self._current_event.ID, self._btype, self._current_event.dep, self._current_event.Del, a))
 		elif self._btype == 'slide':
-			self.fig.suptitle('%s - %s'%(self._current_event.ID, self._btype))
+			self.fig.suptitle('%s - %s\nDep:%s  Distance: %s%s'
+				%(self._current_event.ID, self._btype, self._current_event.dep, self._current_event.Del, a))
 			nfilts = len(self._current_slide.keys())
 			ax = self.fig.subplots(4, nfilts, sharex='col', sharey='row')
 			for ind, (name,st) in enumerate(self._current_slide.items()):
@@ -735,10 +738,13 @@ class glanceEQ(QtWidgets.QMainWindow):
 					ax.set_ylabel(self._current_type)
 				ax.set_title(name)
 			if self._current_type == 'slowness':
-				a = u"\u00b0"
-				title = '%s - %s\nSlant Stack at a Backazimuth of %.1f %sN'%(self._btype, self._current_ID, self._current_event.bakAzimuth,a)
+				title = '%s - %s\nSlant Stack at a Backazimuth of %.1f %sN\nDep:%s  Distance: %s%s'
+						%(self._btype, self._current_ID, self._current_event.bakAzimuth,a,
+							self._current_event.dep, self._current_event.Del, a)
 			elif self._current_type == 'theta':
-				title = '%s - %s\nSlant Stack at a slowness of %.2f s/deg'%(self._btype, self._current_ID, self._current_event.rayParameter)
+				title = '%s - %s\nSlant Stack at a slowness of %.2f s/deg\nDep:%s  Distance: %s%s'
+						%(self._btype, self._current_ID, self._current_event.rayParameter,
+							self._current_event.dep, self._current_event.Del, a)
 			self.fig.suptitle(title)
 		elif self._btype == 'strip':
 			_i = self.wincb.currentIndex()
@@ -869,7 +875,9 @@ class glanceEQ(QtWidgets.QMainWindow):
 						if ind is 0:
 							ax[0,ind].set_ylabel('log10(Amp)')
 							ax[1,ind].set_ylabel('Amp')
-				self.fig.suptitle('Coda Strip for %s using %s method in win %s'%(self._current_event.ID, self._method, trinwin['name']))
+				self.fig.suptitle('Coda Strip for %s using %s method in win %s\nDep:%s  Distance: %s%s'
+					%(self._current_event.ID, self._method, trinwin['name'],
+						self._current_event.dep, self._current_event.Del, a))
 
 
 		self._canvasDraw()
