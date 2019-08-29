@@ -382,7 +382,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self._eventInfo(self._current_id)
 		self._current_strip = True
 		spts = int(self.trinWin[_j]['smooth'] / self._current_delta )
-		codaStrip(self._current_event,beamtype=self._btype,method=_method, window=spts,
+		codaStrip(self._current_event, method=_method, window=spts,
 				 	  siglen=self.trinWin[_j]['coda'], noise=self.trinWin[_j]['noise'],beamphase=self.beamphase,
 			  		  model=self.trinWin[_j]['model'], stime=self.trinWin[_j]['stime'], etime=self.trinWin[_j]['etime'],)
 		self._btype = 'strip'
@@ -471,9 +471,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 							QMessageBox.Yes | QMessageBox.No)
 				if choice is QMessageBox.Yes:
 					self._current_strip = True
-					self._setCodaStrip()
-					self._btype = 'strip'
-					self._updatePlot()
+					self._appStrip()
 					return
 		self._eventInfo(next(self._eventCycle))
 		self._current_strip = False
@@ -1919,7 +1917,7 @@ class stackArray(QtWidgets.QMainWindow):
 
 
 
-def codaStrip(eve, beamtype='beam', method='all',
+def codaStrip(eve, method='all',
 			  siglen=200, noise=200,beamphase='PKiKP',
 			  phase_list=['P','PP','PcP','ScP','PKiKP','SP','ScS'],
 			  model='ak135', stime=400.0, etime=1800.0,
@@ -1932,13 +1930,10 @@ def codaStrip(eve, beamtype='beam', method='all',
 	if not hasattr(eve, 'arrivals'):
 		eve.getArrival(phase_list=phase_list,model=model)
 
-	if beamtype == 'beam':
-		st = eve.beam
-	elif beamtype == 'slide':
-		tr = eve.slideSt
-	else:
-		msg = ('Not a valid option for codastrip')
+	if not hasattr(eve, 'beam'):
+		msg = ('Earthquake object has not calculate the beamforming yet')
 		gpar.log(__name__,msg,level='error',pri=True)
+	st = eve.beam
 
 	filts=[]
 	delta = st[0].stats.delta
