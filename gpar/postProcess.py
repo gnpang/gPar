@@ -765,7 +765,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 					self._appStrip()
 				else:
 					self._btype = 'beam'
-					self.sbcb.setCurrentIndex(3)
+					self.sbcb.setCurrentIndex(0)
 					self._updatePlot()
 			elif len(_badDF) != 0:
 				choice = QMessageBox.question(self, 'Bad event!',
