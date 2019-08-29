@@ -399,6 +399,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		while next(self._eventCycle) != self._eqlist[_i]:
 			pass
 		self._eventInfo(self._eqlist[_i])
+		self._current_strip = False
 		_id = self._current_event.ID
 		if len(self._stripDF) != 0:
 			existDF = self._stripDF[self._stripDF.ID == _id]
@@ -408,11 +409,13 @@ class glanceEQ(QtWidgets.QMainWindow):
 			level = existDF.Level.iloc[0]
 			ind = self.eve_type.index(level)
 			self.levelGrp.button(ind).setChecked(True)
+			self._current_strip=True
 		else:
 			if len(self._badDF) != 0:
 				_badDF = self._badDF[self._badDF.ID == _id]
 				if len(_badDF) != 0:
 					self.levelGrp.button(3).setChecked(True)
+					self._current_strip = True
 		self._drawFig()
 
 	def _pltPrevEvent(self):
@@ -423,6 +426,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		for _i in range(len(self._eqlist) - 1):
 			prevEvent = next(self._eventCycle)
 		self._eventInfo(prevEvent)
+		self._current_strip = False
 		_id = self._current_event.ID
 		if len(self._stripDF) != 0:
 			existDF = self._stripDF[self._stripDF.ID == _id]
@@ -432,11 +436,13 @@ class glanceEQ(QtWidgets.QMainWindow):
 			level = existDF.Level.iloc[0]
 			ind = self.eve_type.index(level)
 			self.levelGrp.button(ind).setChecked(True)
+			self._current_strip = True
 		else:
 			if len(self._badDF) != 0:
 				_badDF = self._badDF[self._badDF.ID == _id]
 				if len(_badDF) != 0:
 					self.levelGrp.button(3).setChecked(True)
+					self._current_strip = True
 		if _j == 0:
 			_n = len(self.evecb) - 1
 			self.evecb.setCurrentIndex(_n)
@@ -470,6 +476,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 					self._updatePlot()
 					return
 		self._eventInfo(next(self._eventCycle))
+		self._current_strip = False
 		_id = self._current_event.ID
 		if len(self._stripDF) != 0:
 			existDF = self._stripDF[self._stripDF.ID == _id]
@@ -479,11 +486,13 @@ class glanceEQ(QtWidgets.QMainWindow):
 			level = existDF.Level.iloc[0]
 			ind = self.eve_type.index(level)
 			self.levelGrp.button(ind).setChecked(True)
+			self._current_strip = True
 		else:
 			if len(self._badDF) != 0:
 				_badDF = self._badDF[self._badDF.ID == _id]
 				if len(_badDF) != 0:
 					self.levelGrp.button(3).setChecked(True)
+					self._current_strip = True
 		_i = self.evecb.currentIndex()
 		if _i == len(self.evecb) - 1:
 			self.evecb.setCurrentIndex(0)
