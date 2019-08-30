@@ -304,6 +304,12 @@ class glanceEQ(QtWidgets.QMainWindow):
 				self.ampmax.setSingleStep(1)
 				self.ampmin.setValue(2)
 				self.ampmin.setSingleStep(1)
+			elif self.vepcb.currentText() == 'log10':
+				self.ampmax.setMaximum(5)
+				self.ampmax.setValue(3)
+				self.ampmax.setSingleStep(0.5)
+				self.ampmin.setValue(1)
+				self.ampmin.setSingleStep(0.5)
 		else:
 			self.ampmin.setEnabled(False)
 			self.ampmax.setEnabled(False)
@@ -710,14 +716,16 @@ class glanceEQ(QtWidgets.QMainWindow):
 			if not hasattr(self._current_event, 'arrivals'):
 				self._current_event.getArrival()
 			for ind, _row in self._current_energy.iterrows():
-				abspow = _row.POWER
+				# abspow = _row.POWER
 				name = _row.FILT
 				if self.vepcb.currentText() == 'log10':
-					abspow = np.log10(abspow)
+					abspow = np.log10(_row.POWER)
 				elif self.vepcb.currentText() == 'log':
-					abspow = np.log(abspow)
+					abspow = np.log(_row.POWER)
 				elif self.vepcb.currentText() == 'sqrt':
-					abspow = np.sqrt(abspow)
+					abspow = np.sqrt(_row.POWER)
+				else:
+					abspow = _row.POWER
 				ax = self.fig.add_subplot(1, num, ind+1)
 				ax.imshow(abspow, extent=extent, aspect='auto', cmap='Reds', vmin=vmin, vmax=vmax)
 				arrival = self._current_event.arrivals[self.beamphase]['TT']
