@@ -212,12 +212,12 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 		self.codacb.setMaximumWidth(100)
 		self.codacb.setMinimumWidth(80)
-		# self.ampmin = QDoubleSpinBox(decimals=1, maximum=5, minimum=0, singleStep=.5, value=1)
-		# self.ampmax = QDoubleSpinBox(decimals=1, maximum=5, minimum=0, singleStep=.5, value=3)
-		# self.ampmin.valueChanged.connect(self._updatePlot)
-		# self.ampmax.valueChanged.connect(self._updatePlot)
-		# self.ampmin.setEnabled(False)
-		# self.ampmax.setEnabled(False)
+		self.ampmin = QDoubleSpinBox(decimals=1, maximum=5, minimum=0, singleStep=.5, value=1)
+		self.ampmax = QDoubleSpinBox(decimals=1, maximum=5, minimum=0, singleStep=.5, value=3)
+		self.ampmin.valueChanged.connect(self._updatePlot)
+		self.ampmax.valueChanged.connect(self._updatePlot)
+		self.ampmin.setEnabled(False)
+		self.ampmax.setEnabled(False)
 		self._initAmp()
 		self.sbcb.activated.connect(self._activeAmp)
 
@@ -282,51 +282,40 @@ class glanceEQ(QtWidgets.QMainWindow):
 	def _hardExist(self):
 		self.deleteLater()
 
-	def _initAmp(self):
-		if self.vepcb.currentText() == 'beam':
-			self.ampmin = QDoubleSpinBox(decimals=1, maximum=100000, minimum=0, singleStep=500, value=10)
-			self.ampmax = QDoubleSpinBox(decimals=1, maximum=100000, minimum=0, singleStep=500, value=1000)
-		elif self.vepcb.currentText() == 'sqrt':
-			self.ampmin = QDoubleSpinBox(decimals=1, maximum=300, minimum=0, singleStep=5, value=3)
-			self.ampmax = QDoubleSpinBox(decimals=1, maximum=300, minimum=0, singleStep=5, value=30)
-		elif self.vepcb.currentText() == 'log':
-			self.ampmin = QDoubleSpinBox(decimals=1, maximum=12, minimum=0, singleStep=1, value=2)
-			self.ampmax = QDoubleSpinBox(decimals=1, maximum=12, minimum=0, singleStep=1, value=7)
-		else:
-			self.ampmin = QDoubleSpinBox(decimals=1, maximum=5, minimum=0, singleStep=0.5, value=1)
-			self.ampmax = QDoubleSpinBox(decimals=1, maximum=5, minimum=0, singleStep=0.5, value=3)
-		self.ampmin.valueChanged.connect(self._updatePlot)
-		self.ampmax.valueChanged.connect(self._updatePlot)
-		self.ampmin.setEnabled(False)
-		self.ampmax.setEnabled(False)
 
 	def _activeAmp(self):
 		if self.sbcb.currentText() == 'vespetrum':
 			self.ampmin.setEnabled(True)
 			self.ampmax.setEnabled(True)
 			self.vepcb.setEnabled(True)
-			# if self.vepcb.currentText() == 'beam':
-			# 	self.ampmax.setMaximum(100000)
-			# 	# self.ampmax.setValue(1000)
-			# 	self.ampmax.setSingleStep(500)
-			# 	# self.ampmin.setValue(10)
-			# 	self.ampmin.setSingleStep(500)
-			# elif self.vepcb.currentText() == 'sqrt':
-			# 	self.ampmax.setMaximum(300)
-			# 	# self.ampmax.setValue(30)
-			# 	self.ampmax.setSingleStep(5)
-			# 	# self.ampmin.setValue(3)
-			# 	self.ampmin.setSingleStep(5)
-			# elif self.vepcb.currentText() == 'log':
-			# 	self.ampmax.setMaximum(12)
-			# 	# self.ampmax.setValue(7)
-			# 	self.ampmax.setSingleStep(1)
-			# 	# self.ampmin.setValue(2)
-			# 	self.ampmin.setSingleStep(1)
-			# elif self.vepcb.currentText() == 'log10':
-			# 	self.ampmax.setSingleStep(0.5)
-			# 	self.ampmin.setSingleStep(0.5)
-			# 	self.ampmax.setMaximum(5)
+			if self.vepcb.currentText() == 'beam':
+				self.ampmax.setMaximum(100000)
+				# self.ampmax.setValue(1000)
+				self.ampmax.setSingleStep(500)
+				# self.ampmin.setValue(10)
+				self.ampmin.setMaximum(100000)
+				self.ampmin.setSingleStep(500)
+			elif self.vepcb.currentText() == 'sqrt':
+				self.ampmax.setMaximum(300)
+				# self.ampmax.setValue(30)
+				self.ampmax.setSingleStep(5)
+				# self.ampmin.setValue(3)
+				self.ampmin.setMaximum(300)
+				self.ampmin.setSingleStep(5)
+			elif self.vepcb.currentText() == 'log':
+				# self.ampmax.setMaximum(12)
+				# # self.ampmax.setValue(7)
+				# self.ampmax.setSingleStep(1)
+				# # self.ampmin.setValue(2)
+				# self.ampmin.setMaximum(12)
+				self.ampmin = QDoubleSpinBox(decimals=1, maximum=12, minimum=0, singleStep=1, value=2)
+				self.ampmax = QDoubleSpinBox(decimals=1, maximum=12, minimum=0, singleStep=1, value=7)
+				# self.ampmin.setSingleStep(1)
+			elif self.vepcb.currentText() == 'log10':
+				self.ampmax.setSingleStep(0.5)
+				self.ampmin.setSingleStep(0.5)
+				self.ampmax.setMaximum(5)
+				self.ampmin.setMaximum(5)
 		else:
 			self.ampmin.setEnabled(False)
 			self.ampmax.setEnabled(False)
