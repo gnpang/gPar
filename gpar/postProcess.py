@@ -303,14 +303,12 @@ class glanceEQ(QtWidgets.QMainWindow):
 				self.ampmin.setMaximum(300)
 				self.ampmin.setSingleStep(5)
 			elif self.vepcb.currentText() == 'log':
-				# self.ampmax.setMaximum(12)
+				self.ampmax.setMaximum(12)
 				# # self.ampmax.setValue(7)
-				# self.ampmax.setSingleStep(1)
+				self.ampmax.setSingleStep(1)
 				# # self.ampmin.setValue(2)
-				# self.ampmin.setMaximum(12)
-				self.ampmin = QDoubleSpinBox(decimals=1, maximum=12, minimum=0, singleStep=1, value=2)
-				self.ampmax = QDoubleSpinBox(decimals=1, maximum=12, minimum=0, singleStep=1, value=7)
-				# self.ampmin.setSingleStep(1)
+				self.ampmin.setMaximum(12)
+				self.ampmin.setSingleStep(1)
 			elif self.vepcb.currentText() == 'log10':
 				self.ampmax.setSingleStep(0.5)
 				self.ampmin.setSingleStep(0.5)
