@@ -308,14 +308,14 @@ class glanceEQ(QtWidgets.QMainWindow):
 				self.ampmin.setSingleStep(1)
 				# self.ampmin.valueChanged.connect(self._updatePlot)
 				# self.ampmax.valueChanged.connect(self._updatePlot)
-			elif self.vepcb.currentText() == 'log10':
-				self.ampmax.setMaximum(5)
-				self.ampmax.setValue(3)
-				self.ampmax.setSingleStep(0.5)
-				self.ampmin.setValue(1)
-				self.ampmin.setSingleStep(0.5)
-			self.ampmin.valueChanged.connect(self._updatePlot)
-			self.ampmax.valueChanged.connect(self._updatePlot)
+			# elif self.vepcb.currentText() == 'log10':
+			# 	self.ampmax.setMaximum(5)
+			# 	self.ampmax.setValue(3)
+			# 	self.ampmax.setSingleStep(0.5)
+			# 	self.ampmin.setValue(1)
+			# 	self.ampmin.setSingleStep(0.5)
+			# self.ampmin.valueChanged.connect(self._updatePlot)
+			# self.ampmax.valueChanged.connect(self._updatePlot)
 		else:
 			self.ampmin.setEnabled(False)
 			self.ampmax.setEnabled(False)
