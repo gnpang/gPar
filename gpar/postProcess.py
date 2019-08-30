@@ -298,24 +298,12 @@ class glanceEQ(QtWidgets.QMainWindow):
 				self.ampmax.setSingleStep(5)
 				self.ampmin.setValue(3)
 				self.ampmin.setSingleStep(5)
-				# self.ampmin.valueChanged.connect(self._updatePlot)
-				# self.ampmax.valueChanged.connect(self._updatePlot)
 			elif self.vepcb.currentText() == 'log':
 				self.ampmax.setMaximum(12)
-				self.ampmax.setValue(7)
+				# self.ampmax.setValue(7)
 				self.ampmax.setSingleStep(1)
-				self.ampmin.setValue(2)
+				# self.ampmin.setValue(2)
 				self.ampmin.setSingleStep(1)
-				# self.ampmin.valueChanged.connect(self._updatePlot)
-				# self.ampmax.valueChanged.connect(self._updatePlot)
-			# elif self.vepcb.currentText() == 'log10':
-			# 	self.ampmax.setMaximum(5)
-			# 	self.ampmax.setValue(3)
-			# 	self.ampmax.setSingleStep(0.5)
-			# 	self.ampmin.setValue(1)
-			# 	self.ampmin.setSingleStep(0.5)
-			self.ampmin.valueChanged.connect(self._updatePlot)
-			self.ampmax.valueChanged.connect(self._updatePlot)
 		else:
 			self.ampmin.setEnabled(False)
 			self.ampmax.setEnabled(False)
@@ -1161,7 +1149,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 			if windowvalue is not None:
 				self.winName.setText(windowvalue['name'])
-				self.noisewin.setValue(windowvalue['noise'])
+				self.noisewin.actiue(windowvalue['noise'])
 				self.codawin.setValue(windowvalue['coda'])
 				self.stime.setValue(windowvalue['stime'])
 				self.etime.setValue(windowvalue['etime'])
