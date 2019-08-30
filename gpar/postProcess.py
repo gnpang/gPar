@@ -218,7 +218,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self.ampmax.valueChanged.connect(self._updatePlot)
 		self.ampmin.setEnabled(False)
 		self.ampmax.setEnabled(False)
-		self._initAmp()
+		# self._initAmp()
 		self.sbcb.activated.connect(self._activeAmp)
 
 		self.ttbtn = QtWidgets.QPushButton('Phases', parent=self.main_widget)
