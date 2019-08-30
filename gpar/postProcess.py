@@ -283,7 +283,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self.deleteLater()
 
 	def _initAmp(self):
-		if self.vepcb.currentText() == 'beam'
+		if self.vepcb.currentText() == 'beam':
 			self.ampmin = QDoubleSpinBox(decimals=1, maximum=100000, minimum=0, singleStep=500, value=10)
 			self.ampmax = QDoubleSpinBox(decimals=1, maximum=100000, minimum=0, singleStep=500, value=1000)
 		elif self.vepcb.currentText() == 'sqrt':
