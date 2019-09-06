@@ -1159,7 +1159,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 			if windowvalue is not None:
 				self.winName.setText(windowvalue['name'])
-				self.noisewin.actiue(windowvalue['noise'])
+				self.noisewin.setValue(windowvalue['noise'])
 				self.codawin.setValue(windowvalue['coda'])
 				self.stime.setValue(windowvalue['stime'])
 				self.etime.setValue(windowvalue['etime'])
