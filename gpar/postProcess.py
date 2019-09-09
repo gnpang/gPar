@@ -2264,7 +2264,7 @@ def stackTR(obsdf, pklname=None,win=[200.0,200.0],
 		for dt in dts:
 			index = obsdf[obsdf.delta == dt].index
 			for ind in index:
-				obsdf.iloc[ind].codeResSt.resample(sample)
+				obsdf.iloc[ind].codaResSt.resample(sample)
 	else:
 		delta = deltas[0]
 		#npt = obsdf.iloc[0].codaResSt[0].stats.npts
