@@ -2277,7 +2277,13 @@ def stackTR(obsdf, pklname=None,win=[200.0,200.0],
 		codaResSt = row.codaResSt
 		tmp_data = np.empty((len(filters), npt))
 		for i, tr in enumerate(codaResSt):
-			_, tmp_data[i] = norm(tr.data, sind, eind)
+			_, td = norm(tr.data, sind, eind)
+			if len(td) > npt:
+				td = td[0:npt]
+			elif len(td) < npt:
+				td = np.pad(td,(0, npt-len(td)), 'edge')
+			# _, tmp_data[i] = norm(tr.data, sind, eind)
+			tmp_data[i] = td
 		DATA[ind] = tmp_data
 	obsdf['DATA'] = DATA
 	n = len(obsdf)
