@@ -479,7 +479,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 				choice = QMessageBox.question(self, 'Stripping?',
 							"Haven't stripping yet, want to do it?",
 							QMessageBox.Yes | QMessageBox.No)
-				if choice is QMessageBox.Yes:
+				if choice == QMessageBox.Yes:
 					self._current_strip = True
 					self._appStrip()
 					return
@@ -665,6 +665,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 				ax.legend()
 				if _i == 0:
 					ax.set_xlabel('Seconds')
+				ax.set_xlim([time[0], time[-1]])
 				self.fig.suptitle('%s - %s\nDep:%s  Distance: %s%s'
 					%(self._current_event.ID, self._btype, self._current_event.dep, self._current_event.Del, a))
 		elif self._btype == 'slide':
@@ -1661,10 +1662,10 @@ class stackArray(QtWidgets.QMainWindow):
 											 capsize=0.1, alpha=0.5)
 							_ax_st.set_ylim([-0.1, 1.1])
 						else:
-							_ax_st.plot(time, _st[i].data,color='dark'+color[_i],label=label)
+							_ax_st.plot(time, _st[i].data,color=color[_i],label=label)
 							if self.ebtn.isChecked():
 								_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
-											 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
+											 marker='.',mew=0.1, ecolor='light'+color[_i], linewidth=0.2, markersize=0.2,
 											 capsize=0.1, alpha=0.5)
 							peak = peak+0.1
 							_ax_st.set_ylim([-0.1, peak])
