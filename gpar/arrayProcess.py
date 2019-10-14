@@ -764,7 +764,7 @@ class Doublet(object):
 		_df['TS'] = taup
 		_df['CC'] = cc
 		_df = _df[_df.CC >= threshold]
-		if len(_df) == cut:
+		if len(_df) < cut:
 			msg = ('Correlation for doublet %s is too bad, maybe due to SNR, dropping'%self.ID)
 			gpar.log(__name__, msg, level='info', pri=True)
 			self._qual=False
