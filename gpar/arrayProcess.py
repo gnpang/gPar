@@ -729,8 +729,8 @@ class Doublet(object):
 		st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
 		tmp_st1 = st1.copy().trim(starttime=stime1, endtime=etime1)
 		tmp_st2 = st2.copy().trim(starttime=stime2, endtime=etime2)
-		tmp_st1, tmpe_st2 = self._resample(tmp_st1,tmp_st2,delta, method)
 		npts = int((cetime + cstime)/delta) + 1
+		tmp_st1, tmpe_st2 = self._resample(tmp_st1,tmp_st2,delta, method,npts)
 		Mptd1 = np.zeros([len(st1), npts])
 		Mptd2 = np.zeros([len(st2), npts])
 		inds = range(len(sta))
@@ -741,18 +741,18 @@ class Doublet(object):
 				gpar.log(__name__, msg, level='warning',pri=True)
 				self._qual = False
 				return
-			data1 = tr1.data
-			data2 = tr2.data
+			# data1 = tr1.data
+			# data2 = tr2.data
 
-			if len(data1) > npts:
-				data1 = data1[:npts]
-			elif len(data1) < npts:
-				data1 = np.pad(data1, (0,npts-len(data1)), 'edge')
+			# if len(data1) > npts:
+			# 	data1 = data1[:npts]
+			# elif len(data1) < npts:
+			# 	data1 = np.pad(data1, (0,npts-len(data1)), 'edge')
 
-			if len(data2) > npts:
-				data2 = data2[:npts]
-			elif len(data2) < npts:
-				data2 = np.pad(data2, (0,npts-len(data2)), 'edge')
+			# if len(data2) > npts:
+			# 	data2 = data2[:npts]
+			# elif len(data2) < npts:
+			# 	data2 = np.pad(data2, (0,npts-len(data2)), 'edge')
 
 			Mptd1[ind,:] = data1
 			Mptd2[ind,:] = data2
