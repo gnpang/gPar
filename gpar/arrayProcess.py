@@ -741,8 +741,8 @@ class Doublet(object):
 				gpar.log(__name__, msg, level='warning',pri=True)
 				self._qual = False
 				return
-			# data1 = tr1.data
-			# data2 = tr2.data
+			data1 = tr1.data
+			data2 = tr2.data
 
 			# if len(data1) > npts:
 			# 	data1 = data1[:npts]
