@@ -582,7 +582,7 @@ class Doublet(object):
 				 winlen=5, step=0.05,
 				 starttime=100.0, endtime=300.0,
 				 domain='freq', fittype='cos',
-				 phase=['PKIKP']):
+				 phase=['PKIKP'],cut=10):
 
 		self.ID = row.DoubleID
 		msg = ("Building %s: EV1: %s; EV2: %s"%(self.ID,row.TIME1, row.TIME2))
@@ -612,7 +612,9 @@ class Doublet(object):
 		else:
 			self.getArrival(array=array)
 		self._alignWave(filt=filt,delta=resample,cstime=cstime,cetime=cetime,
-						starttime=starttime,endtime=endtime,domain=domain,fittype=fittype)
+						starttime=starttime,endtime=endtime,
+						domain=domain,fittype=fittype,
+						cut=cut)
 
 	def _checkInput(self):
 		if not isinstance(self.st1, obspy.core.stream.Stream):
@@ -621,7 +623,7 @@ class Doublet(object):
 		if not isinstance(self.st2, obspy.core.stream.Stream):
 			msg = ('Waveform data for %s is not stream, stop running' % self.ID)
 			gpar.log(__name__,msg,level='error',pri=True)
-	def _resample(self, st1, st2,resample, method):
+	def _resample(self, st1, st2,resample, method, npts):
 		rrate = 1.0/resample
 		if method == 'resample':
 			st1.resample(sampling_rate=rrate)
@@ -632,6 +634,19 @@ class Doublet(object):
 		else:
 			msg = ('Not a valid option for waveform resampling, choose from resample and interpolate')
 			gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
+		for _tr1, _tr2 in zip_longest(st1, st2):
+			data1 = _tr1.data
+			data2 = _tr2.data
+			if len(data1) > npts:
+				_tr1.data = data1[0:npts]
+			elif len(data1) < npts:
+				data1 = np.pad(data1, (0,npts-len(data1)), 'edge')
+				_tr1.data = data1
+			if len(data2) > npts:
+				_tr2.data = data2[0:npts]
+			elif len(data2) < npts:
+				data2 = np.pad(data2, (0,npts-len(data1)), 'edge')
+				_tr2.data = data2
 
 		return st1, st2
 
@@ -671,7 +686,7 @@ class Doublet(object):
 				   cstime=20.0, cetime=20.0, method='resample',
 				   starttime=100.0, endtime=300.0,
 				   domain='freq', fittype='cos',
-				   threshold=0.4):
+				   threshold=0.4, cut=10):
 		# msg = ('Aligning waveforms for doublet %s'%(self.ID))
 		# gpar.log(__name__, msg, level='info', pri=True)
 		sta1 = []
@@ -749,7 +764,7 @@ class Doublet(object):
 		_df['TS'] = taup
 		_df['CC'] = cc
 		_df = _df[_df.CC >= threshold]
-		if len(_df) == 0:
+		if len(_df) == cut:
 			msg = ('Correlation for doublet %s is too bad, maybe due to SNR, dropping'%self.ID)
 			gpar.log(__name__, msg, level='info', pri=True)
 			self._qual=False
@@ -762,6 +777,7 @@ class Doublet(object):
 		self.refTime = self.arr1 + refTime
 		use_st1 = obspy.Stream()
 		use_st2 = obspy.Stream()
+		npts = int((starttime + endtime)/delta) + 1
 		for ind, row in _df.iterrows():
 			sta = row.STA
 			_tr1 = st1.select(id=sta)[0].copy()
@@ -772,7 +788,7 @@ class Doublet(object):
 			stime = self.arr1 + thiftBT
 			_tr1.trim(starttime=stime, endtime=stime+starttime+endtime)
 			use_st1.append(_tr1)
-		use_st1, use_st2 = self._resample(use_st1, use_st2, delta, method)
+		use_st1, use_st2 = self._resample(use_st1, use_st2, delta, method, npts)
 		# refTime = self.arr2 - starttime
 		# st2.trim(starttime = self.arr2-starttime, endtime=self.arr2+endtime)
 		# for ind, tr in enumerate(st1):
