@@ -909,6 +909,7 @@ class Doublet(object):
 		if savefig:
 			savename = self.ID + '.' + sta_id + '.eps'
 			plt.savefig(savename)
+			plt.close()
 		if show:
 			print('Showing figure')
 			plt.show()
