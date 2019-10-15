@@ -861,7 +861,8 @@ class Doublet(object):
 				 sta_id='CN.YKR9..SHZ',
 				 stime=100, etime=300,
 				 lim=[1100, 1450],
-				 filt=[1.33, 2.67, 3, True]):
+				 filt=[1.33, 2.67, 3, True],
+				 savefig=True, show=True):
 		# fig = plt.figure()
 
 		#
@@ -905,8 +906,12 @@ class Doublet(object):
 		plt.ylim([-2,2])
 		plt.xlim(lim)
 		plt.xlabel('Time (s)')
-		print('Showing figure')
-		plt.show()
+		if savefig:
+			savename = self.ID + '.' + sta_id + '.eps'
+			plt.savefig(savename)
+		if show:
+			print('Showing figure')
+			plt.show()
 
 
 def getTimeShift(rayParameter,bakAzimuth,geometry,unit='deg'):
