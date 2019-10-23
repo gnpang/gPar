@@ -2000,11 +2000,13 @@ def codaStrip(eve, method='all',
 
 	# data_before = np.empty((n_tr, noi_pts))
 	data_before = data[:, noi_ind1: noi_ind1 + noi_pts]
+	print(data_before)
 
 	data_sig = data[:, sig_ind:sig_ind + sig_pts]
 
 	time_after = tt2 + np.arange(int(noise/delta)+1) * delta
 	data_after = data[:, noi_ind2: noi_ind2+noi_pts]
+	print(data_after)
 	sind = int(stime/delta)
 	npts = int((etime - stime)/delta) + 1
 	time = np.matrix(np.linspace(stime, etime, npts))
