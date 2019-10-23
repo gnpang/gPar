@@ -479,7 +479,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 				choice = QMessageBox.question(self, 'Stripping?',
 							"Haven't stripping yet, want to do it?",
 							QMessageBox.Yes | QMessageBox.No)
-				if choice == QMessageBox.Yes:
+				if choice is QMessageBox.Yes:
 					self._current_strip = True
 					self._appStrip()
 					return
@@ -665,7 +665,6 @@ class glanceEQ(QtWidgets.QMainWindow):
 				ax.legend()
 				if _i == 0:
 					ax.set_xlabel('Seconds')
-				ax.set_xlim([time[0], time[-1]])
 				self.fig.suptitle('%s - %s\nDep:%s  Distance: %s%s'
 					%(self._current_event.ID, self._btype, self._current_event.dep, self._current_event.Del, a))
 		elif self._btype == 'slide':
@@ -1352,7 +1351,21 @@ class stackArray(QtWidgets.QMainWindow):
 		self.btnbar2.addWidget(self.filtcb)
 		self.btnbar2.addStretch(1)
 
+		#Menubar
+		menuBar = self.menuBar()
+		fileMenu = menubar.addMenu('&File')
+		fileMenu.addAction(QtGui.QIcon().fromTheme('document-save'),
+						   'Save Reg', self._saveFile)
 
+	def _saveFile(self):
+		if len(self._region) >= 2:
+			_region = self._region[1:]
+			for _reg in _region:
+				name = _reg['name']
+				array = self._current_array['name']
+				_df = self.regDf[name]
+				savename = os.path.join(array,name+'.pkl')
+				_df.to_pickle(savename)
 
 	def _initArrayList(self):
 		self._arlist = pd.DataFrame()
@@ -1662,10 +1675,10 @@ class stackArray(QtWidgets.QMainWindow):
 											 capsize=0.1, alpha=0.5)
 							_ax_st.set_ylim([-0.1, 1.1])
 						else:
-							_ax_st.plot(time, _st[i].data,color=color[_i],label=label)
+							_ax_st.plot(time, _st[i].data,color='dark'+color[_i],label=label)
 							if self.ebtn.isChecked():
 								_ax_st.errorbar(time, _st[i].data, yerr=2*_std_st[i].data,
-											 marker='.',mew=0.1, ecolor='light'+color[_i], linewidth=0.2, markersize=0.2,
+											 marker='.',mew=0.1, ecolor=color[_i], linewidth=0.2, markersize=0.2,
 											 capsize=0.1, alpha=0.5)
 							peak = peak+0.1
 							_ax_st.set_ylim([-0.1, peak])
@@ -1956,6 +1969,8 @@ def codaStrip(eve, method='all',
 		gpar.log(__name__,msg,level='error',pri=True)
 	st = eve.beam
 
+	noi_sind = int((eve.arrivals['P']['TT'] - 300.0)/delta)
+	noi_pts = int(100.0/delta)
 	filts=[]
 	delta = st[0].stats.delta
 	starttime = st[0].stats.starttime
@@ -1967,7 +1982,11 @@ def codaStrip(eve, method='all',
 	npts = st[0].stats.npts
 	data = np.empty((n_tr,npts))
 	for ind, tr in enumerate(st):
-		data[ind,:] = np.abs(scipy.signal.hilbert(tr.data))
+		tmp_data = np.abs(scipy.signal.hilbert(tr.data))
+		mean = np.mean(tmp_data[noi_sind:noi_sind+noi_pts])
+		data[ind,:] = tmp_data - mean
+		# data[ind,:] = np.abs(scipy.signal.hilbert(tr.data))
+
 		filts.append(tr.stats.channel)
 	# data = np.abs(scipy.signal.hilbert(tr.data))
 	sig_pts = int(siglen/delta) + 1
