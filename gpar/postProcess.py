@@ -1352,7 +1352,7 @@ class stackArray(QtWidgets.QMainWindow):
 		self.btnbar2.addStretch(1)
 
 		#Menubar
-		menuBar = self.menuBar()
+		menubar = self.menuBar()
 		fileMenu = menubar.addMenu('&File')
 		fileMenu.addAction(QtGui.QIcon().fromTheme('document-save'),
 						   'Save Reg', self._saveFile)
