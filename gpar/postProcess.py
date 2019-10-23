@@ -1984,7 +1984,7 @@ def codaStrip(eve, method='all',
 	# mean = np.empty((n_tr, 1))
 	for ind, tr in enumerate(st):
 		tmp_data = np.abs(scipy.signal.hilbert(tr.data))
-		tmp_data = moving_ave(tmp_data, window)
+		# tmp_data = moving_ave(tmp_data, window)
 		# mean[ind,:] = np.mean(tmp_data[noi_sind:noi_sind+noi_win])
 		# print(mean)
 		# data[ind,:] = tmp_data - mean
@@ -1992,6 +1992,7 @@ def codaStrip(eve, method='all',
 		data[ind,:] = tmp_data
 
 		filts.append(tr.stats.channel)
+	data = moving_ave(data, window)
 	# data = np.abs(scipy.signal.hilbert(tr.data))
 	sig_pts = int(siglen/delta) + 1
 	noi_pts = int(noise/delta) + 1
