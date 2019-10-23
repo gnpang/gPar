@@ -1984,6 +1984,7 @@ def codaStrip(eve, method='all',
 	for ind, tr in enumerate(st):
 		tmp_data = np.abs(scipy.signal.hilbert(tr.data))
 		mean = np.mean(tmp_data[noi_sind:noi_sind+noi_win])
+		print(mean)
 		data[ind,:] = tmp_data - mean
 		# data[ind,:] = np.abs(scipy.signal.hilbert(tr.data))
 
