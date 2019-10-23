@@ -2015,6 +2015,7 @@ def codaStrip(eve, method='all',
 	if method == 'all':
 		#fitting coda model
 		coda_par = codaFit(np.append(time_before,time_after),np.append(data_before,data_after,axis=1))
+		print(coda_par)
 		#getting predict noise signal in linear scale
 		coda_data = np.asarray(np.exp(np.transpose(coda_par[0,:]) - np.transpose(coda_par[1,:]) \
 					*np.log(time) - np.transpose(coda_par[2,:])*time))
