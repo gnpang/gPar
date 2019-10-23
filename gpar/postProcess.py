@@ -1970,7 +1970,7 @@ def codaStrip(eve, method='all',
 	st = eve.beam
 	delta = st[0].stats.delta
 	noi_sind = int((eve.arrivals['P']['TT'] - 300.0)/delta)
-	noi_pts = int(100.0/delta)
+	noi_win = int(100.0/delta)
 	filts=[]
 	
 	starttime = st[0].stats.starttime
@@ -1983,7 +1983,7 @@ def codaStrip(eve, method='all',
 	data = np.empty((n_tr,npts))
 	for ind, tr in enumerate(st):
 		tmp_data = np.abs(scipy.signal.hilbert(tr.data))
-		mean = np.mean(tmp_data[noi_sind:noi_sind+noi_pts])
+		mean = np.mean(tmp_data[noi_sind:noi_sind+noi_win])
 		data[ind,:] = tmp_data - mean
 		# data[ind,:] = np.abs(scipy.signal.hilbert(tr.data))
 
