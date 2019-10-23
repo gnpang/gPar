@@ -1981,13 +1981,15 @@ def codaStrip(eve, method='all',
 	n_tr = len(st)
 	npts = st[0].stats.npts
 	data = np.empty((n_tr,npts))
+	# mean = np.empty((n_tr, 1))
 	for ind, tr in enumerate(st):
 		tmp_data = np.abs(scipy.signal.hilbert(tr.data))
-		mean = np.mean(tmp_data[noi_sind:noi_sind+noi_win])
+		tmp_data = moving_ave(tmp_data, window)
+		# mean[ind,:] = np.mean(tmp_data[noi_sind:noi_sind+noi_win])
 		# print(mean)
-		data[ind,:] = tmp_data - mean
+		# data[ind,:] = tmp_data - mean
 		# print(data[ind,:])
-		# data[ind,:] = np.abs(scipy.signal.hilbert(tr.data))
+		data[ind,:] = tmp_data
 
 		filts.append(tr.stats.channel)
 	# data = np.abs(scipy.signal.hilbert(tr.data))
@@ -2000,13 +2002,13 @@ def codaStrip(eve, method='all',
 
 	# data_before = np.empty((n_tr, noi_pts))
 	data_before = data[:, noi_ind1: noi_ind1 + noi_pts]
-	print(np.min(data_before))
+	# print(np.min(data_before))
 
 	data_sig = data[:, sig_ind:sig_ind + sig_pts]
 
 	time_after = tt2 + np.arange(int(noise/delta)+1) * delta
 	data_after = data[:, noi_ind2: noi_ind2+noi_pts]
-	print(np.min(data_after))
+	# print(np.min(data_after))
 	sind = int(stime/delta)
 	npts = int((etime - stime)/delta) + 1
 	time = np.matrix(np.linspace(stime, etime, npts))
@@ -2017,13 +2019,14 @@ def codaStrip(eve, method='all',
 	if method == 'all':
 		#fitting coda model
 		coda_par = codaFit(np.append(time_before,time_after),np.append(data_before,data_after,axis=1))
-		print(coda_par)
+		# print(coda_par)
 		#getting predict noise signal in linear scale
 		coda_data = np.asarray(np.exp(np.transpose(coda_par[0,:]) - np.transpose(coda_par[1,:]) \
 					*np.log(time) - np.transpose(coda_par[2,:])*time))
 		# coda_data = np.asarray(coda_data)
 		#getting residual signal after removing the predict noise
-		coda_res = moving_ave(obs_data, window) - coda_data
+		# coda_res = moving_ave(obs_data, window) - coda_data
+		coda_res = obs_data - coda_data
 		res = np.mean(coda_res[:,ind:ind+sig_pts],axis=-1)
 		#store coda model information
 		_df = pd.DataFrame(columns=['FILT','lnA','B','C','RMS'])
