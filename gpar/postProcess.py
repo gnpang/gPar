@@ -1968,11 +1968,11 @@ def codaStrip(eve, method='all',
 		msg = ('Earthquake object has not calculate the beamforming yet')
 		gpar.log(__name__,msg,level='error',pri=True)
 	st = eve.beam
-
+	delta = st[0].stats.delta
 	noi_sind = int((eve.arrivals['P']['TT'] - 300.0)/delta)
 	noi_pts = int(100.0/delta)
 	filts=[]
-	delta = st[0].stats.delta
+	
 	starttime = st[0].stats.starttime
 	tt1 = eve.arrivals[beamphase]['TT'] - noise #- starttime
 	tt2 = eve.arrivals[beamphase]['TT'] + siglen #- starttime
