@@ -11,7 +11,10 @@ import scipy
 from obspy.core import UTCDateTime
 from obspy.core import AttribDict
 from obspy.taup import TauPyModel
+from obspy.signal.util import next_pow_2, util_geo_km
 from obspy.signal.util import util_geo_km
+from obspy.signal.headers import clibsignal
+from obspy.signal.invsim import cosine_taper
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import matplotlib.cm as cm
@@ -49,8 +52,7 @@ class Array(object):
 		self.name = arrayName
 		self.refPoint = refPoint
 		self.coordsys = coordsys
-		if not isDoublet:
-			self.getGeometry(staDf,refPoint,coordsys=coordsys)
+		self.getGeometry(staDf,refPoint,coordsys=coordsys)
 		if not isDoublet:
 			self.events = [0]*len(eqDF)
 			for ind, row in eqDF.iterrows():
@@ -197,6 +199,19 @@ class Array(object):
 						 starttime=starttime,endtime=endtime, unit=unit,
 						 winlen=winlen,overlap=overlap,write=write, **kwargs)
 
+	def slideFK(self, winlen=2.0, overlap=0.5, grdpts_x=301.0, grdpts_y=301.0,
+				sll_x=-15.0, sll_y=-15.0, sl_s=0.1, starttime=500, endtime=1000,
+				method=0, prewhiten=0, freqmin=1, freqmax=2, write=False, **kwargs):
+		for eq in self.events:
+			eq.slideFK(timeTable=self.timeTable, arrayName=self.name,
+					   winlen=winlen, overlap=overlap, 
+					   sll_x=sll_x, sll_y=sll_y, sl_s=sl_s,
+					   grdpts_x=grdpts_x, grdpts_y=grdpts_y,
+					   freqmin=freqmin, freqmax=freqmax,
+					   starttime=starttime, endtime=endtime,
+					   prewhiten=prewhiten, method=method, write=write,
+					   **kwargs)
+
 	def vespectrum(self,grdpts=401,
 					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
 					stack='linear',
@@ -231,24 +246,45 @@ class Earthquake(object):
 		Earthquake basic information including ray parameters for specific phase
 		defualt is for PKiKP
 		"""
-		self.time = UTCDateTime(row.TIME)
-		self.ID = row.DIR
-		self.lat = row.LAT
-		self.lon = row.LON
-		self.dep = row.DEP
-		self.Mw = row.Mw
-		self.Del = row.Del
-		self.azimuth = row.Az
-		self.bakAzimuth = row.Baz
-		self.pattern = row.BB
-		self.rayParameter = row.Rayp
+		# self.time = UTCDateTime(row.TIME)
+		# self.ID = row.DIR
+		# self.lat = row.LAT
+		# self.lon = row.LON
+		# self.dep = row.DEP
+		# self.mw = row.Mw
+		# self.dis = row.Del
+		# self.az = row.Az
+		# self.baz = row.Baz
+		# self.bb = row.BB
+		# self.rayp = row.Rayp
 		# self.takeOffAngle = row.Angle
+		# self._defOri()
+		# self._updateOri(row)
+		self.__dict__.update((k.lower(), v) for k,v in row.items())
+		self.ID = row.DIR
 		self.beamphase = beamphase
 		self.phase_list = phase_list
-		self.stream = row.Stream
+		# self.stream = row.Stream
 		self.ntr = len(row.Stream)
 		self.delta = row.Stream[0].stats.delta
 		self._checkInputs()
+
+	# def _defOri(self):
+	# 	self.time = -12345
+	# 	self.ID = -12345
+	# 	self.lat = -12345
+	# 	self.lon = -12345
+	# 	self.dep = -12345
+	# 	self.mw = -12345
+	# 	self.dis = -12345
+	# 	self.az = -12345
+	# 	self.baz = -12345
+	# 	self.bb = -12345
+	# 	self.rayp = -12345
+	# 	self.takeOffAngle = -12345
+
+	def _updateOri(self, row):
+		self.__dict__.update((k, v) for k,v in row.items())
 
 	def _checkInputs(self):
 		if not isinstance(self.time, UTCDateTime):
@@ -269,7 +305,12 @@ class Earthquake(object):
 		model = TauPyModel(model)
 		if phase_list == None:
 			phase_list = self.phase_list
-		arrivals = model.get_travel_times(source_depth_in_km=self.dep,distance_in_degree=self.Del,phase_list=phase_list)
+
+		if not hasattr(self, 'dep') or self.dis==-12345:
+			msg = "Depth or distance for %s is not defined"%self.ID
+			gpar.log(__name__, msg, level='error', pri=True)
+
+		arrivals = model.get_travel_times(source_depth_in_km=self.dep,distance_in_degree=self.dis,phase_list=phase_list)
 
 		phases = {}
 		for arr in arrivals:
@@ -280,7 +321,7 @@ class Earthquake(object):
 			phases[pha] = times
 
 		self.arrivals = phases
-		msg = ('Travel times for %s for earthquake %s in depth of %.2f in distance of %.2f' % (phase_list, self.ID, self.dep, self.Del))
+		msg = ('Travel times for %s for earthquake %s in depth of %.2f in distance of %.2f' % (phase_list, self.ID, self.dep, self.dis))
 		gpar.log(__name__,msg,level='info',pri=True)
 
 	def beamforming(self, geometry, arrayName, starttime=0.0, winlen=1800.0,
@@ -307,7 +348,10 @@ class Earthquake(object):
 			write: boot, if True write a sac file for beamforming trace, store into the directory where the event waveforms are.
 		"""
 		# stime = time.time()
-		tsDF = getTimeShift(self.rayParameter,self.bakAzimuth,geometry,unit=unit)
+		if not hasattr(self, 'rayp') or not hasattr(self, 'baz'):
+			msg = "Ray parameter or back azimuth is not defined for %s"%self.ID
+			gpar.log(__name__, msg, level='error', pri=True)
+		tsDF = getTimeShift(self.rayp,self.baz,geometry,unit=unit)
 		self.timeshift = tsDF
 		stalist = tsDF.STA
 		st = self.stream.copy()
@@ -335,86 +379,7 @@ class Earthquake(object):
 			gpar.log(__name__,msg,level='info',pri=True)
 			tmp_st = st.copy()
 			tmp_st.filter('bandpass',freqmin=filt[0],freqmax=filt[1],corners=filt[2],zerophase=filt[3])
-			beamTr = obspy.core.trace.Trace()
-			beamTr.stats.delta = self.delta
-			if stack == 'psw':
-				shiftTRdata = np.empty((ntr,npt),dtype=complex)
-			else:
-				shiftTRdata = np.empty((ntr,npt))
-			for ind, tr in enumerate(tmp_st):
-				sta = tr.stats.station
-				data = tr.data
-				if stack == 'root':
-					order = kwargs['order']
-				elif stack == 'psw':
-					order = kwargs['order']
-					data = scipy.signal.hilbert(data)
-				tr_npt = tr.stats.npts
-				tmp_tsDF = tsDF[tsDF.STA==sta].iloc[0]
-				sind = int(int(starttime - tr.stats.sac.b)/delta + tmp_tsDF.LAG)
-
-				if sind < 0:
-					msg = ('Shift time is before start of records, padding %d points staion %s'%(sind,sta))
-					gpar.log(__name__,msg,level='info',pri=True)
-				if (sind+npt) >= tr_npt:
-					msg = ('Shift time past end of record, padding %d points'%(sind+npt-tr_npt))
-					gpar.log(__name__,msg,level='info',pri=True)
-
-				if sind < 0 and (sind+npt) < tr_npt:
-					dnpt = npt - np.abs(sind)
-					data_use = data[0:dnpt]
-					data_use = np.pad(data_use,(np.abs(sind),0),'edge')
-					data_com = np.diff(data_use) * tmp_tsDF.DT/delta
-					data_com = np.append(data_com,0)
-					tmp_data = data_use + data_com
-					if stack == 'root':
-						shiftTRdata[ind,:] = np.sign(tmp_data)*tmp_data
-					elif stack == 'linear' or stack == 'psw':
-						shiftTRdata[ind,:] = tmp_data
-
-				elif sind >=0 and sind+npt < tr_npt:
-					data_use = data[sind:npt+sind]
-					# print(data_use[0])
-					data_com = np.diff(data_use) * tmp_tsDF.DT/delta
-					data_com = np.append(data_com,0)
-					tmp_data = data_use + data_com
-					if stack == 'root':
-						shiftTRdata[ind,:] = np.sign(tmp_data)*tmp_data
-					elif stack == 'linear' or stack == 'psw':
-						shiftTRdata[ind,:] = tmp_data
-				elif sind >=0 and (sind+npt) >= tr_npt:
-					data_use = data[sind:]
-					pad_end = sind+npt - tr_npt
-					data_use = np.pad(data_use,(0,pad_end),'edge')
-					data_com = np.diff(data_use) * tmp_tsDF.DT/delta
-					data_com = np.append(data_com,0)
-					tmp_data = data_use + data_com
-					if stack == 'root':
-						shiftTRdata[ind,:] = np.sign(tmp_data)*np.power(np.abs(tmp_data), 1.0/order)
-					elif stack == 'linear' or stack == 'psw':
-						shiftTRdata[ind,:] = tmp_data
-				elif sind < 0 and sind+npt >= tr_npt:
-					pad_head = -sind
-					pad_end = npt+sind-tr_npt
-					data_use = data
-					data_use = np.pad(data_use,(pad_head,pad_end),'edge')
-					data_com = np.diff(data_use) * tmp_tsDF.DT/delta
-					data_com = np.append(data_com,0)
-					tmp_data = data_use + data_com
-					if stack == 'root':
-						shiftTRdata[ind,:] = np.sign(tmp_data)*tmp_data
-					elif stack == 'linear' or stack == 'psw':
-						shiftTRdata[ind,:] = tmp_data
-			if stack == 'linear':
-				beamdata = shiftTRdata.sum(axis=0) / ntr
-			elif stack == 'root':
-				beamdata = shiftTRdata.sum(axis=0) / ntr
-				beamdata = np.sign(beamdata) * np.power(np.abs(beamdata), 1.0/order)
-			elif stack == 'psw':
-				amp = np.absolute(shiftTRdata)
-				stack_amp = np.sum(np.real(shiftTRdata),axis=0)
-				beamdata = stack_amp * np.power(np.absolute(np.sum(shiftTRdata/amp,axis=0))/ntr, order)/ntr
-			beamTr.data = beamdata
+			beamTr = beamForming(tmp_st, tsDF, npt, starttime, stack=stack)
 			beamTr.stats.starttime = self.time
 			bpfilt = str(filt[0]) +'-'+str(filt[1])
 			beamTr.stats.network = 'beam'
@@ -517,6 +482,52 @@ class Earthquake(object):
 				name = 'slide.' + self.ID + '.'+stack+'.'+bpfilt+'.pkl'
 				name = os.path.join('./',arrayName,'Data',self.ID,name)
 				st.write(name,format='PICKLE')
+
+	def slideFK(self, timeTable, arrayName, winlen=2.0, overlap=0.5, grdpts_x=301, grdpts_y=301,
+				sll_x=-15.0, sll_y=-15.0, sl_s=0.1, starttime=500, endtime=1000,
+				method=0, prewhiten=0, freqmin=1, freqmax=2, write=False, **kwargs):
+		ntr = self.ntr
+		st = self.stream.copy()
+		st.detrend('demean')
+		msg = "Calculating FK beamforming for %s in in frequency %s-%s"%(self.ID, freqmin, freqmax)
+		gpar.log(__name__, msg, level='info', pri=True)
+
+		rel = fkBeam(stream=st, ntr=ntr, time_shift_table=timeTable, 
+					 winlen=winlen, overlap=overlap, 
+					 sll_x=sll_x, sll_y=sll_y, sl_s=sl_s,
+					 grdpts_x=grdpts_x, grdpts_y=grdpts_y,
+					 freqmin=freqmin, freqmax=freqmax,
+					 starttime=starttime, endtime=endtime,
+					 prewhiten=prewhiten, method=method)
+		fkst = obspy.core.stream.Stream()
+		otime = self.time
+		ndel = winlen*(1-overlap)
+		bnpts = int((endtime-starttime)/ndel)
+		label = ['Absamp', 'Slowness','Back Azimuth','Relamp']
+
+		for i in range(4):
+			tr = obspy.core.trace.Trace()
+			tr.data = rel[i,:]
+			tr.stats.starttime = otime+starttime
+			tr.stats.delta = ndel
+			tr.stats.channel = label[i]
+			sac = AttribDict({'b':starttime,'e':starttime + (bnpts-1)*ndel,
+							  'evla':self.lat,'evlo':self.lon,'evdp':self.dep,
+							  'kcmpnm':"beam",'delta':ndel,
+							  'nzyear':self.time.year,'nzjday':self.time.julday,
+							  'nzhour':self.time.hour,'nzmin':self.time.minute,
+							  'nzsec':self.time.second,'nzmsec':self.time.microsecond/1000})
+			tr.stats.sac = sac
+			fkst.append(tr)
+
+		self.fkSt = fkst
+
+		if write:
+			bpfilt = str(freqmin) + '-'+ str(freqmax)
+			name = 'fk.' + self.ID +'.' +bpfilt+'.pkl'
+			name = os.path.join('./',arrayName, 'Data', self.ID, name)
+			st.write(name, format='PICKLE')
+
 	#@profile
 	def vespectrum(self,geometry,arrayName,grdpts=401,
 					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
@@ -536,12 +547,12 @@ class Earthquake(object):
 			self.energy = slantBeam(self.stream, self.ntr, delta,
 									geometry, arrayName, grdpts,
 									filts, stack, sl_s, vary, sll,starttime,
-									endtime, unit, bakAzimuth=self.bakAzimuth)
+									endtime, unit, bakAzimuth=self.baz)
 		elif vary == 'theta':
 			self.energy = slantBeam(self.stream, self.ntr, delta,
 									geometry,  arrayName, grdpts,
 									filts, stack, sl_s, vary, sll,starttime,
-									endtime, unit, rayParameter=self.rayParameter)
+									endtime, unit, rayParameter=self.rayp)
 		# self.slantTime = times
 
 		# self.slantK = k
@@ -558,10 +569,10 @@ class Earthquake(object):
 		if self.slantType == 'slowness':
 			unit = 's/deg'
 			a = u"\u00b0"
-			title = 'Slant Stack at a Backazimuth of %.1f %sN'%(self.bakAzimuth,a)
+			title = 'Slant Stack at a Backazimuth of %.1f %sN'%(self.baz,a)
 		elif self.slantType == 'theta':
 			unit = 'deg'
-			title = 'Slant Stack at a slowness of %.2f s/deg'%(self.rayParameter)
+			title = 'Slant Stack at a slowness of %.2f s/deg'%(self.rayp)
 
 		ax[0].set_ylabel(self.slantType)
 		fig.suptitle(title)
@@ -675,14 +686,133 @@ class Doublet(object):
 										  receiver_latitude_in_deg=array.refPoint[0], receiver_longitude_in_deg=array.refPoint[1])[0]
 		self.arr1 = self.ev1['TIME'] + arr1.time
 		self.tt1 = arr1.time
+		self.rayp1 = arr1.ray_param_sec_degree
 		arr2 = model.get_travel_times_geo(source_depth_in_km=self.ev2['DEP'],source_latitude_in_deg=self.ev2['LAT'],
 										  source_longitude_in_deg=self.ev2['LON'],phase_list=phase,
 										  receiver_latitude_in_deg=array.refPoint[0], receiver_longitude_in_deg=array.refPoint[1])[0]
 		self.arr2 = self.ev2['TIME'] + arr2.time
 		self.tt2 = arr2.time
-		# msg = ('Travel time for %s for earthquake %s in depth of %.2f in distance of %.2f is %s' % (phase, self.ID, self.dep, self.Del, self.arrival))
+		self.rayp2 = arr2.ray_param_sec_degree
+		# msg = ('Travel time for %s for earthquake %s in depth of %.2f in distance of %.2f is %s' % (phase, self.ID, self.dep, self.dis, self.arrival))
+
 		# gpar.log(__name__,msg,level='info',pri=True)
-	def _alignWave(self,filt=[1.33, 2.67,3,True],delta=0.01,
+	
+	def beamForming(self,geometry, starttime=0.0, winlen=1800.0,
+					filt=[1, 3, 4, True], stack='linear', unit='deg',
+					cstime=20, cetime=50,method='resample', delta=0.01,
+					channel='SHZ',
+					**kwargs):
+		if not hasattr(self, 'rap1') or not hasattr(self, 'rap2'):
+			msg = "Ray parameters are not defined, calculating ray parameters"
+			gpar.log(__name__, msg, level='info', pri=True)
+			self.getArrival(array=kwargs['array'],phase=kwargs['beamphase'],model=kwargs['model'])
+
+		tsDF1 = getTimeShift(self.rayp1, self.dis['bakAzi'], geometry, unit=unit)
+		stalist1 = tsDF1.STA
+		tsDF2 = getTimeShift(self.rayp2, self.dis['bakAzi'], geometry, unit=unit)
+		stalist2 = tsDF2.STA
+		st1 = self.st1.copy()
+		st1 = st1.select(channel=channel)
+		st2 = self.st2.copy()
+		st2 = st2.select(channel=channel)
+		st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
+		st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
+
+		if len(st1) < len(tsDF1):
+			for s in stalist1:
+				tmp_st = st1.select(station=s)
+				if len(tmp_st) == 0:
+					msg = 'Station %s is missing for event %s, dropping station'%(s, self.ev1['TIME'])
+					gpar.log(__name__, msg, level='info', pri=True)
+					tsDF1 = tsDF1[~(tsDF1.STA == s)]
+		if len(st2) < len(tsDF2):
+			for s in stalist2:
+				tmp_st = st2.select(station=s)
+				if len(tmp_st) == 0:
+					msg = 'Station %s is missing for event %s, dropping station'%(s, self.ev2['TIME'])
+					gpar.log(__name__, msg, level='info', pri=True)
+					tsDF2 = tsDF2[~(tsDF2.STA == s)]
+
+		delta1 = st1[0].stats.delta
+		delta2 = st2[0].stats.delta
+
+		DT1 = tsDF1.TimeShift - (tsDF1.TimeShift/delta1).astype(int)*delta1
+		DT2 = tsDF2.TimeShift - (tsDF2.TimeShift/delta1).astype(int)*delta2
+
+		lag1 = (tsDF1.TimeShift/delta).astype(int) + 1
+		lag2 = (tsDF2.TimeShift/delta).astype(int) + 1
+
+		tsDF1['DT'] = DT1
+		tsDF1['LAG'] = lag1
+		tsDF2['DT'] = DT2
+		tsDF2['LAG'] = lag2
+
+		npt1 = int(winlen/delta1) + 1
+		npt2 = int(winlen/delta2) + 1
+		msg = ('Calculating beamforming for doublet %s - event 1 %s'%(self.ID, self.ev1['TIME']))
+		gpar.log(__name__,msg, level='info', pri=True)
+		beamTr1 = beamForming(st1, tsDF1, npt1, starttime, stack=stack)
+		beamTr1.stats.starttime = self.ev1['TIME']
+		msg = ('Calculating beamforming for doublet %s - event 2 %s'%(self.ID, self.ev2['TIME']))
+		gpar.log(__name__,msg, level='info', pri=True)
+		beamTr2 = beamForming(st2, tsDF2, npt2, starttime, stack=stack)
+		beamTr2.stats.starttime = self.ev2['TIME']
+		self.beamTr1 = beamTr1.copy()
+		self.beamTr2 = beamTr2.copy()
+		stime1 = self.arr1 - cstime
+		etime1 = self.arr1 + cetime
+		stime2 = self.arr2 - cstime
+		etime2 = self.arr2 + cetime
+		beamTr1.trim(starttime=stime1, endtime=etime1)
+		beamTr2.trim(starttime=stime2, endtime=etime2)
+		bst1 = obspy.core.stream.Stream()
+		bst2 = obspy.core.stream.Stream()
+		bst1.append(beamTr1)
+		bst2.append(beamTr2)
+		npts = int((cetime + cstime)/delta) + 1
+		bst1, bst2 = self._resample(bst1, bst2, delta, method, npts)
+		Mptd1 = np.zeros([1, npts])
+		Mptd2 = np.zeros([1, npts])
+		Mptd1[0,:] = bst1[0].data
+		Mptd2[0,:] = bst2[0].data
+		taup, ccmax, dt, cc = _getLag(Mptd1, Mptd2, delta, domain='freq', fittype='cos', getcc=True)
+		self.beamcc = cc[0,:]
+		self.tshift = taup[0] 
+		self.ccmax = ccmax[0] 
+
+	def plotBeam(self,delta=0.01, tstart=20, tend=50, savefig=True):
+		plt.subplot(3,1,1)
+
+		taup = self.tshift 
+		cc = self.beamcc
+		npts = int((tstart + tend)/delta) + 1
+		dt = (np.arange(len(cc)) - (npts -1)) * delta
+		tr1 = self.beamTr1.copy()
+		thiftBT = -tstart-taup
+		stime = self.arr1 + thiftBT
+		tr1.trim(starttime=stime, endtime=stime+tstart+tend)
+		tr2 = self.beamTr2.copy()
+		tr2.trim(starttime=self.arr2-tstart, endtime=self.arr2+tend)
+		delta1 = tr1.stats.delta
+		delta2 = tr2.stats.delta
+		data1 = tr1.data/np.max(np.absolute(tr1.data))
+		data2 = tr2.data/np.max(np.absolute(tr2.data))
+		t1 = self.tt2 - tstart + np.arange(len(data1))*delta1
+		t2 = self.tt2 - tstart + np.arange(len(data2))*delta2
+		plt.plot(t1, data1, 'b', linewidth=0.5)
+		plt.plot(t2, data2, 'r-.', linewidth=0.5)
+		plt.title('Doublet %s: \n%s-%s\nDistance: %.2f\nMax CC %.3f - TimeShift %.4f'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL'],self.ccmax, taup))
+		plt.subplot(3,1,2)
+		plt.plot(dt, cc)
+		plt.ylabel('CC')
+		
+		plt.tight_layout()
+		if savefig:
+			savename = self.ID + '.' + 'beam.eps'
+			plt.savefig(savename)
+			plt.close()
+
+	def _alignWave(self,filt=[1, 3,4,True],delta=0.01,
 				   cstime=20.0, cetime=20.0, method='resample',
 				   starttime=100.0, endtime=300.0,
 				   domain='freq', fittype='cos',
@@ -849,7 +979,7 @@ class Doublet(object):
 		ts = self.tt1 + np.arange(tpts) * step - starttime
 		self.ts = ts
 
-	def updateFilter(filt, starttime=100, endtime=300,
+	def updateFilter(self, filt, starttime=100, endtime=300,
 					cstime=20.0, cetime=20.0,
 					winlen=None, step=None):
 		self._alignWave(filt=filt,delta=self.delta,
@@ -878,9 +1008,11 @@ class Doublet(object):
 		data2 = tr2.data / np.max(np.absolute(tr2.data))
 		# t1 = self.tt1 - tstart + np.arange(len(data1)) * st1[0].stats.delta
 		t2 = self.tt2 - tstart + np.arange(len(data2)) * tr2.stats.delta
-		plt.plot(t2, data1, 'b', t2, data2, 'r')
+		plt.plot(t2, data1, 'b', linewidth=0.5)
+		plt.plot(t2, data2, 'r-.', linewidth=0.5)
 		# plt.xlabel('Time (s)')
 		plt.ylabel('Normalized Amp')
+		plt.title('Doublet %s: \n%s-%s\nDistance: %.2f'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL']))
 
 		plt.subplot(5,1,2)
 		tr1 = st1.select(id=sta_id).copy()[0]
@@ -906,6 +1038,7 @@ class Doublet(object):
 		plt.ylim([-2,2])
 		plt.xlim(lim)
 		plt.xlabel('Time (s)')
+		plt.tight_layout()
 		if savefig:
 			savename = self.ID + '.' + sta_id + '.eps'
 			plt.savefig(savename)
@@ -954,7 +1087,7 @@ def getTimeShift(rayParameter,bakAzimuth,geometry,unit='deg'):
 
 def getTimeTable(geometry,sll_x=-15.0,sll_y=-15.0,sl_s=0.1,grdpts_x=301,grdpts_y=301,unit='deg'):
 	"""
-	Return timeshift table for given array geometry, modified from obsy
+	Return timeshift table for given array geometry, modified from obspy
 
 	"""
 	sx = sll_x + np.arange(grdpts_x)*sl_s
@@ -964,9 +1097,7 @@ def getTimeTable(geometry,sll_x=-15.0,sll_y=-15.0,sl_s=0.1,grdpts_x=301,grdpts_y
 		sx = sx/deg2km
 		sy = sy/deg2km
 	elif unit == 'rad':
-		sx = rayParameter * np.sin(bakAzimuth * deg2rad)
 		sx = sx/6370.0
-		sy = rayParameter * np.cos(bakAzimuth * deg2rad)
 		sy = sy/6370.0
 	else:
 		msg = ('Input not one of deg and rad, set unit as s/km')
@@ -985,6 +1116,7 @@ def getTimeTable(geometry,sll_x=-15.0,sll_y=-15.0,sl_s=0.1,grdpts_x=301,grdpts_y
 	# 	timeIndexTable[sta] = timeTable[ind,:,:]
 
 	return timeTable
+
 def getSlantTime(geometry, grdpts=401, sl_s=0.1, sll_k=-20.0,vary='slowness',unit='deg',**kwargs):
 
 	k = sll_k + np.arange(grdpts)*sl_s
@@ -1019,6 +1151,230 @@ def getSlantTime(geometry, grdpts=401, sl_s=0.1, sll_k=-20.0,vary='slowness',uni
 	timeShift = (tsx + tsy)
 
 	return timeShift
+
+# def getSteer(ntr, deltaf, nsamp, time_shift_table, grdpts_x=301, grdpts_y=301, sl_s=0.1, freqmin=1.0, freqmax=2.0):
+# 	'''
+# 	Function to calculate steer matrix for FK
+# 	Parameters:
+# 		ntr: number of traces
+# 		deltaf: delta of frequency
+# 		time_shift_table: a numpy time shift table made by getTimeTable
+# 		grdpts_x: number of points in x slowness
+# 		grdpts_y: number of points in y slowness
+# 		sl_s: interval of slowness
+# 		filt: filter information
+# 	'''
+
+# 	nfft = next_pow_2(nsamp)
+# 	nlow = int(freqmin/deltaf + 0.5)
+# 	nhigh = int(freqmax/deltaf + 0.5)
+# 	nlow = max(1, nlow)
+# 	nhigh = min(nfft//2-1, nhigh) #avoid using nyquist
+# 	nf = nhigh - nlow + 1
+# 	steer = np.empty((nf, grdpts_x, grdpts_y, nstat), dtype=np.complex128)
+# 	clibsignal.calcSteer(nstat, grdpts_x, grdpts_y, nf, nlow, deltaf, time_shift_table, steer)
+
+# 	return steer
+def get_spoint(stream, stime, etime):
+	spoint = np.empty(len(stream), dtype=np.int32, order="C")
+	epoint = np.empty(len(stream), dtype=np.int32, order="C")
+	for i, tr in enumerate(stream):
+		length = tr.stats.endtime - tr.stats.starttime
+		if length < etime:
+			msg = "Stream is shorter than %s sec" % (etime)
+			gpar.log(__name__, msg, level='error', pri=True)
+		spoint[i] = int(stime * tr.stats.sampling_rate + 0.5)
+		epoint[i] = int(etime * tr.stats.sampling_rate + 0.5)
+
+	return spoint, epoint
+
+def beamForming(stream, tsDF, npt, starttime, stack='linear'):
+	beamTr = obspy.core.trace.Trace()
+	delta = stream[0].stats.delta
+	beamTr.stats.delta = delta
+	ntr = len(stream)
+	if ntr != len(tsDF):
+		msg = 'Station timeshift table is not matching with stream'
+		gpar.log(__name__, msg, level='error', pri=True)
+	if stack == 'psw':
+		shiftTRdata = np.empty((ntr,npt),dtype=complex)
+	else:
+		shiftTRdata = np.empty((ntr,npt))
+	for ind, tr in enumerate(stream):
+		sta = tr.stats.station
+		data = tr.data
+		if stack == 'root':
+			order = kwargs['order']
+		elif stack == 'psw':
+			order = kwargs['order']
+			data = scipy.signal.hilbert(data)
+		tr_npt = tr.stats.npts
+		tmp_tsDF = tsDF[tsDF.STA==sta].iloc[0]
+		sind = int(int(starttime - tr.stats.sac.b)/delta + tmp_tsDF.LAG)
+
+		if sind < 0:
+			msg = ('Shift time is before start of records, padding %d points staion %s'%(sind,sta))
+			gpar.log(__name__,msg,level='info',pri=True)
+		if (sind+npt) >= tr_npt:
+			msg = ('Shift time past end of record, padding %d points'%(sind+npt-tr_npt))
+			gpar.log(__name__,msg,level='info',pri=True)
+
+		if sind < 0 and (sind+npt) < tr_npt:
+			dnpt = npt - np.abs(sind)
+			data_use = data[0:dnpt]
+			data_use = np.pad(data_use,(np.abs(sind),0),'edge')
+			data_com = np.diff(data_use) * tmp_tsDF.DT/delta
+			data_com = np.append(data_com,0)
+			tmp_data = data_use + data_com
+			if stack == 'root':
+				shiftTRdata[ind,:] = np.sign(tmp_data)*tmp_data
+			elif stack == 'linear' or stack == 'psw':
+				shiftTRdata[ind,:] = tmp_data
+
+		elif sind >=0 and sind+npt < tr_npt:
+			data_use = data[sind:npt+sind]
+					# print(data_use[0])
+			data_com = np.diff(data_use) * tmp_tsDF.DT/delta
+			data_com = np.append(data_com,0)
+			tmp_data = data_use + data_com
+			if stack == 'root':
+				shiftTRdata[ind,:] = np.sign(tmp_data)*tmp_data
+			elif stack == 'linear' or stack == 'psw':
+				shiftTRdata[ind,:] = tmp_data
+		elif sind >=0 and (sind+npt) >= tr_npt:
+			data_use = data[sind:]
+			pad_end = sind+npt - tr_npt
+			data_use = np.pad(data_use,(0,pad_end),'edge')
+			data_com = np.diff(data_use) * tmp_tsDF.DT/delta
+			data_com = np.append(data_com,0)
+			tmp_data = data_use + data_com
+			if stack == 'root':
+				shiftTRdata[ind,:] = np.sign(tmp_data)*np.power(np.abs(tmp_data), 1.0/order)
+			elif stack == 'linear' or stack == 'psw':
+				shiftTRdata[ind,:] = tmp_data
+		elif sind < 0 and sind+npt >= tr_npt:
+			pad_head = -sind
+			pad_end = npt+sind-tr_npt
+			data_use = data
+			data_use = np.pad(data_use,(pad_head,pad_end),'edge')
+			data_com = np.diff(data_use) * tmp_tsDF.DT/delta
+			data_com = np.append(data_com,0)
+			tmp_data = data_use + data_com
+			if stack == 'root':
+				shiftTRdata[ind,:] = np.sign(tmp_data)*tmp_data
+			elif stack == 'linear' or stack == 'psw':
+				shiftTRdata[ind,:] = tmp_data
+	if stack == 'linear':
+		beamdata = shiftTRdata.sum(axis=0) / ntr
+	elif stack == 'root':
+		beamdata = shiftTRdata.sum(axis=0) / ntr
+		beamdata = np.sign(beamdata) * np.power(np.abs(beamdata), 1.0/order)
+	elif stack == 'psw':
+		amp = np.absolute(shiftTRdata)
+		stack_amp = np.sum(np.real(shiftTRdata),axis=0)
+		beamdata = stack_amp * np.power(np.absolute(np.sum(shiftTRdata/amp,axis=0))/ntr, order)/ntr
+	beamTr.data = beamdata
+	return beamTr 
+
+
+def fkBeam(stream, ntr, time_shift_table,
+		   winlen=2.0, overlap=0.5,
+		   sll_x=-15, sll_y=-15, sl_s=0.1,
+		   grdpts_x=301.0, grdpts_y=301.0, 
+		   freqmin=1.0, freqmax=2.0, 
+		   starttime=900, endtime=1300,
+		   prewhiten=0, method=0, **kwargs):
+	'''
+	Function for seismic array fk/capon beamforming, calling obspy fk analysis function
+	'''
+	time_shift_table = time_shift_table.astype(np.float32)
+	eotr = True
+	res = []
+	spoint, _epoint = get_spoint(stream, starttime, endtime)
+	fs = stream[0].stats.sampling_rate
+	nsamp = int(winlen * fs)
+	ndel = winlen * (1-overlap)
+	nfft = next_pow_2(nsamp)
+	deltaf = fs/float(nfft)
+	nlow = int(freqmin/deltaf + 0.5)
+	nhigh = int(freqmax/deltaf + 0.5)
+	nlow = max(1, nlow)
+	nhigh = min(nfft//2-1, nhigh) #avoid using nyquist
+	nf = nhigh - nlow + 1
+	steer = np.empty((nf, grdpts_x, grdpts_y, ntr), dtype=np.complex128)
+	clibsignal.calcSteer(ntr, grdpts_x, grdpts_y, nf, nlow, deltaf, time_shift_table, steer)
+	nstep = int(nsamp * 1-(overlap))
+	_r = np.empty((nf, ntr, ntr), dtype=np.complex128)
+	ft = np.empty((ntr, nf), dtype=np.complex128)
+	offset = 0
+	tap = cosine_taper(nsamp, p=0.22)
+	abspow_map = np.empty((grdpts_x, grdpts_y), dtype=np.float64)
+	relpow_map = np.empty((grdpts_x, grdpts_y), dtype=np.float64)
+	bnpts = int((endtime - starttime)/ndel)
+	abspow = np.empty(bnpts)
+	relpow = np.empty(bnpts)
+	slow_h = np.empty(bnpts)
+	bakaz = np.empty(bnpts)
+
+	for ind in range(bnpts):
+		try:
+			for i, tr in enumerate(stream):
+				dat = tr.data[spoint[i]+offset: spoint[i]+offset+nsamp]
+				dat = (dat - dat.mean()) * tap
+				ft[i, :] = np.fft.rfft(dat, nfft)[nlow:nlow+nf]
+		except:
+			msg = 'Problem in extat data and do the DFFT'
+			gpar.log(__name__, msg, level='error', pri=True)
+		ft = np.ascontiguousarray(ft, np.complex128)
+		relpow_map.fill(0.)
+		abspow_map.fill(0.)
+
+			# Computing the covariances of the signal at different receivers
+		dpow = 0.0
+		for i in range(ntr):
+			for j in range(i, ntr):
+				_r[:, i, j] = ft[i,:] * ft[j,:].conj()
+				if method == 1:
+					_r[:, i, j] /= np.abs(_r[:, i, j].sum())
+				if i != j:
+					_r[:, j, i] = _r[:, i, j].conjugate()
+				else:
+					dpow += np.abs(_r[:, i, j].sum())
+		dpow *= ntr
+		if method == 1:
+			for n in range(nf):
+				_r[n, :, :] = np.linalg.pinv(_r[n, :, :], rcond=1e-6)
+
+		errcode = clibsignal.generalizedBeamformer(relpow_map, abspow_map, 
+													   steer, _r, ntr, prewhiten,
+            										   grdpts_x, grdpts_y, nf, dpow, method)
+		if errcode != 0:
+			msg = 'generalizedBeamforming exited with error %d'%(errcode)
+			gpar.log(__name__, msg, level='error', pri=True)
+		ix, iy = np.unravel_index(relpow_map.argmax(), relpow_map.shape)
+		relpow_tmp, abspow_tmp = relpow_map[ix, iy], abspow_map[ix, iy]
+		slow_x = sll_x + ix * sl_s
+		slow_y = sll_y + iy * sl_s
+		slow = np.sqrt(slow_x**2 + slow_y**2)
+		if slow < 1e-8:
+			slow = 1e-8
+		slow_h[ind] = slow
+		azimuth = 180.0 * np.arctan2(slow_x, slow_y)/PI
+		baz = azimuth % -360 +180
+		if baz < 0:
+			baz = baz +360.0
+		bakaz[ind] = baz
+		abspow[ind] = abspow_tmp
+		relpow[ind] = relpow_tmp
+		offset += nstep
+
+	rel = np.empty((4,bnpts))
+	rel[0,:] = np.log10(abspow)
+	rel[1,:] = slow_h
+	rel[2,:] = bakaz
+	rel[3,:] = relpow
+
+	return rel
 
 def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdpts_y=301,
 					filt=[1,2,4,True], sflag=1,stack='linear',
@@ -1335,7 +1691,7 @@ def _corr(Mptd1, Mptd2, domain):
 
 	return cor
 
-def _getLag(Mptd1, Mptd2, delta, domain='freq', fittype='cos'):
+def _getLag(Mptd1, Mptd2, delta, domain='freq', fittype='cos', getcc=False):
 
 	cc = _corr(Mptd1, Mptd2,domain=domain)
 	ntr, ndt = Mptd1.shape
@@ -1370,7 +1726,10 @@ def _getLag(Mptd1, Mptd2, delta, domain='freq', fittype='cos'):
 		msg = ('Not a valid option for fitting CC curve, selet from parabola and cos')
 		gpar.log(__name__, msg, level='error', pri=True)
 
-	return [xmax, ymax,np.mean(xmax), np.mean(ymax)]
+	if getcc:
+		return [xmax, ymax, dt, cc]
+	else:
+		return [xmax, ymax,np.mean(xmax), np.mean(ymax)]
 
 def polyfit(x, y):
 	p = np.polyfit(x,y,2)

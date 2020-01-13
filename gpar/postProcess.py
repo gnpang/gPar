@@ -530,10 +530,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 			filts[tr.stats.station] = tr.stats.channel
 		self._current_filts = filts
 		self._current_ID = event.ID
-		self._current_dis = event.Del
-		self._current_p = event.rayParameter
-		self._current_bb = event.pattern
-		self._current_bakAz = event.bakAzimuth
+		self._current_dis = event.dis
+		self._current_p = event.rayp
+		self._current_bb = event.bb
+		self._current_bakAz = event.baz
 		self._current_delta = event.delta
 		if hasattr(event, 'slideSt'):
 			self._current_slide = event.slideSt
@@ -584,10 +584,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 		lat = event.lat
 		lon = event.lon
 		dep = event.dep
-		mw = event.Mw
-		dis = event.Del
-		bb = event.pattern
-		bakAzi = event.bakAzimuth
+		mw = event.mw
+		dis = event.dis
+		bb = event.bb
+		bakAzi = event.baz
 		delta = event.delta
 
 		if level =='D':
@@ -666,10 +666,10 @@ class glanceEQ(QtWidgets.QMainWindow):
 				if _i == 0:
 					ax.set_xlabel('Seconds')
 				self.fig.suptitle('%s - %s\nDep:%s  Distance: %s%s'
-					%(self._current_event.ID, self._btype, self._current_event.dep, self._current_event.Del, a))
+					%(self._current_event.ID, self._btype, self._current_event.dep, self._current_event.dis, a))
 		elif self._btype == 'slide':
 			self.fig.suptitle('%s - %s\nDep:%s  Distance: %s%s'
-				%(self._current_event.ID, self._btype, self._current_event.dep, self._current_event.Del, a))
+				%(self._current_event.ID, self._btype, self._current_event.dep, self._current_event.dis, a))
 			nfilts = len(self._current_slide.keys())
 			ax = self.fig.subplots(4, nfilts, sharex='col', sharey='row')
 			for ind, (name,st) in enumerate(self._current_slide.items()):
@@ -686,7 +686,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 						ax[_i,ind].set_ylim([0, peak])
 					elif label == 'Slowness':
 						ax[_i,ind].set_ylim([0, 15])
-						rp = self._current_event.rayParameter
+						rp = self._current_event.rayp
 						ax[_i, ind].hlines(rp, np.min(time), np.max(time), 'r', 'dashed')
 					elif label == 'Back Azimuth':
 						ax[_i, ind].set_ylim([0,360])
@@ -734,7 +734,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 				ax.imshow(abspow, extent=extent, aspect='auto', cmap='Reds', vmin=vmin, vmax=vmax)
 				arrival = self._current_event.arrivals[self.beamphase]['TT']
 				ax.vlines(arrival, ax.get_ylim()[0],ax.get_ylim()[1],'k',label=self.beamphase)
-				rp = self._current_event.rayParameter
+				rp = self._current_event.rayp
 				ax.hlines(rp, ax.get_xlim()[0],ax.get_xlim()[1], 'b')
 				ax.hlines(-rp, ax.get_xlim()[0],ax.get_xlim()[1], 'b')
 				if self.ttbtn.isChecked():
@@ -751,12 +751,12 @@ class glanceEQ(QtWidgets.QMainWindow):
 				ax.set_title(name)
 			if self._current_type == 'slowness':
 				title = '%s - %s\nSlant Stack at a Backazimuth of %.1f %sN\nDep:%s  Distance: %s%s' \
-						%(self._btype, self._current_ID, self._current_event.bakAzimuth,a,
-							self._current_event.dep, self._current_event.Del, a)
+						%(self._btype, self._current_ID, self._current_event.baz,a,
+							self._current_event.dep, self._current_event.dis, a)
 			elif self._current_type == 'theta':
 				title = '%s - %s\nSlant Stack at a slowness of %.2f s/deg\nDep:%s  Distance: %s%s' \
-						%(self._btype, self._current_ID, self._current_event.rayParameter,
-							self._current_event.dep, self._current_event.Del, a)
+						%(self._btype, self._current_ID, self._current_event.rayp,
+							self._current_event.dep, self._current_event.dis, a)
 			self.fig.suptitle(title)
 		elif self._btype == 'strip':
 			_i = self.wincb.currentIndex()
@@ -889,7 +889,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 							ax[1,ind].set_ylabel('Amp')
 				self.fig.suptitle('Coda Strip for %s using %s method in win %s\nDep:%s  Distance: %s%s'
 					%(self._current_event.ID, self._method, trinwin['name'],
-						self._current_event.dep, self._current_event.Del, a))
+						self._current_event.dep, self._current_event.dis, a))
 
 
 		self._canvasDraw()

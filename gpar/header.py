@@ -61,6 +61,7 @@ clibarray.get_coherence.argtypes = [np.ctypeslib.ndpointer(dtype=np.complex128, 
 									C.c_int, C.c_double, C.c_int]
 clibarray.get_coherence.restype = C.c_double
 
+
 class C_COMPLEX(C.Structure):
 	_fields_ = [("real", C.c_double),
 				("imag", C.c_double)]

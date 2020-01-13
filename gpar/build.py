@@ -214,6 +214,20 @@ def upDateArray(array, beamtype='beam',
 		if save:
 			fileName = ar.name + '.veps.pkl'
 			ar.write(fileName)
+	elif beamtype == 'fk':
+		req_pa = set(['sll_x','sll_y','sl_s',
+					  'grdpts_x','grdpts_y',
+					  'winlen','overlap','freqmin',
+					  'freqmax', 'prewhiten','method'
+					  ])
+		if not req_pa.issubset(kwargs.keys()):
+			msg = ('Required parameters %s for FK are missing'%req_pa)
+			gpar.log(__name__,msg,level='error',pri=True)
+		ar.getTimeTable(sll_x=sll_x,sll_y=sll_y,sl_s=sl_s,grdpts_x=grdpts_x,grdpts_y=grdpts_y,unit=unit)
+		ar.slideFK(starttime=starttime, endtime=endtime,write=write, **kwargs)
+		if save:
+			fileName = ar.name + 'fk.pkl'
+			ar.write(fileName)
 	else:
 		msg = ('Not a valid array processing, choose from beam, slide or vespectrum')
 		gpar.log(__name__,msg,level='error',pri=True)
