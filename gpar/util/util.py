@@ -25,7 +25,7 @@ def readList(flist, list_type='array',sep='\s+'):
 	"""
 
 	read_array = set(['NAME','LAT','LON','CODE'])
-	read_eq = set(['TIME','LAT','LON','DEP','Mw','Del','Az','Baz','BB','Rayp','DIR'])
+	read_eq = set(['TIME','LAT','LON','DEP','Mw','DIS','Az','Baz','BB','Rayp','DIR'])
 	read_db = set(['DoubleID', 'DIR1', 'TIME1', 'LAT1', 'LON1', 'DEP1', 'M1', 'DIR2', 'TIME2', 'LAT2', 'LON2', 'DEP2', 'M2'])
 	read_coda = set(['TIME','LAT','LON','DEP','Mw','Del','Az','Baz','BB','Rayp','RES','lnA','B','C'])
 	read_two = set(['TIME','LAT','LON','DEP','Mw','Del','Az','Baz','BB','Rayp','RES','m1','b1','m2','b2'])
