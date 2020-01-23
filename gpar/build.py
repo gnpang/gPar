@@ -129,13 +129,13 @@ def createArray(arrayList='array.list',
 					array.getTimeTable(sll_x=sll_x,sll_y=sll_y,sl_s=sl_s,grdpts_x=grdpts_x,grdpts_y=grdpts_y,unit=unit)
 		elif mode =='db':
 			req_pa = set(['starttime', 'endtime', 'cstime','cetime',
-						  'filt', 'domain', 'fittype'])
+						  'filt', 'domain', 'fittype','rphase'])
 			if not req_pa.issubset(kwargs.keys()):
 				msg = ('Required parameters %s for doublets are missing'%req_pa)
 				gpar.log(__name__,msg,level='error',pri=True)
-			array = gpar.arrayProcess.Array(row.NAME, refpoint, eqdf, stadf, coordsys, beamphase,
+			array = gpar.arrayProcess.Array(row.NAME, refpoint, eqdf, stadf, coordsys, beamphase,phase_list=phase_list,
 											isDoublet=True,starttime=kwargs['starttime'],endtime=kwargs['endtime'],
-											cstime=kwargs['cstime'], cetime=kwargs['cetime'],
+											cstime=kwargs['cstime'], cetime=kwargs['cetime'],rphase=kwargs['rphase'],
 											filt=kwargs['filt'],domain=kwargs['domain'],fittype=kwargs['fittype'])
 		if save:
 			array.write()

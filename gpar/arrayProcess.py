@@ -60,7 +60,7 @@ class Array(object):
 		else:
 			self.doublet = [0]*len(eqDF)
 			for ind, row in eqDF.iterrows():
-				self.doublet[ind] = Doublet(self, row, phase=[beamphase],**kwargs)
+				self.doublet[ind] = Doublet(self, row, tphase=beamphase,**kwargs)
 
 	def getGeometry(self,staDF,refPoint,coordsys='lonlat'):
 		"""
@@ -593,7 +593,8 @@ class Doublet(object):
 				 winlen=5, step=0.05,
 				 starttime=100.0, endtime=300.0,
 				 domain='freq', fittype='cos',
-				 phase=['PKIKP'],cut=10):
+				 tphase='PKIKP', rphase='PKP',
+				 phase_list=['PKiKP','PKIKP','PKP','PP'],cut=10):
 
 		self.ID = row.DoubleID
 		msg = ("Building %s: EV1: %s; EV2: %s"%(self.ID,row.TIME1, row.TIME2))
@@ -604,7 +605,9 @@ class Doublet(object):
 		self.ev2 = {'TIME': UTCDateTime(row.TIME2), 'LAT': row.LAT2,
 					'LON': row.LON2, 'DEP': row.DEP2,
 					'MAG': row.M2}
-		self.phase = phase
+		self.phase_list = phase_list
+		self.tphase = tphase
+		self.rphase = rphase
 		self.delta = resample
 		self.winlen = winlen
 		self.step = step
@@ -615,13 +618,13 @@ class Doublet(object):
 		self._checkInput()
 		# self._resample(resample,method)
 		self._getDel(array)
-		if hasattr(row, 'TT1') and hasattr(row, 'TT2'):
-			self.tt1 = row.TT1
-			self.tt2 = row.TT2
-			self.arr1 = self.ev1['TIME'] + row.TT1
-			self.arr2 = self.ev2['TIME'] + row.TT2
-		else:
-			self.getArrival(array=array)
+		# if hasattr(row, 'TT1') and hasattr(row, 'TT2'):
+		# 	self.tt1 = row.TT1
+		# 	self.tt2 = row.TT2
+		# 	self.arr1 = self.ev1['TIME'] + row.TT1
+		# 	self.arr2 = self.ev2['TIME'] + row.TT2
+		# else:
+		self.getArrival(array=array)
 		self._alignWave(filt=filt,delta=resample,cstime=cstime,cetime=cetime,
 						starttime=starttime,endtime=endtime,
 						domain=domain,fittype=fittype,
@@ -656,7 +659,7 @@ class Doublet(object):
 			if len(data2) > npts:
 				_tr2.data = data2[0:npts]
 			elif len(data2) < npts:
-				data2 = np.pad(data2, (0,npts-len(data1)), 'edge')
+				data2 = np.pad(data2, (0,npts-len(data2)), 'edge')
 				_tr2.data = data2
 
 		return st1, st2
@@ -680,19 +683,30 @@ class Doublet(object):
 		if phase != None:
 			phase = phase
 		else:
-			phase = self.phase
+			phase = self.phase_list
 		arr1 = model.get_travel_times_geo(source_depth_in_km=self.ev1['DEP'],source_latitude_in_deg=self.ev1['LAT'],
 										  source_longitude_in_deg=self.ev1['LON'],phase_list=phase,
-										  receiver_latitude_in_deg=array.refPoint[0], receiver_longitude_in_deg=array.refPoint[1])[0]
-		self.arr1 = self.ev1['TIME'] + arr1.time
-		self.tt1 = arr1.time
-		self.rayp1 = arr1.ray_param_sec_degree
+										  receiver_latitude_in_deg=array.refPoint[0], receiver_longitude_in_deg=array.refPoint[1])
+		pha1 = {}
+		for a in arr1:
+			pha = a.name
+			times = {'UTC':self.ev1['TIME'] + a.time,
+					 'TT':a.time,
+					 'RP':a.ray_param_sec_degree}
+			pha1[pha] = times
+		self.arr1 = pha1
 		arr2 = model.get_travel_times_geo(source_depth_in_km=self.ev2['DEP'],source_latitude_in_deg=self.ev2['LAT'],
 										  source_longitude_in_deg=self.ev2['LON'],phase_list=phase,
-										  receiver_latitude_in_deg=array.refPoint[0], receiver_longitude_in_deg=array.refPoint[1])[0]
-		self.arr2 = self.ev2['TIME'] + arr2.time
-		self.tt2 = arr2.time
-		self.rayp2 = arr2.ray_param_sec_degree
+										  receiver_latitude_in_deg=array.refPoint[0], receiver_longitude_in_deg=array.refPoint[1])
+
+		pha2 = {}
+		for a in arr2:
+			pha = a.name
+			times = {'UTC':self.ev2['TIME'] + a.time,
+					 'TT':a.time,
+					 'RP':a.ray_param_sec_degree}
+			pha2[pha] = times
+		self.arr2 = pha2
 		# msg = ('Travel time for %s for earthquake %s in depth of %.2f in distance of %.2f is %s' % (phase, self.ID, self.dep, self.dis, self.arrival))
 
 		# gpar.log(__name__,msg,level='info',pri=True)
@@ -700,52 +714,65 @@ class Doublet(object):
 	def beamForming(self,geometry, starttime=0.0, winlen=1800.0,
 					filt=[1, 3, 4, True], stack='linear', unit='deg',
 					cstime=20, cetime=50,method='resample', delta=0.01,
-					channel='SHZ',
+					channel='SHZ', tphase='PKiKP', rphase='PP',
+					step=0.05, steplen=2,
 					**kwargs):
-		if not hasattr(self, 'rap1') or not hasattr(self, 'rap2'):
-			msg = "Ray parameters are not defined, calculating ray parameters"
-			gpar.log(__name__, msg, level='info', pri=True)
-			self.getArrival(array=kwargs['array'],phase=kwargs['beamphase'],model=kwargs['model'])
+		# if not hasattr(self, 'rap1') or not hasattr(self, 'rap2'):
+		# 	msg = "Ray parameters are not defined, calculating ray parameters"
+		# 	gpar.log(__name__, msg, level='info', pri=True)
+		# 	self.getArrival(array=kwargs['array'],phase=kwargs['beamphase'],model=kwargs['model'])
 
-		tsDF1 = getTimeShift(self.rayp1, self.dis['bakAzi'], geometry, unit=unit)
-		stalist1 = tsDF1.STA
-		tsDF2 = getTimeShift(self.rayp2, self.dis['bakAzi'], geometry, unit=unit)
-		stalist2 = tsDF2.STA
+		tRayp = self.arr1[tphase]['RP']
+		rRayp = self.arr1[rphase]['RP']
+
+
+		tsDF = getTimeShift(tRayp, self.dis['bakAzi'], geometry, unit=unit)
+		refDF = getTimeShift(rRayp, self.dis['bakAzi'], geometry, unit=unit)
+		# tsDF1 = tsDF.copy()
+		# tsDF2 = tsDF.copy()
+		stalist = tsDF.STA
+		refsta = refDF.STA
+		# tsDF2 = getTimeShift(self.rayp2, self.dis['bakAzi'], geometry, unit=unit)
+		# stalist2 = tsDF2.STA
 		st1 = self.st1.copy()
 		st1 = st1.select(channel=channel)
 		st2 = self.st2.copy()
 		st2 = st2.select(channel=channel)
 		st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
 		st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
-
-		if len(st1) < len(tsDF1):
-			for s in stalist1:
-				tmp_st = st1.select(station=s)
-				if len(tmp_st) == 0:
-					msg = 'Station %s is missing for event %s, dropping station'%(s, self.ev1['TIME'])
-					gpar.log(__name__, msg, level='info', pri=True)
-					tsDF1 = tsDF1[~(tsDF1.STA == s)]
-		if len(st2) < len(tsDF2):
-			for s in stalist2:
-				tmp_st = st2.select(station=s)
-				if len(tmp_st) == 0:
-					msg = 'Station %s is missing for event %s, dropping station'%(s, self.ev2['TIME'])
-					gpar.log(__name__, msg, level='info', pri=True)
-					tsDF2 = tsDF2[~(tsDF2.STA == s)]
-
 		delta1 = st1[0].stats.delta
 		delta2 = st2[0].stats.delta
+		tsDF1 = getDT(st1, tsDF, stalist, delta1)
+		tsDF2 = getDT(st2, tsDF, stalist, delta2)
+		refDF1 = getDT(st1, refDF, refsta, delta1)
+		refDF2 = getDT(st2, refDF, refsta, delta2)
+		# if len(st1) < len(tsDF1):
+		# 	for s in stalist:
+		# 		tmp_st = st1.select(station=s)
+		# 		if len(tmp_st) == 0:
+		# 			msg = 'Station %s is missing for event %s, dropping station'%(s, self.ev1['TIME'])
+		# 			gpar.log(__name__, msg, level='info', pri=True)
+		# 			tsDF1 = tsDF1[~(tsDF1.STA == s)]
+		# if len(st2) < len(tsDF2):
+		# 	for s in stalist:
+		# 		tmp_st = st2.select(station=s)
+		# 		if len(tmp_st) == 0:
+		# 			msg = 'Station %s is missing for event %s, dropping station'%(s, self.ev2['TIME'])
+		# 			gpar.log(__name__, msg, level='info', pri=True)
+		# 			tsDF2 = tsDF2[~(tsDF2.STA == s)]
 
-		DT1 = tsDF1.TimeShift - (tsDF1.TimeShift/delta1).astype(int)*delta1
-		DT2 = tsDF2.TimeShift - (tsDF2.TimeShift/delta1).astype(int)*delta2
+		
 
-		lag1 = (tsDF1.TimeShift/delta).astype(int) + 1
-		lag2 = (tsDF2.TimeShift/delta).astype(int) + 1
+		# DT1 = tsDF1.TimeShift - (tsDF1.TimeShift/delta1).astype(int)*delta1
+		# DT2 = tsDF2.TimeShift - (tsDF2.TimeShift/delta1).astype(int)*delta2
 
-		tsDF1['DT'] = DT1
-		tsDF1['LAG'] = lag1
-		tsDF2['DT'] = DT2
-		tsDF2['LAG'] = lag2
+		# lag1 = (tsDF1.TimeShift/delta).astype(int) + 1
+		# lag2 = (tsDF2.TimeShift/delta).astype(int) + 1
+
+		# tsDF1['DT'] = DT1
+		# tsDF1['LAG'] = lag1
+		# tsDF2['DT'] = DT2
+		# tsDF2['LAG'] = lag2
 
 		npt1 = int(winlen/delta1) + 1
 		npt2 = int(winlen/delta2) + 1
@@ -753,58 +780,142 @@ class Doublet(object):
 		gpar.log(__name__,msg, level='info', pri=True)
 		beamTr1 = beamForming(st1, tsDF1, npt1, starttime, stack=stack)
 		beamTr1.stats.starttime = self.ev1['TIME']
+		beamTr1.stats.channel = tphase
+		beamRefTr1 = beamForming(st1, refDF1, npt1, starttime, stack=stack)
+		beamRefTr1.stats.starttime = self.ev1['TIME']
+		beamRefTr1.stats.channel = rphase
 		msg = ('Calculating beamforming for doublet %s - event 2 %s'%(self.ID, self.ev2['TIME']))
 		gpar.log(__name__,msg, level='info', pri=True)
 		beamTr2 = beamForming(st2, tsDF2, npt2, starttime, stack=stack)
 		beamTr2.stats.starttime = self.ev2['TIME']
-		self.beamTr1 = beamTr1.copy()
-		self.beamTr2 = beamTr2.copy()
-		stime1 = self.arr1 - cstime
-		etime1 = self.arr1 + cetime
-		stime2 = self.arr2 - cstime
-		etime2 = self.arr2 + cetime
+		beamTr2.stats.channel = tphase
+		beamRefTr2 = beamForming(st2, tsDF2, npt2, starttime, stack=stack)
+		beamRefTr2.stats.starttime = self.ev2['TIME']
+		beamRefTr2.stats.channel = rphase
+		self.beamSt1 = obspy.core.stream.Stream()
+		self.beamSt1.append(beamTr1.copy())
+		self.beamSt1.append(beamRefTr1.copy())
+		self.beamSt2 = obspy.core.stream.Stream()
+		self.beamSt2.append(beamTr2.copy())
+		self.beamSt2.append(beamRefTr2.copy())
+		stime1 = self.arr1[tphase]['UTC'] - cstime
+		etime1 = self.arr1[tphase]['UTC'] + cetime
+		rstime1 = self.arr1[rphase]['UTC'] - cstime
+		retime1 = self.arr1[rphase]['UTC'] + cetime
+		stime2 = self.arr2[tphase]['UTC'] - cstime
+		etime2 = self.arr2[tphase]['UTC'] + cetime
+		rstime2 = self.arr2[rphase]['UTC'] - cstime
+		retime2 = self.arr2[rphase]['UTC'] + cetime
 		beamTr1.trim(starttime=stime1, endtime=etime1)
+		beamRefTr1.trim(starttime=rstime1, endtime=retime1)
 		beamTr2.trim(starttime=stime2, endtime=etime2)
+		beamRefTr2.trim(starttime=rstime2, endtime=retime2)
 		bst1 = obspy.core.stream.Stream()
 		bst2 = obspy.core.stream.Stream()
-		bst1.append(beamTr1)
-		bst2.append(beamTr2)
+		bst1.append(beamTr1);bst1.append(beamRefTr1)
+		bst2.append(beamTr2);bst2.append(beamRefTr2)
 		npts = int((cetime + cstime)/delta) + 1
 		bst1, bst2 = self._resample(bst1, bst2, delta, method, npts)
-		Mptd1 = np.zeros([1, npts])
-		Mptd2 = np.zeros([1, npts])
-		Mptd1[0,:] = bst1[0].data
-		Mptd2[0,:] = bst2[0].data
+		Mptd1 = np.zeros([2, npts])
+		Mptd2 = np.zeros([2, npts])
+		Mptd1[0,:] = bst1[0].data;Mptd1[1,:] = bst1[1].data
+		Mptd2[0,:] = bst2[0].data;Mptd2[1,:] = bst2[1].data
 		taup, ccmax, dt, cc = _getLag(Mptd1, Mptd2, delta, domain='freq', fittype='cos', getcc=True)
-		self.beamcc = cc[0,:]
-		self.tshift = taup[0] 
-		self.ccmax = ccmax[0] 
+		self.tshift = taup
+		use_st1 = self.beamSt1.copy()
+		use_st2 = self.beamSt2.copy()
+		inds = len(use_st1)
+		for ind, tr1, tr2 in zip_longest(range(inds),use_st1, use_st2):
+			thiftBT = -cstime - taup[ind]
+			if ind == 0:
+				stime1 = self.arr1[tphase]['UTC'] + thiftBT
+				stime2 = self.arr2[tphase]['UTC'] - cstime
+			elif ind == 1:
+				stime1 = self.arr1[rphase]['UTC'] + thiftBT
+				stime2 = self.arr2[rphase]['UTC'] - cstime
+			tr1.trim(starttime=stime1, endtime=stime1+cstime+cetime)
+			tr2.trim(starttime=stime2, endtime=stime2+cstime+cetime)
+		use_st1, use_st2 = self._resample(use_st1, use_st2, delta, method, npts)
+		Mptd1 = np.zeros([2, npts])
+		Mptd2 = np.zeros([2, npts])
+		Mptd1[0,:] = use_st1[0].data;Mptd1[1,:] = use_st1[1].data
+		Mptd2[0,:] = use_st2[0].data;Mptd2[1,:] = use_st2[1].data
 
-	def plotBeam(self,delta=0.01, tstart=20, tend=50, savefig=True):
-		plt.subplot(3,1,1)
+		target_ts = []
+		target_cc = []
+		ref_ts = []
+		ref_cc = []
+		step_n = int(step/delta) + 1 
+		win_npt = int(steplen/delta) + 1
+		sind = 0
+		eind = sind + win_npt
+		err = True
+		while err:
+			tmp_td1 = Mptd1[:,sind : eind]
+			tmp_td2 = Mptd2[:, sind : eind]
+			ts, cc,_,_ = _getLag(tmp_td1, tmp_td2, delta, domain='freq', fittype='cos', getcc=True)
+			target_ts.append(ts[0]); target_cc.append(cc[0])
+			ref_ts.append(ts[1]); ref_cc.append(cc[1])
+			sind = sind + step_n
+			eind = sind + win_npt
+			if eind > npts:
+				err = False
+		self.tcc=target_cc
+		self.ttaup=target_ts
+		self.rcc=ref_cc
+		self.rtaup=ref_ts
 
+		# self.beamcc = cc
+		# self.ccmax = ccmax[0] 
+
+	def plotBeam(self,delta=0.01, tstart=20, tend=50, step=0.05, savefig=True):
+
+		fig, ax = plt.subplots(3, 2, sharey='row')
+		fig.suptitle('Doublet %s: \n%s-%s\nDistance: %.2f\n'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL']))
+		ax[0,0].set_title(self.tphase)
+		ax[0,1].set_title(self.rphase)
+		ax[0,0].set_ylabel('Normal Amp')
+		ax[1,0].set_ylabel('Taup')
+		ax[2,0].set_ylabel('CC')
+		# plt.subplot(3,2,1)
 		taup = self.tshift 
-		cc = self.beamcc
+		# cc = self.beamcc
 		npts = int((tstart + tend)/delta) + 1
-		dt = (np.arange(len(cc)) - (npts -1)) * delta
-		tr1 = self.beamTr1.copy()
-		thiftBT = -tstart-taup
-		stime = self.arr1 + thiftBT
-		tr1.trim(starttime=stime, endtime=stime+tstart+tend)
-		tr2 = self.beamTr2.copy()
-		tr2.trim(starttime=self.arr2-tstart, endtime=self.arr2+tend)
-		delta1 = tr1.stats.delta
-		delta2 = tr2.stats.delta
-		data1 = tr1.data/np.max(np.absolute(tr1.data))
-		data2 = tr2.data/np.max(np.absolute(tr2.data))
-		t1 = self.tt2 - tstart + np.arange(len(data1))*delta1
-		t2 = self.tt2 - tstart + np.arange(len(data2))*delta2
-		plt.plot(t1, data1, 'b', linewidth=0.5)
-		plt.plot(t2, data2, 'r-.', linewidth=0.5)
-		plt.title('Doublet %s: \n%s-%s\nDistance: %.2f\nMax CC %.3f - TimeShift %.4f'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL'],self.ccmax, taup))
-		plt.subplot(3,1,2)
-		plt.plot(dt, cc)
-		plt.ylabel('CC')
+		# dt = (np.arange(len(cc)) - (npts -1)) * delta
+		st1 = self.beamSt1.copy()
+		st2 = self.beamSt2.copy()
+		phase = [self.tphase, self.rphase]
+		taups = [self.ttaup, self.rtaup]
+		ccs = [self.tcc, self.rcc]
+		for ind in range(2):
+			tr1 = st1[ind].copy()
+			thiftBT = -tstart-taup[ind]
+			stime = self.arr1[phase[ind]]['UTC'] + thiftBT
+			tr1.trim(starttime=stime, endtime=stime+tstart+tend)
+			
+			tr2 = st2[ind].copy()
+			tr2.trim(starttime=self.arr2[phase[ind]]['UTC']-tstart, endtime=self.arr2[phase[ind]]['UTC']+tend)
+			delta1 = tr1.stats.delta
+			delta2 = tr2.stats.delta
+			data1 = tr1.data/np.max(np.absolute(tr1.data))
+			data2 = tr2.data/np.max(np.absolute(tr2.data))
+			t1 = self.arr2[phase[ind]]['TT'] - tstart + np.arange(len(data1))*delta1
+			t2 = self.arr2[phase[ind]]['TT'] - tstart + np.arange(len(data2))*delta2
+			ax[0,ind].plot(t1, data1, 'b', linewidth=0.5)
+			ax[0,ind].plot(t2, data2, 'r-.', linewidth=0.5)
+			# ttaup = taups[0]
+			ts = self.arr2[phase[ind]]['TT'] - tstart + np.arange(len(taups[ind])) * step
+			ax[1,ind].plot(ts, taups[ind], linewidth=0.5)
+			ax[1,ind].set_ylim([-2, 2])
+			# ax[1,0].set_ylabel('Taup')
+			ax[2,ind].plot(ts, self.tcc, linewidth=0.5)
+			ax[2,ind].set_ylim([0, 1])
+		# ax[2,0].set_ylabel('CC')
+
+		# plt.title('Doublet %s: \n%s-%s\nDistance: %.2f\nMax CC %.3f - TimeShift %.4f'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL'],self.ccmax, taup))
+		# plt.subplot(3,1,2)
+		# plt.plot(dt, cc)
+		# plt.ylabel('CC')
 		
 		plt.tight_layout()
 		if savefig:
@@ -821,21 +932,22 @@ class Doublet(object):
 		# gpar.log(__name__, msg, level='info', pri=True)
 		sta1 = []
 		sta2 = []
+		tphase = self.tphase
 		tmp_st1 = self.st1.copy()
 		tmp_st2 = self.st2.copy()
-		stime1 = self.arr1 - cstime
-		etime1 = self.arr1 + cetime
+		stime1 = self.arr1[tphase]['UTC'] - cstime
+		etime1 = self.arr1[tphase]['UTC'] + cetime
 		tmp_st1.trim(starttime=stime1, endtime=etime1)
 		if len(tmp_st1) == 0:
-			msg = ('Earthquake %s does not have waveform in %s period'%(self.ev1['TIME'], self.phase))
+			msg = ('Earthquake %s does not have waveform in %s period'%(self.ev1['TIME'], self.tphase))
 			gpar.log(__name__, msg, level='warning', pri=True)
 			self._qual = False
 			return
-		stime2 = self.arr2 - cstime
-		etime2 = self.arr2 + cetime
+		stime2 = self.arr2[tphase]['UTC'] - cstime
+		etime2 = self.arr2[tphase]['UTC'] + cetime
 		tmp_st2.trim(starttime=stime2, endtime=etime2)
 		if len(tmp_st2) == 0:
-			msg = ('Earthquake %s does not have waveform in %s period'%(self.ev2['TIME'], self.phase))
+			msg = ('Earthquake %s does not have waveform in %s period'%(self.ev2['TIME'], self.tphase))
 			gpar.log(__name__, msg, level='warning', pri=True)
 			self._qual = False
 			return
@@ -904,7 +1016,7 @@ class Doublet(object):
 		self.align = _df
 		# selective trace
 		refTime = np.min(-starttime - _df.TS)
-		self.refTime = self.arr1 + refTime
+		self.refTime = self.arr1[tphase]['UTC'] + refTime
 		use_st1 = obspy.Stream()
 		use_st2 = obspy.Stream()
 		npts = int((starttime + endtime)/delta) + 1
@@ -912,10 +1024,10 @@ class Doublet(object):
 			sta = row.STA
 			_tr1 = st1.select(id=sta)[0].copy()
 			_tr2 = st2.select(id=sta)[0].copy()
-			_tr2.trim(starttime=self.arr2-starttime, endtime=self.arr2+endtime)
+			_tr2.trim(starttime=self.arr2[tphase]['UTC']-starttime, endtime=self.arr2[tphase]['UTC']+endtime)
 			use_st2.append(_tr2)
 			thiftBT = -starttime - row.TS
-			stime = self.arr1 + thiftBT
+			stime = self.arr1[tphase]['UTC'] + thiftBT
 			_tr1.trim(starttime=stime, endtime=stime+starttime+endtime)
 			use_st1.append(_tr1)
 		use_st1, use_st2 = self._resample(use_st1, use_st2, delta, method, npts)
@@ -953,6 +1065,7 @@ class Doublet(object):
 			gpar.log(__name__, msg, level='warning', pri=True)
 			return
 		msg = ('Calculating Coda Interferometry for doublet %s'%self.ID)
+		gpar.log(__name__, msg, level='info', pri=True)
 		if winlen is None:
 			winlen = self.winlen
 		if step is None:
@@ -976,7 +1089,7 @@ class Doublet(object):
 		self.cc = cc
 
 		tpts = len(taup)
-		ts = self.tt1 + np.arange(tpts) * step - starttime
+		ts = self.arr1[self.tphase]['TT'] + np.arange(tpts) * step - starttime
 		self.ts = ts
 
 	def updateFilter(self, filt, starttime=100, endtime=300,
@@ -1002,12 +1115,12 @@ class Doublet(object):
 		tr1 = st1.select(id=sta_id).copy()[0]
 		tr2 = st2.select(id=sta_id).copy()[0]
 		_ts = self.align[self.align.STA==sta_id].TS.iloc[0]
-		tr1.trim(starttime=self.arr1-tstart-_ts, endtime=self.arr1+tend-_ts)
-		tr2.trim(starttime=self.arr2-tstart, endtime=self.arr2+tend)
+		tr1.trim(starttime=self.arr1[tphase]['UTC']-tstart-_ts, endtime=self.arr1[tphase]['UTC']+tend-_ts)
+		tr2.trim(starttime=self.arr2[tphase]['UTC']-tstart, endtime=self.arr2[tphase]['UTC']+tend)
 		data1 = tr1.data / np.max(np.absolute(tr1.data))
 		data2 = tr2.data / np.max(np.absolute(tr2.data))
 		# t1 = self.tt1 - tstart + np.arange(len(data1)) * st1[0].stats.delta
-		t2 = self.tt2 - tstart + np.arange(len(data2)) * tr2.stats.delta
+		t2 = self.arr2[self.tphase]['TT'] - tstart + np.arange(len(data2)) * tr2.stats.delta
 		plt.plot(t2, data1, 'b', linewidth=0.5)
 		plt.plot(t2, data2, 'r-.', linewidth=0.5)
 		# plt.xlabel('Time (s)')
@@ -1748,3 +1861,21 @@ def cosinfit(x, y, delta):
 	# ymax = np.cos(w*xmax+O)
 
 	return [xmax, ymax]
+
+def getDT(st, DF, stalist, delta):
+
+	tsDF = DF.copy()
+	if len(st) < len(tsDF):
+		for s in stalist:
+			tmp_st = st.select(station=s)
+			if len(tmp_st) == 0:
+				msg = 'Station %s is missing, dropping station'%(s)
+				gpar.log(__name__, msg, level='info', pri=True)
+				tsDF = tsDF[~(tsDF.STA == s)]
+	DT = tsDF.TimeShift - (tsDF.TimeShift/delta).astype(int)*delta
+	lag = (tsDF.TimeShift/delta).astype(int) + 1
+	tsDF['DT'] = DT
+	tsDF['LAG'] = lag
+
+	return tsDF
+

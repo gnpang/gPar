@@ -125,7 +125,7 @@ def makeEventList(ndk='gcmt_1976_2017.ndk',array='ILAR',
 	gpar.log(__name__, msg, level='info',pri=True)
 	great_circle_distance_in_degree, azimuth, bakAzimuth = calc_Dist_Azi(evedf.LAT,evedf.LON,Olat,Olon)
 
-	evedf['Del'] = np.around(great_circle_distance_in_degree, decimals=2)
+	evedf['DIS'] = np.around(great_circle_distance_in_degree, decimals=2)
 	evedf['Az'] = np.around(azimuth, decimals=2)
 	evedf['Baz'] = np.around(bakAzimuth, decimals=2)
 	msg = 'Selecting distance from %.2f to %.2f'%(mindis, maxdis)
@@ -146,10 +146,19 @@ def makeEventList(ndk='gcmt_1976_2017.ndk',array='ILAR',
 		dep = row.DEP
 		dis = row.Del
 
-		arr = model.get_travel_times(source_depth_in_km=dep,distance_in_degree=dis,phase_list=phase)[0]
-		ray[ind] = float("{0:.3f}".format(arr.ray_param_sec_degree))
-		ray_radian[ind] = float("{0:.3f}".format(arr.ray_param))
-		takeoff_angle[ind] = float("{0:.3f}".format(arr.takeoff_angle))
+		try:
+			arr = model.get_travel_times(source_depth_in_km=dep,distance_in_degree=dis,phase_list=phase)[0]
+			ray[ind] = float("{0:.3f}".format(arr.ray_param_sec_degree))
+			ray_radian[ind] = float("{0:.3f}".format(arr.ray_param))
+			takeoff_angle[ind] = float("{0:.3f}".format(arr.takeoff_angle))
+		except:
+			msg = ('Problem to calculate ray parameter for eve %s to array %s, set to -999'%(row.DIR, array))
+			gpar.log(__name__, msg, level='warning',pri=True)
+			ray[ind] = -999
+			ray_radian[ind] = -999
+			takeoff_angle[ind] = -999
+
+
 
 	evedf['Rayp'] = ray
 	evedf['Rayp_rad'] = ray_radian
@@ -164,7 +173,7 @@ def makeEventList(ndk='gcmt_1976_2017.ndk',array='ILAR',
 
 	#df = evedf.copy()
 
-	cols = ['TIME', 'LAT', 'LON', 'DEP', 'Mw', 'Del', 'Az', 'Baz','Rayp', 'BB', 'Angle','DIR']
+	cols = ['TIME', 'LAT', 'LON', 'DEP', 'Mw', 'DIS', 'Az', 'Baz','Rayp', 'BB', 'Angle','DIR']
 	evedf.drop(columns=['mxx','mxy','mzx','myy','myz','mzz','Rayp_rad','exp'], inplace=True)
 	#df.reset_index(inplace=True)
 	name = 'eq.'+array + '.list'
