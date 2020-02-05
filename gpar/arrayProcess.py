@@ -593,7 +593,7 @@ class Doublet(object):
 				 winlen=5, step=0.05,
 				 starttime=100.0, endtime=300.0,
 				 domain='freq', fittype='cos',
-				 tphase='PKIKP', rphase='PKP',
+				 tphase='PKIKP', rphase='PP',
 				 phase_list=['PKiKP','PKIKP','PKP','PP'],cut=10):
 
 		self.ID = row.DoubleID
@@ -713,15 +713,16 @@ class Doublet(object):
 	
 	def beamForming(self,geometry, starttime=0.0, winlen=1800.0,
 					filt=[1, 3, 4, True], stack='linear', unit='deg',
-					cstime=20, cetime=50,method='resample', delta=0.01,
-					channel='SHZ', tphase='PKiKP', rphase='PP',
+					cstime=20, cetime=20,method='resample', delta=0.01,
+					channel='SHZ',
 					step=0.05, steplen=2,
 					**kwargs):
 		# if not hasattr(self, 'rap1') or not hasattr(self, 'rap2'):
 		# 	msg = "Ray parameters are not defined, calculating ray parameters"
 		# 	gpar.log(__name__, msg, level='info', pri=True)
 		# 	self.getArrival(array=kwargs['array'],phase=kwargs['beamphase'],model=kwargs['model'])
-
+		tphase = self.tphase
+		rphase = self.rphase
 		tRayp = self.arr1[tphase]['RP']
 		rRayp = self.arr1[rphase]['RP']
 
@@ -746,34 +747,6 @@ class Doublet(object):
 		tsDF2 = getDT(st2, tsDF, stalist, delta2)
 		refDF1 = getDT(st1, refDF, refsta, delta1)
 		refDF2 = getDT(st2, refDF, refsta, delta2)
-		# if len(st1) < len(tsDF1):
-		# 	for s in stalist:
-		# 		tmp_st = st1.select(station=s)
-		# 		if len(tmp_st) == 0:
-		# 			msg = 'Station %s is missing for event %s, dropping station'%(s, self.ev1['TIME'])
-		# 			gpar.log(__name__, msg, level='info', pri=True)
-		# 			tsDF1 = tsDF1[~(tsDF1.STA == s)]
-		# if len(st2) < len(tsDF2):
-		# 	for s in stalist:
-		# 		tmp_st = st2.select(station=s)
-		# 		if len(tmp_st) == 0:
-		# 			msg = 'Station %s is missing for event %s, dropping station'%(s, self.ev2['TIME'])
-		# 			gpar.log(__name__, msg, level='info', pri=True)
-		# 			tsDF2 = tsDF2[~(tsDF2.STA == s)]
-
-		
-
-		# DT1 = tsDF1.TimeShift - (tsDF1.TimeShift/delta1).astype(int)*delta1
-		# DT2 = tsDF2.TimeShift - (tsDF2.TimeShift/delta1).astype(int)*delta2
-
-		# lag1 = (tsDF1.TimeShift/delta).astype(int) + 1
-		# lag2 = (tsDF2.TimeShift/delta).astype(int) + 1
-
-		# tsDF1['DT'] = DT1
-		# tsDF1['LAG'] = lag1
-		# tsDF2['DT'] = DT2
-		# tsDF2['LAG'] = lag2
-
 		npt1 = int(winlen/delta1) + 1
 		npt2 = int(winlen/delta2) + 1
 		msg = ('Calculating beamforming for doublet %s - event 1 %s'%(self.ID, self.ev1['TIME']))
@@ -845,8 +818,8 @@ class Doublet(object):
 		target_cc = []
 		ref_ts = []
 		ref_cc = []
-		step_n = int(step/delta) + 1 
-		win_npt = int(steplen/delta) + 1
+		step_n = int(step/delta) 
+		win_npt = int(steplen/delta)
 		sind = 0
 		eind = sind + win_npt
 		err = True
@@ -868,10 +841,11 @@ class Doublet(object):
 		# self.beamcc = cc
 		# self.ccmax = ccmax[0] 
 
-	def plotBeam(self,delta=0.01, tstart=20, tend=50, step=0.05, savefig=True):
+	def plotBeam(self,delta=0.01, tstart=20, tend=20, step=0.05, steplen=2, savefig=True):
 
-		fig, ax = plt.subplots(3, 2, sharey='row')
-		fig.suptitle('Doublet %s: \n%s-%s\nDistance: %.2f\n'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL']))
+		fig, ax = plt.subplots(3, 2, sharey='row', sharex='col',figsize=(6.4, 7.2),constrained_layout=True)
+		
+
 		ax[0,0].set_title(self.tphase)
 		ax[0,1].set_title(self.rphase)
 		ax[0,0].set_ylabel('Normal Amp')
@@ -903,12 +877,16 @@ class Doublet(object):
 			t2 = self.arr2[phase[ind]]['TT'] - tstart + np.arange(len(data2))*delta2
 			ax[0,ind].plot(t1, data1, 'b', linewidth=0.5)
 			ax[0,ind].plot(t2, data2, 'r-.', linewidth=0.5)
+			ax[0,ind].axvline(x=self.arr2[phase[ind]]['TT'], c='k')
+			ax[0,ind].set_xlim([np.min(t1), np.max(t1)-steplen])
 			# ttaup = taups[0]
 			ts = self.arr2[phase[ind]]['TT'] - tstart + np.arange(len(taups[ind])) * step
 			ax[1,ind].plot(ts, taups[ind], linewidth=0.5)
+			ax[1,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
 			ax[1,ind].set_ylim([-2, 2])
 			# ax[1,0].set_ylabel('Taup')
 			ax[2,ind].plot(ts, self.tcc, linewidth=0.5)
+			ax[2,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
 			ax[2,ind].set_ylim([0, 1])
 		# ax[2,0].set_ylabel('CC')
 
@@ -916,8 +894,10 @@ class Doublet(object):
 		# plt.subplot(3,1,2)
 		# plt.plot(dt, cc)
 		# plt.ylabel('CC')
+		fig.suptitle('Doublet %s: \n%s-%s\nDistance: %.2f\n'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL']))
 		
-		plt.tight_layout()
+		# plt.tight_layout()
+
 		if savefig:
 			savename = self.ID + '.' + 'beam.eps'
 			plt.savefig(savename)
@@ -1102,56 +1082,78 @@ class Doublet(object):
 
 	def plotCoda(self,tstart=20, tend=10,
 				 sta_id='CN.YKR9..SHZ',
-				 stime=100, etime=300,
-				 lim=[1100, 1450],
+				 stime=100, etime=300,aphase='PKIKP',
 				 filt=[1.33, 2.67, 3, True],
 				 savefig=True, show=True):
 		# fig = plt.figure()
 
-		#
-		plt.subplot(5,1,1)
+		fig, ax = plt.subplots(5,1,figsize=(6.4, 7.2), constrained_layout=True)
+		# ax.subplot(5,1,1)
+
+		TTs = [self.arr1[self.tphase]['TT'], self.arr1[self.rphase]['TT']]
+		lim = [TTs[0]-stime-10, TTs[0]+etime-10]
 		st1 = self.use_st1.copy()
 		st2 = self.use_st2.copy()
 		tr1 = st1.select(id=sta_id).copy()[0]
 		tr2 = st2.select(id=sta_id).copy()[0]
 		_ts = self.align[self.align.STA==sta_id].TS.iloc[0]
-		tr1.trim(starttime=self.arr1[tphase]['UTC']-tstart-_ts, endtime=self.arr1[tphase]['UTC']+tend-_ts)
-		tr2.trim(starttime=self.arr2[tphase]['UTC']-tstart, endtime=self.arr2[tphase]['UTC']+tend)
+		tr1.trim(starttime=self.arr1[self.tphase]['UTC']-tstart-_ts, endtime=self.arr1[self.tphase]['UTC']+tend-_ts)
+		tr2.trim(starttime=self.arr2[self.tphase]['UTC']-tstart, endtime=self.arr2[self.tphase]['UTC']+tend)
 		data1 = tr1.data / np.max(np.absolute(tr1.data))
 		data2 = tr2.data / np.max(np.absolute(tr2.data))
 		# t1 = self.tt1 - tstart + np.arange(len(data1)) * st1[0].stats.delta
-		t2 = self.arr2[self.tphase]['TT'] - tstart + np.arange(len(data2)) * tr2.stats.delta
-		plt.plot(t2, data1, 'b', linewidth=0.5)
-		plt.plot(t2, data2, 'r-.', linewidth=0.5)
+		t2 = TTs[0] - tstart + np.arange(len(data2)) * tr2.stats.delta
+		ax[0].plot(t2, data1, 'b', linewidth=0.5)
+		ax[0].plot(t2, data2, 'r-.', linewidth=0.5)
+		ax[0].axvline(TTs[0], c='r',linewidth=0.5)
+		if aphase != None and self.arr1.get(aphase) != None:
+			ax[0].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
 		# plt.xlabel('Time (s)')
-		plt.ylabel('Normalized Amp')
-		plt.title('Doublet %s: \n%s-%s\nDistance: %.2f'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL']))
+		ax[0].set_ylabel('Amp')
+		ax[0].set_ylim([-1,1])
+		ax[0].set_title('Doublet %s: \n%s-%s\nDistance: %.2f'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL']))
 
-		plt.subplot(5,1,2)
+		# plt.subplot(5,1,2)
 		tr1 = st1.select(id=sta_id).copy()[0]
 		tr2 = st2.select(id=sta_id).copy()[0]
 		# tr1.trim(starttime=self.arr1-stime-_ts, endtime=self.arr1+etime-_ts)
 		# tr2.trim(starttime=self.arr2-stime, endtime=self.arr2+etime)
 		t = self.ts.min() + np.arange(len(st1[0].data))*tr1.stats.delta
-		plt.plot(t, tr1.data)
-		plt.ylabel('Event 1')
-		plt.xlim(lim)
-		plt.subplot(5,1,3)
-		plt.plot(t,tr2.data)
-		plt.xlim(lim)
-		plt.ylabel('Event 2')
-		plt.subplot(5, 1, 4)
-		plt.plot(self.ts, self.cc)
-		plt.ylim([0, 1])
-		plt.xlim(lim)
-		plt.ylabel('CCmax Stack')
-		plt.subplot(5, 1, 5)
-		plt.plot(self.ts, self.taup)
-		plt.ylabel('Tau Stack')
-		plt.ylim([-2,2])
-		plt.xlim(lim)
-		plt.xlabel('Time (s)')
-		plt.tight_layout()
+		ax[1].plot(t, tr1.data, c='k', linewidth=0.5)
+		ax[1].axvline(TTs[0], c='r',linewidth=0.5)
+		ax[1].axvline(TTs[1], c='b',linewidth=0.5)
+		if aphase != None and self.arr1.get(aphase) != None:
+			ax[1].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
+		ax[1].set_ylabel('Eq. 1')
+		ax[1].set_xlim(lim)
+		# plt.subplot(5,1,3)
+		ax[2].plot(t,tr2.data, c='k', linewidth=0.5)
+		ax[2].axvline(TTs[0], c='r',linewidth=0.5)
+		ax[2].axvline(TTs[1], c='b',linewidth=0.5)
+		if aphase != None and self.arr1.get(aphase) != None:
+			ax[2].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
+		ax[2].set_xlim(lim)
+		ax[2].set_ylabel('Eq. 2')
+		# plt.subplot(5, 1, 4)
+		ax[3].plot(self.ts, self.cc,linewidth=0.5)
+		ax[3].axvline(TTs[0], c='r',linewidth=0.5, linestyle='-.')
+		ax[3].axvline(TTs[1], c='b',linewidth=0.5, linestyle='-.')
+		if aphase != None and self.arr1.get(aphase) != None:
+			ax[3].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
+		ax[3].set_ylim([0, 1])
+		ax[3].set_xlim(lim)
+		ax[3].set_ylabel('CC')
+		# plt.subplot(5, 1, 5)
+		ax[4].plot(self.ts, self.taup,linewidth=0.5)
+		ax[4].axvline(TTs[0], c='r',linewidth=0.5, linestyle='-.')
+		ax[4].axvline(TTs[1], c='b',linewidth=0.5, linestyle='-.')
+		if aphase != None and self.arr1.get(aphase) != None:
+			ax[4].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
+		ax[4].set_ylabel('Tau')
+		ax[4].set_ylim([-1,1])
+		ax[4].set_xlim(lim)
+		ax[4].set_xlabel('Time (s)')
+		# plt.tight_layout()
 		if savefig:
 			savename = self.ID + '.' + sta_id + '.eps'
 			plt.savefig(savename)

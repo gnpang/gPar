@@ -130,7 +130,7 @@ def makeEventList(ndk='gcmt_1976_2017.ndk',array='ILAR',
 	evedf['Baz'] = np.around(bakAzimuth, decimals=2)
 	msg = 'Selecting distance from %.2f to %.2f'%(mindis, maxdis)
 	gpar.log(__name__, msg, level='info',pri=True)
-	evedf = evedf[(evedf.Del >= mindis) & (evedf.Del <= maxdis)]
+	evedf = evedf[(evedf.DIS >= mindis) & (evedf.DIS <= maxdis)]
 
 	if minmag is not None:
 		msg = 'Selecting magnitude larger than %s'%(minmag)
@@ -144,7 +144,7 @@ def makeEventList(ndk='gcmt_1976_2017.ndk',array='ILAR',
 	for ind, row in evedf.iterrows():
 		# print('getting travel time for %dth event in array %s'%(ind, array))
 		dep = row.DEP
-		dis = row.Del
+		dis = row.DIS
 
 		try:
 			arr = model.get_travel_times(source_depth_in_km=dep,distance_in_degree=dis,phase_list=phase)[0]
