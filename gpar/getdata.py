@@ -520,7 +520,7 @@ def _loadDirectoryData(arrayName, df, mode,minlen,channel='Z'):
 
 			if len(st) == 0:
 				msg = ("Waveforms for event %s have problem" % eve.DIR)
-				gpar.log(__name__,msg,level='warning,e=ValueError')
+				gpar.log(__name__,msg,level='warning')
 				st = pd.NaT
 			st = _checkData(st,minlen)
 			stream[ind] = st
@@ -587,10 +587,13 @@ def _checkData(st, minlen):
 	if st is None or len(st)<1:
 		return None
 
+	sample_rates = []
 	for tr in st:
 		stats = tr.stats
 		lasttime = stats.npts * stats.delta
-
+		sample = stats.sampling_rate
+		if sample not in sample_rates:
+			sample_rates.append(sample)
 		if lasttime < minlen:
 			msg = ('Trace in station %s starting from %s is shrter than require, removing'%(stats.station, stats.starttime))
 			gpar.log(__name__, msg, level='info')
@@ -602,6 +605,12 @@ def _checkData(st, minlen):
 			continue
 	if len(st) == 0:
 		st = None
+	if len(delta) > 1 and st != None:
+		resample = np.min(sample_rates)
+		msg ("Traces have different sampling rate %s\nnow resample them to the samllest sample %s"%(sample_rates, resample))
+		gpar.log(__name__, msg, level='info')
+		st.resample(sampling_rate)
+
 	return st
 
 def _checkSta(tr, stadf):
