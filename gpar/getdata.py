@@ -521,7 +521,7 @@ def _loadDirectoryData(arrayName, df, mode,minlen,channel='Z'):
 			if len(st) == 0:
 				msg = ("Waveforms for event %s have problem" % eve.DIR)
 				gpar.log(__name__,msg,level='warning')
-				st = pd.NaT
+				st = None
 			st = _checkData(st,minlen)
 			stream[ind] = st
 		elif mode == 'db':
