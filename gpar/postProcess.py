@@ -1481,7 +1481,8 @@ class stackArray(QtWidgets.QMainWindow):
 		while next(self._arrayCycle) != self._namelist[_i]:
 			pass
 		self._arrayInfo(self._namelist[_i])
-		self._resetReg()
+		self._initReg()
+		# self._resetReg()
 
 	def _pltPrevArray(self):
 		_j = self.arcb.currentIndex()
@@ -1489,13 +1490,15 @@ class stackArray(QtWidgets.QMainWindow):
 			prevarray = next(self._arrayCycle)
 		self._arrayInfo(prevarray)
 		self.arcb.setCurrentIndex(_j-1)
-		self._resetReg()
+		self._initReg()
+		# self._resetReg()
 
 	def _pltNextArray(self):
 		_i = self.arcb.currentIndex()
 		self._arrayInfo(next(self._arrayCycle))
 		self.arcb.setCurrentIndex(_i+1)
-		self._resetReg()
+		# self._resetReg()
+		self._initReg()
 
 	def _calStack(self):
 		_i = self.discb.currentIndex()
