@@ -1387,6 +1387,7 @@ class stackArray(QtWidgets.QMainWindow):
 		win = self._current_array_df['win'].iloc[0]
 		window = [win['noise'], win['coda']]
 		self.regDf = {'global':self._current_array_df}
+		print('Doing global stack')
 		_stackSt, _stdSt = stackTR(self._current_array_df,
 								  pklname=None,win=window,
 								  mindis=self.dis[0]['mindis'],
@@ -1394,6 +1395,7 @@ class stackArray(QtWidgets.QMainWindow):
 								  step=self.dis[0]['step'],
 								  overlap=self.dis[0]['overlap'],
 								  write=self.dis[0]['write'])
+		print(len(_stackSt))
 		self.stackSt = {'global': _stackSt}
 		self.stdSt = {'global': _stdSt}
 
@@ -2282,7 +2284,8 @@ def misfit(data1,data2):
 def stackTR(obsdf, pklname=None,win=[200.0,200.0],
 			mindis=50., maxdis=75.,
 		   step=5.0,overlap=0.0, write=False):
-
+	
+	print(len(obsdf))
 	deltas = obsdf.delta.unique()
 	filters = obsdf.iloc[0].crms.FILT
 	if len(deltas) != 1:
