@@ -797,11 +797,13 @@ class glanceEQ(QtWidgets.QMainWindow):
 				stime = trinwin['stime']
 				etime = trinwin['etime']
 				delta = self._current_beam[0].stats.delta
-				npts = int((etime - stime)/delta) + 1
-				time = np.linspace(stime, etime, npts)
+				# npts = int((etime - stime)/delta) + 1
+				npts = int((etime - stime)/delta)
+				# time = np.linspace(stime, etime, npts)
+				time = stime + np.arange(npts) * delta
 
 				sind = int(stime / delta)
-				eind = int(etime / delta)
+				# eind = int(etime / delta)
 				if self._method == 'all':
 					codamode = existDF.crms.iloc[0]
 					twomode = existDF.trms.iloc[0]
@@ -2030,7 +2032,8 @@ def codaStrip(eve, method='all',
 	sind = int(stime/delta)
 	# npts = int((etime - stime)/delta) + 1
 	npts = int((etime - stime)/delta)
-	time = np.matrix(np.linspace(stime, etime, npts))
+	# time = np.matrix(np.linspace(stime, etime, npts))
+	time = stime + np.arange(npts) * delta
 	obs_data = data[:, sind: sind+npts]
 	ind = int((tari - stime)/delta)
 	res_ind = int((tt1 - stime)/delta)
