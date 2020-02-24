@@ -1179,7 +1179,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 						stime=float(self.stime.cleanText()),
 						etime=float(self.etime.cleanText()),
 						smooth=float(self.smooth.cleanText()),
-						model=float(self.model.text()))
+						model=str(self.model.text()))
 
 # class for event stacking in arrays
 class stackArray(QtWidgets.QMainWindow):
