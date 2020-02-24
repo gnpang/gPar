@@ -1990,6 +1990,8 @@ def codaStrip(eve, method='all',
 	tari = eve.arrivals[beamphase]['TT']
 	n_tr = len(st)
 	npts = st[0].stats.npts
+	if npts%2 !=0:
+		npts = npts-1
 	data = np.empty((n_tr,npts))
 	# mean = np.empty((n_tr, 1))
 	for ind, tr in enumerate(st):
