@@ -363,7 +363,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		editWindow = self.defWindow(self, this_window)
 		if editWindow.exec_():
 			self.trinWin[_i] = editWindow.getValues()
-			self.updateWindow()
+			self._updateWindow()
 			self.wincb.setCurrentIndex(_i)
 			self._appStrip()
 
@@ -375,7 +375,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		pass
 		_i = self.wincb.currentIndex()
 
-	def _updateWinow(self):
+	def _updateWindow(self):
 		self.wincb.clear()
 		self.wincb.setCurrentIndex(-1)
 		for _i, _f in enumerate(self.trinWin):
