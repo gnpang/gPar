@@ -174,7 +174,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		self.codacb.setMinimumWidth(80)
 		self.wincb = QComboBox(self)
 		self.wincb.activated.connect(self._changeStrip)
-		self._updateWinow()
+		self._updateWindow()
 
 		# edit/delete coda selected window
 		winEdit = QtWidgets.QPushButton('Coda Window')
@@ -349,7 +349,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 		if newWin.exec_():
 			self.trinWin.append(newWin.getValues())
-			self._updateWinow()
+			self._updateWindow()
 			self.wincb.setCurrentIndex(len(self.trinWin)-1)
 			self._appStrip()
 
