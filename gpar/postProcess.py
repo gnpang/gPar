@@ -2026,7 +2026,8 @@ def codaStrip(eve, method='all',
 	data_after = data[:, noi_ind2: noi_ind2+noi_pts]
 	# print(np.min(data_after))
 	sind = int(stime/delta)
-	npts = int((etime - stime)/delta) + 1
+	# npts = int((etime - stime)/delta) + 1
+	npts = int((etime - stime)/delta)
 	time = np.matrix(np.linspace(stime, etime, npts))
 	obs_data = data[:, sind: sind+npts]
 	ind = int((tari - stime)/delta)
