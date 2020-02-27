@@ -815,6 +815,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 					timeR = np.arange(cRes[0].stats.npts)*cRes[0].stats.delta - trinwin['noise']
 					data_time = np.arange(twoSt[0].stats.npts) * delta + (twoSt[0].stats.starttime - self._current_beam[0].stats.starttime)
 					ax = self.fig.subplots(2, nfilter)
+					if nfilter == 1:
+						ax = ax.reshape(2, nfilter)
 					for ind in range(nfilter):
 						data = np.abs(scipy.signal.hilbert(self._current_beam[ind].data))[sind:sind+npts]
 						ax[0,ind].plot(time,np.log10(data),'k', label='beam')
