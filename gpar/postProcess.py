@@ -672,6 +672,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 				%(self._current_event.ID, self._btype, self._current_event.dep, self._current_event.dis, a))
 			nfilts = len(self._current_slide.keys())
 			ax = self.fig.subplots(4, nfilts, sharex='col', sharey='row')
+			ax = ax.reshape(4,nfilts)
 			for ind, (name,st) in enumerate(self._current_slide.items()):
 				for _i, tr in enumerate(st):
 					if hasattr(tr.stats, 'channel'):
