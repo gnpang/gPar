@@ -1488,6 +1488,10 @@ class stackArray(QtWidgets.QMainWindow):
 		while next(self._arrayCycle) != self._namelist[_i]:
 			pass
 		self._arrayInfo(self._namelist[_i])
+		self.filtcb.clear()
+		self.filtcb.addItem('all')
+		for filt in self._current_filter:
+			self.filtcb.addItem(filt)
 		self._initReg()
 		self._drawFig()
 		# self._resetReg()
@@ -1497,6 +1501,10 @@ class stackArray(QtWidgets.QMainWindow):
 		for _i in range(len(self._namelist) - 1):
 			prevarray = next(self._arrayCycle)
 		self._arrayInfo(prevarray)
+		self.filtcb.clear()
+		self.filtcb.addItem('all')
+		for filt in self._current_filter:
+			self.filtcb.addItem(filt)
 		self.arcb.setCurrentIndex(_j-1)
 		self._initReg()
 		self._drawFig()
@@ -1505,6 +1513,10 @@ class stackArray(QtWidgets.QMainWindow):
 	def _pltNextArray(self):
 		_i = self.arcb.currentIndex()
 		self._arrayInfo(next(self._arrayCycle))
+		self.filtcb.clear()
+		self.filtcb.addItem('all')
+		for filt in self._current_filter:
+			self.filtcb.addItem(filt)
 		self.arcb.setCurrentIndex(_i+1)
 		# self._resetReg()
 		self._initReg()
