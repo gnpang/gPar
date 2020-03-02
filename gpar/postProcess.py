@@ -1642,7 +1642,7 @@ class stackArray(QtWidgets.QMainWindow):
 						peak = peak + 0.1
 						_ax_st.set_ylim([-0.1, peak])
 					_ax_st.hlines(0,time[0],time[-1],'k')
-					_ax_st.set_xlim([-window[0]/2, window[0]/2+window[1]])
+					_ax_st.set_xlim([-window[0], window[0]+window[1]])
 					_ax_st.legend()
 		else:
 			_region = self._region[1:]
@@ -1710,7 +1710,7 @@ class stackArray(QtWidgets.QMainWindow):
 							peak = peak+0.1
 							_ax_st.set_ylim([-0.1, peak])
 						_ax_st.hlines(0,time[0],time[-1],'k')
-						_ax_st.set_xlim([-window[0]/2, window[0]/2+window[1]])
+						_ax_st.set_xlim([-window[0], window[0]+window[1]])
 						_ax_st.legend()
 		self._canvasDraw()
 
