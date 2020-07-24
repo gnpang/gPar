@@ -8,7 +8,11 @@ import fnmatch
 
 from distutils.util import change_root
 
-from numpy.distutils.core import DistutilsSetupError, setup
+try:
+	from numpy.distutils.core import DistutilsSetupError
+except:
+	from distutils.core import DistutilsSetupError
+from numpy.distutils.core import setup
 from numpy.distutils.ccompiler import get_default_compiler
 from numpy.distutils.misc_util import Configuration
 
