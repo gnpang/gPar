@@ -99,8 +99,8 @@ class Array(object):
 			Y = dis_in_km * np.cos(az*deg2rad)
 			staDF['X'] = X
 			staDF['Y'] = Y
-			staDF['RX'] = X
-			staDF['RY'] = Y
+			staDF['RX'] = RX
+			staDF['RY'] = RY
 			geometry = staDF
 		elif coordsys == 'xy':
 			X = staDF.X - refPoint[0]
@@ -131,8 +131,8 @@ class Array(object):
 			grdpts_y: ind, total points in y slowness
 		'''
 
-		sx = sll_x + np.arange(grdpts_x)
-		sy = sll_y + np.arange(grdpts_y)
+		sx = sll_x + np.arange(grdpts_x) * sl_s
+		sy = sll_y + np.arange(grdpts_y) * sl_s
 		delta_x = sx - tsx
 		delta_y = sy - tsy
 		mx = np.outer(self.geometry['RX'],delta_x)
