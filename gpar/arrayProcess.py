@@ -158,8 +158,9 @@ class Array(object):
 		extent = [arf['sll_x'], xmax, arf['sll_y'], ymax]
 		fig, ax = plt.subplots(figsize=(8,6))
 		ax.imshow(arf['arf'], extent=extent, aspect='auto', cmap='Reds_r')
-		ax.set_title('Array response for %s in frequency %s\ntargeting sx=%.2f, sy=%.2f'
+		a=ax.set_title('Array response for %s in frequency %s\ntargeting sx=%.2f, sy=%.2f'
 					%(self.name, arf['freq'], arf['tsx'],arf['tsy']))
+		fig.colorbar(a,ax=ax)
 		ax.set_ylabel('Slowness Y')
 		ax.set_xlabel('Slowness X')
 		plt.show()
