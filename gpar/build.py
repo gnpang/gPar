@@ -67,6 +67,7 @@ def createArray(arrayList='array.list',
 				mode='eq',
 				minlen=1500,
 				phase_list=['P','PP','PcP','ScP','PKiKP','SP','ScS'],
+				verb=False,
 				**kwargs):
 
 	"""
@@ -100,7 +101,7 @@ def createArray(arrayList='array.list',
 		# 	st = fet.getStream(eve.DIR)
 		# 	streams[num] = st
 		# eqdf['Stream'] = streams
-		eqdf, stadf = fet.getEqData(row, phase=beamphase, mode=mode,minlen=minlen,channel=channel)
+		eqdf, stadf = fet.getEqData(row, phase=beamphase, mode=mode,minlen=minlen,channel=channel,verb=verb)
 		if eqdf is None:
 			msg = 'Earthquake list for array %s is not existed, skipping' %(row.NAME)
 			gpar.log(__name__, msg, level='warning', pri=True)
