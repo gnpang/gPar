@@ -395,7 +395,7 @@ class DataFetcher(object):
 			self.client = obspy.clients.fdsn.Client('IRIS')
 			self._getStream = _loadFromFDSN
 
-	def getEqData(self, ar, timebefore=None, timeafter=None, phase=['PKiKP'], minlen=None, mode='eq',**kwargs):
+	def getEqData(self, ar, timebefore=None, timeafter=None, phase=['PKiKP'], minlen=None, mode='eq',verb=False,**kwargs):
 		if timebefore is None:
 			timebefore = self.timeBeforeOrigin
 		if timeafter is None:
@@ -424,18 +424,20 @@ class DataFetcher(object):
 			eqdf = util.readList(eqlist,list_type='event', sep='\s+')
 		elif mode == 'db':
 			eqdf = util.readList(eqlist,list_type='doublet', sep='\s+')
-		ndf, stadf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, loc='??', minlen=minlen, mode=mode,channel=kwargs['channel'])
+		ndf, stadf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, verb=verb,
+									loc='??', minlen=minlen, mode=mode,channel=kwargs['channel'])
 
 		return ndf, stadf
 
-	def getStream(self, ar, df, stime, etime, net, staele, chan, loc='??', minlen=1500, mode='eq',channel='Z'):
+	def getStream(self, ar, df, stime, etime, net, staele, chan, verb, 
+				loc='??', minlen=1500, mode='eq',channel='Z'):
 		if not isinstance(chan, (list, tuple)):
 			if not isinstance(chan, string_types):
 				msg = 'chan must be a string or list of string'
 				gpar.log(__name__, msg, level=error, pri=True)
 			chan = [chan]
 		if self.method == 'dir':
-			df, stadf = self._getStream(ar.NAME, df, mode,minlen,channel)
+			df, stadf = self._getStream(ar.NAME, df, mode,minlen,verb,channel)
 		else:
 			stadf = pd.DataFrame(columns=['STA','LAT','LON'])
 			client = self.client
@@ -476,7 +478,7 @@ class DataFetcher(object):
 
 # Functions to get stream data based on selected method
 
-def _loadDirectoryData(arrayName, df, mode,minlen,channel='Z'):
+def _loadDirectoryData(arrayName, df, mode,minlen,verb,channel='Z'):
 
 	staDf = pd.DataFrame(columns=['STA', 'LAT', 'LON'])
 	if mode == 'eq':
@@ -490,6 +492,8 @@ def _loadDirectoryData(arrayName, df, mode,minlen,channel='Z'):
 	for ind, eve in df.iterrows():
 		if mode == 'eq':
 			_id = eve.DIR[:-6]
+			if verb:
+				print('loading data %s:%s'%(arrayName, eve.DIR))
 			sacfiles = os.path.join(arrayName, 'Data', eve.DIR, _id+'*'+channel+'.sac')
 			try:
 				st = read(sacfiles)
@@ -525,6 +529,8 @@ def _loadDirectoryData(arrayName, df, mode,minlen,channel='Z'):
 			st = _checkData(st,minlen)
 			stream[ind] = st
 		elif mode == 'db':
+			if verb:
+				print('loading data %s: %s'%(arrayName, eve.DoubleID))
 			_id1 = eve.DIR1[:-6]
 			_id2 = eve.DIR2[:-6]
 			sacfile1 = os.path.join(arrayName, 'Data', eve.DIR1, _id1+'*'+channel+'.sac')
