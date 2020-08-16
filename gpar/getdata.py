@@ -551,10 +551,12 @@ def _loadDirectoryData(arrayName, df, mode,minlen,verb,channel='Z'):
 				continue
 			st1 = _checkData(st1,minlen)
 			st2 = _checkData(st2,minlen)
-			for tr in st1:
-				staDf = _checkSta(tr,staDf)
-			for tr in st2:
-				staDf = _checkSta(tr,staDf)
+			if st1 != None:
+				for tr in st1:
+					staDf = _checkSta(tr,staDf)
+			if st2 != None:
+				for tr in st2:
+					staDf = _checkSta(tr,staDf)
 			stream1[ind] = st1
 			stream2[ind] = st2
 	if mode == 'eq':
