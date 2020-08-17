@@ -581,6 +581,9 @@ def _loadFromFDSN(fet, start, end, net, sta, chan, loc):
 	if '-' in sta:
 		sta = ','.join(sta.split('-'))
 	try:
+		msg = ('downloaded data %s in channel %s from %s to %s loc %s' %
+				(net+'.'+sta, chan, start, end, loc))
+		gpar.log(__name__, msg, level='warning', pri=True)
 		st = client.get_waveforms(net, sta, loc, chan, start, end)
 	except:
 		msg = ('Could not fetch data on %s in channel %s from %s to %s loc %s' %
