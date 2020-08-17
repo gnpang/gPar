@@ -425,12 +425,12 @@ class DataFetcher(object):
 		elif mode == 'db':
 			eqdf = util.readList(eqlist,list_type='doublet', sep='\s+')
 		ndf, stadf = self.getStream(ar, eqdf, timebefore, timeafter, net, sta, chan, verb=verb,
-									loc='??', minlen=minlen, mode=mode,channel=kwargs['channel'])
+									loc='*', minlen=minlen, mode=mode,channel=kwargs['channel'])
 
 		return ndf, stadf
 
 	def getStream(self, ar, df, stime, etime, net, staele, chan, verb, 
-				loc='??', minlen=1500, mode='eq',channel='Z'):
+				loc='*', minlen=1500, mode='eq',channel='Z'):
 		if not isinstance(chan, (list, tuple)):
 			if not isinstance(chan, string_types):
 				msg = 'chan must be a string or list of string'
