@@ -380,7 +380,7 @@ class DataFetcher(object):
 			gpar.log(__name__,msg,level='error',e=ValueError)
 		self.method = self.method.lower()
 		if not self.method in DataFetcher.subMethods:
-			msg = 'method %s not support. Options:\n%s'%(self.metho,self.supMethods)
+			msg = 'method %s not support. Options:\n%s'%(self.method,self.supMethods)
 			gpar.log(__name__,msg,level='error',e=ValueError)
 		if self.method == 'dir':
 
@@ -583,8 +583,8 @@ def _loadFromFDSN(fet, start, end, net, sta, chan, loc):
 	try:
 		st = client.get_waveforms(net, sta, loc, chan, start, end)
 	except:
-		msg = ('Could not fetch data on %s in channel %s from %s to %s' %
-				(net+'.'+sta, chan, start, end))
+		msg = ('Could not fetch data on %s in channel %s from %s to %s loc %s' %
+				(net+'.'+sta, chan, start, end, loc))
 		gpar.log(__name__, msg, level='warning', pri=True)
 		st = None
 
