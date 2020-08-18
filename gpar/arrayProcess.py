@@ -1063,6 +1063,7 @@ class Doublet(object):
 		cc = []
 		dv = []
 		for win_st1, win_st2 in zip_longest(st1.slide(winlen, step), st2.slide(winlen, step)):
+			print('running')
 			_taup, _cc = codaInt(win_st1, win_st2, delta=delta, npts=npts,domain=domain,fittype=fittype)
 			taup.append(_taup)
 			cc.append(_cc)
