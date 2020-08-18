@@ -1910,7 +1910,7 @@ def getDT(st, DF, stalist, delta):
 def stretching(x,y,t_x,t_y,delta, t0_x,t0_y, win):
 
 	# st=np.arange(0.5,4,0.1)
-	st = np.arange(0.98, 1.02001, 0.00001)
+	st = np.arange(0.98, 1.02001, 0.0001)
 	n=len(y)
 	sind = int((t0_x - t_x[0])/delta) + 1
 	npts = int(win/delta) + 1
