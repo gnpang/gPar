@@ -24,7 +24,7 @@ try:
 except ImportError:
 	import pickle as cPickle
 
-from memory_profiler import profile
+# from memory_profiler import profile
 
 from gpar.util.rolling_window import rolling_window
 
@@ -1061,13 +1061,17 @@ class Doublet(object):
 		npts = int(winlen / delta)
 		taup = []
 		cc = []
+		dv = []
 		for win_st1, win_st2 in zip_longest(st1.slide(winlen, step), st2.slide(winlen, step)):
 			_taup, _cc = codaInt(win_st1, win_st2, delta=delta, npts=npts,domain=domain,fittype=fittype)
 			taup.append(_taup)
 			cc.append(_cc)
+			_dv = codaStr(st1, st2, delta, win_st1, win_st2, winlen)
+			dv.append(_dv)
 
 		self.taup = taup
 		self.cc = cc
+		self.dv = dv
 
 		tpts = len(taup)
 		ts = self.arr1[self.tphase]['TT'] + np.arange(tpts) * step - starttime
@@ -1088,7 +1092,7 @@ class Doublet(object):
 				 savefig=True, show=True):
 		# fig = plt.figure()
 
-		fig, ax = plt.subplots(5,1,figsize=(6.4, 7.2), constrained_layout=True)
+		fig, ax = plt.subplots(6,1,figsize=(6.4, 7.2), constrained_layout=True)
 		# ax.subplot(5,1,1)
 
 		TTs = [self.arr1[self.tphase]['TT'], self.arr1[self.rphase]['TT']]
@@ -1153,7 +1157,10 @@ class Doublet(object):
 		ax[4].set_ylabel('Tau')
 		ax[4].set_ylim([-1,1])
 		ax[4].set_xlim(lim)
-		ax[4].set_xlabel('Time (s)')
+		ax[5].set_xlabel('Time (s)')
+		ax[5].plot(self.ts, self.dv,linewidth=0.5)
+		ax[5].set_xlim(lim)
+		ax[5].set_ylim(-0.02,0.02)
 		# plt.tight_layout()
 		if savefig:
 			savename = self.ID + '.' + sta_id + '.eps'
@@ -1696,6 +1703,24 @@ def codaInt(st1, st2, delta, npts, domain='freq', fittype='cos'):
 
 	return [taup, cc]
 
+def codaStr(st1, st2, delta, win_st1, win_st2, winlen):
+
+	dvs = []
+	for tr1, tr2, win_tr1, win_tr2 in zip_longest(st1, st2, win_st1, win_st2):
+
+		time1 = np.arange(tr1.stats.npts)
+
+		t0_x = win_tr1.stats.starttime - tr1.stats.starttime
+		t0_y = win_tr2.stats.starttime - tr2.stats.starttime
+
+		s = stretching(tr1.data, tr2.data, time1, time1, delta, t0_x, t0_y, winlen)
+
+		dvs.append(1 - s)
+
+	dv_mean = np.mean(dvs)
+
+	return dv_mean
+
 def getCoherence(hilbertTd,sbeg,TimeTable,winpts,delta):
 	"""
 	Function to calculate coherence between two signals.
@@ -1881,4 +1906,59 @@ def getDT(st, DF, stalist, delta):
 	tsDF['LAG'] = lag
 
 	return tsDF
+
+def stretching(x,y,t_x,t_y,delta, t0_x,t0_y, win):
+
+	st=np.arange(0.5,4,0.1)
+	# st = np.arange(0.98, 1.02001, 0.00001)
+	n=len(y)
+	sind = int((t0_x - t_x[0])/delta) + 1
+	npts = int(win/delta) + 1
+	xi = x[sind: sind+npts]
+	xi = xi[np.newaxis,:].repeat(len(st), axis=0)
+
+	ks = np.arange(npts)
+
+	ti = t0_y + ks * delta
+
+	ts = np.outer(st, ti)
+
+	dt = (ts - t_y[0]) / delta
+	i1 = dt.astype(int)
+
+	i2 = i1 + 1
+	i1 = np.where(i1>=n,n-1,i1)
+	i2 = np.where(i2>=n,n-1,i2)
+
+	i1 = np.where(i1<0, 0, i1)
+	i2 = np.where(i2<0, 0, i2)
+
+	y1 = y[i1]
+	y2 = y[i2]
+
+	ytmp = (y2 - y1) * (dt - i1) + y1
+
+	_, cc, _, _ = _getLag(xi, ytmp, delta, 'freq', 'cos')
+
+	max_i = np.argmax(cc)
+
+	s = st[max_i]
+
+	return s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
