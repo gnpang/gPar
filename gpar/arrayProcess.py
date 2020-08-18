@@ -1062,9 +1062,9 @@ class Doublet(object):
 		taup = []
 		cc = []
 		dv = []
-		_i = 0
+		# _i = 0
 		for win_st1, win_st2 in zip_longest(st1.slide(winlen, step), st2.slide(winlen, step)):
-			print('running %d'%_i)
+			# print('running %d'%_i)
 			_i = _i + 1
 			_taup, _cc = codaInt(win_st1, win_st2, delta=delta, npts=npts,domain=domain,fittype=fittype)
 			taup.append(_taup)
@@ -1098,7 +1098,7 @@ class Doublet(object):
 		fig, ax = plt.subplots(6,1,figsize=(6.4, 7.2), constrained_layout=True)
 		# ax.subplot(5,1,1)
 
-		TTs = [self.arr1[self.tphase]['TT'], self.arr1[self.rphase]['TT']]
+		TTs = [self.arr2[self.tphase]['TT'], self.arr2[self.rphase]['TT']]
 		lim = [TTs[0]-stime-10, TTs[0]+etime-10]
 		st1 = self.use_st1.copy()
 		st2 = self.use_st2.copy()
