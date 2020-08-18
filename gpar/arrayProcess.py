@@ -1065,7 +1065,7 @@ class Doublet(object):
 		# _i = 0
 		for win_st1, win_st2 in zip_longest(st1.slide(winlen, step), st2.slide(winlen, step)):
 			# print('running %d'%_i)
-			_i = _i + 1
+			# _i = _i + 1
 			_taup, _cc = codaInt(win_st1, win_st2, delta=delta, npts=npts,domain=domain,fittype=fittype)
 			taup.append(_taup)
 			cc.append(_cc)
