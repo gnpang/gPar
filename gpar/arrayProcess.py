@@ -952,6 +952,11 @@ class Doublet(object):
 		st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
 		tmp_st1 = st1.copy().trim(starttime=stime1, endtime=etime1)
 		tmp_st2 = st2.copy().trim(starttime=stime2, endtime=etime2)
+		if tmp_st1 == None or tmp_st2 == None:
+			msg = ('Data is empty for doublet %s'%self.ID)
+			gpar.log(__name__, msg, level='warning',pri=True)
+			self._qual = False
+			return
 		npts = int((cetime + cstime)/delta) + 1
 		tmp_st1, tmpe_st2 = self._resample(tmp_st1,tmp_st2,delta, method,npts)
 		Mptd1 = np.zeros([len(st1), npts])
