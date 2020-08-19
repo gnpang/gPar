@@ -753,18 +753,18 @@ class Doublet(object):
 		msg = ('Calculating beamforming for doublet %s - event 1 %s'%(self.ID, self.ev1['TIME']))
 		gpar.log(__name__,msg, level='info', pri=True)
 		beamTr1 = beamForming(st1, tsDF1, npt1, starttime, stack=stack)
-		beamTr1.stats.starttime = self.ev1['TIME']
+		beamTr1.stats.starttime = self.ev1['TIME'] + starttime
 		beamTr1.stats.channel = tphase
 		beamRefTr1 = beamForming(st1, refDF1, npt1, starttime, stack=stack)
-		beamRefTr1.stats.starttime = self.ev1['TIME']
+		beamRefTr1.stats.starttime = self.ev1['TIME'] + starttime
 		beamRefTr1.stats.channel = rphase
 		msg = ('Calculating beamforming for doublet %s - event 2 %s'%(self.ID, self.ev2['TIME']))
 		gpar.log(__name__,msg, level='info', pri=True)
 		beamTr2 = beamForming(st2, tsDF2, npt2, starttime, stack=stack)
-		beamTr2.stats.starttime = self.ev2['TIME']
+		beamTr2.stats.starttime = self.ev2['TIME'] + starttime
 		beamTr2.stats.channel = tphase
 		beamRefTr2 = beamForming(st2, tsDF2, npt2, starttime, stack=stack)
-		beamRefTr2.stats.starttime = self.ev2['TIME']
+		beamRefTr2.stats.starttime = self.ev2['TIME'] + starttime
 		beamRefTr2.stats.channel = rphase
 		self.beamSt1 = obspy.core.stream.Stream()
 		self.beamSt1.append(beamTr1.copy())
