@@ -565,6 +565,7 @@ class Earthquake(object):
 		fig, ax = plt.subplots(1, len(self.energy.keys()),figsize=(8,6),sharey='row')
 		for ind, row in self.energy.iterrows():
 			im = ax[ind].imshow(np.log10(row.POWER),extent=extent, aspect='auto',**kwargs)
+			name = self.ID + '.'+row.FILT + self.slantType
 			ax[ind].set_title(name)
 			ax[ind].set_xlabel('Time (s)')
 		if self.slantType == 'slowness':
