@@ -407,8 +407,8 @@ class DataFetcher(object):
 		sta = ar.Station
 		chan = ar.Channel.split('-')
 		arDir = os.path.join(ar.NAME, 'Data')
-		if hasattr(kwargs,'eqfile'):
-			eqlist = os.path.join(ar.NAME, kwargs['eqlist'])
+		if 'eqfile' in kwargs.keys():
+			eqlist = os.path.join(ar.NAME, kwargs['eqfile'])
 		else:
 			eqlist = os.path.join(ar.NAME, mode+'.'+ar.NAME+'.list')
 		if not os.path.exists(eqlist):
