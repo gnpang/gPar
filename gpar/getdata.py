@@ -330,7 +330,7 @@ def makeDataDirectory(arraylist='array.list', fetch='IRIS',
 		fetcher = gpar.getdata.DataFetcher(fetch, timeBeforeOrigin=timeBeforeOrigin, timeAfterOrigin=timeAfterOrigin, minlen=minlen)
 
 	for ind, row in ardf.iterrows():
-		edf, stadf = fetcher.getEqData(row,channel='*')
+		edf, stadf = fetcher.getEqData(row,channel='*',**kwargs)
 		edf.dropna(inplace=True)
 		edf.reset_index(drop=True, inplace=True)
 		arDir = os.path.join(row.NAME, 'Data')
@@ -407,8 +407,10 @@ class DataFetcher(object):
 		sta = ar.Station
 		chan = ar.Channel.split('-')
 		arDir = os.path.join(ar.NAME, 'Data')
-
-		eqlist = os.path.join(ar.NAME, mode+'.'+ar.NAME+'.list')
+		if hasattr(kwargs,'eqfile'):
+			eqlist = os.path.join(ar.NAME, kwargs['eqlist'])
+		else:
+			eqlist = os.path.join(ar.NAME, mode+'.'+ar.NAME+'.list')
 		if not os.path.exists(eqlist):
 			msg = ('Earthquake list for array %s is not exists, building from ndk file first' % ar.NAME)
 			gpar.log(__name__,msg,level='warning',pri=True)

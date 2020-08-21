@@ -101,7 +101,7 @@ def createArray(arrayList='array.list',
 		# 	st = fet.getStream(eve.DIR)
 		# 	streams[num] = st
 		# eqdf['Stream'] = streams
-		eqdf, stadf = fet.getEqData(row, phase=beamphase, mode=mode,minlen=minlen,channel=channel,verb=verb)
+		eqdf, stadf = fet.getEqData(row, phase=beamphase, mode=mode,minlen=minlen,channel=channel,verb=verb,**kwargs)
 		if eqdf is None:
 			msg = 'Earthquake list for array %s is not existed, skipping' %(row.NAME)
 			gpar.log(__name__, msg, level='warning', pri=True)
