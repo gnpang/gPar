@@ -622,7 +622,7 @@ def _checkData(st, minlen):
 		resample = np.min(sample_rates)
 		msg = ("Traces have different sampling rate %s\nnow resample them to the samllest sample %s"%(sample_rates, resample))
 		gpar.log(__name__, msg, level='info')
-		st.resample(sampling_rate)
+		st.resample(resample)
 
 	return st
 
