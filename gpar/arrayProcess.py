@@ -1071,7 +1071,7 @@ class Doublet(object):
 		npts = int(winlen / delta)
 		taup = []
 		cc = []
-		dv = []
+		dvs = []
 		# _i = 0
 		for win_st1, win_st2 in zip_longest(st1.slide(winlen, step), st2.slide(winlen, step)):
 			# print('running %d'%_i)
@@ -1082,11 +1082,11 @@ class Doublet(object):
 			taup.append(_taup)
 			cc.append(_cc)
 			_dv = codaStr(st1, st2, delta, win_st1, win_st2, winlen,dv,nbtrial, stret_method)
-			dv.append(_dv)
+			dvs.append(_dv)
 
 		self.taup = taup
 		self.cc = cc
-		self.dv = dv
+		self.dv = dvs
 
 		tpts = len(taup)
 		ts = self.arr1[self.tphase]['TT'] + np.arange(tpts) * step - cstime
@@ -1859,8 +1859,6 @@ def _corr(Mptd1, Mptd2, domain):
 
 	t1, n = Mptd1.shape
 	t2, m = Mptd2.shape
-	print(t1)
-	print(t2)
 
 	if t1 != t2:
 		msg = ('Amounts of traces between events are not equal, please check')
@@ -2117,7 +2115,6 @@ def _resample(st1, st2,resample, method, npts):
 def stretching(x,y,t_x,t_y,delta, t0_x,t0_y, win, dv_range=0.02,nbtrial=401):
 
 	# st=np.arange(0.5,4,0.1)
-	print(dv_range)
 	st = 1 + np.linspace(-np.abs(dv_range),np.abs(dv_range),nbtrial)
 	n=len(y)
 	sind = int((t0_x - t_x[0])/delta) + 1
