@@ -906,7 +906,7 @@ class Doublet(object):
 			plt.close()
 
 	def _alignWave(self,filt=[1, 3,4,True],delta=0.01,
-				   tstime=20.0, tetime=50.0, method='resample',
+				   cstime=20.0, cetime=50.0, method='resample',
 				   rstime=20.0, retime=50.0,
 				   domain='freq', fittype='cos',
 				   threshold=0.4, cut=10):
