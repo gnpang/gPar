@@ -60,7 +60,7 @@ class Array(object):
 		else:
 			self.doublet = [0]*len(eqDF)
 			for ind, row in eqDF.iterrows():
-				self.doublet[ind] = Doublet(self, row, tphase=beamphase,**kwargs)
+				self.doublet[ind] = Doublet(self, row, tphase=beamphase,phase_list=phase_list,**kwargs)
 
 	def getGeometry(self,staDF,refPoint,coordsys='lonlat'):
 		"""
