@@ -595,7 +595,7 @@ class Doublet(object):
 				 winlen=5, step=0.05,
 				 rstime=20.0, retime=50.0,
 				 domain='freq', fittype='cos',
-				 tphase='PKIKP', rphase='PP',
+				 tphase='PKIKP', rphase='PP',threshold=0.4,
 				 phase_list=['PKiKP','PKIKP','PKP','PP'],cut=10):
 
 		self.ID = row.DoubleID
@@ -613,6 +613,8 @@ class Doublet(object):
 		self.delta = resample
 		self.winlen = winlen
 		self.step = step
+		self.threshold = threshold
+		self.cut = cut
 		self.st1 = row.ST1
 		self.st2 = row.ST2
 		self.st1.detrend('demean')
@@ -630,7 +632,7 @@ class Doublet(object):
 		self._alignWave(filt=filt,delta=resample,cstime=cstime,cetime=cetime,
 						rstime=rstime,retime=retime,
 						domain=domain,fittype=fittype,
-						cut=cut)
+						threshold=threshold,cut=cut)
 
 	def _checkInput(self):
 		if not isinstance(self.st1, obspy.core.stream.Stream):
@@ -1129,7 +1131,8 @@ class Doublet(object):
 					winlen=None, step=None):
 		self._alignWave(filt=filt,delta=self.delta,
 						cstime=cstime,cetime=cetime,
-						rstime=rstime,retime=retime)
+						rstime=rstime,retime=retime,
+						threshold=self.threshold, cut=self.cut)
 		self.codaInter(delta=None, winlen=winlen, step=step,starttime=starttime)
 
 	def plotCoda(self,cstime=20, cetime=10,
