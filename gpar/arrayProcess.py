@@ -1102,6 +1102,8 @@ class Doublet(object):
 		
 		st1 = self.ref_st1.copy()
 		st2 = self.ref_st2.copy()
+		for tr in st1:
+			tr.stats.starttime = self.ref_time
 		ref_taup = []
 		ref_cc = []
 		ref_dv = []
