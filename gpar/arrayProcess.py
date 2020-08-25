@@ -920,7 +920,7 @@ class Doublet(object):
 		arr1 = self.arr1[tphase]['UTC']
 		arr2 = self.arr2[tphase]['UTC']
 		data = cutWaveForm(tmp_st1, tmp_st2, delta,
-						   arr1, arr2, tstime, tetime,
+						   arr1, arr2, cstime, cetime,
 						   filt,threshold,method,domain,
 						   fittype,cut)
 		if data == None:
