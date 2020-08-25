@@ -593,7 +593,7 @@ class Doublet(object):
 				 filt=[1.33, 2.67,3,True],
 				 cstime=20.0, cetime=20.0,
 				 winlen=5, step=0.05,
-				 starttime=100.0, endtime=300.0,
+				 rstime=100.0, retime=300.0,
 				 domain='freq', fittype='cos',
 				 tphase='PKIKP', rphase='PP',
 				 phase_list=['PKiKP','PKIKP','PKP','PP'],cut=10):
@@ -628,7 +628,7 @@ class Doublet(object):
 		# else:
 		self.getArrival(array=array)
 		self._alignWave(filt=filt,delta=resample,cstime=cstime,cetime=cetime,
-						starttime=starttime,endtime=endtime,
+						rstime=rstime,retime=retime,
 						domain=domain,fittype=fittype,
 						cut=cut)
 
@@ -906,8 +906,8 @@ class Doublet(object):
 			plt.close()
 
 	def _alignWave(self,filt=[1, 3,4,True],delta=0.01,
-				   cstime=20.0, cetime=20.0, method='resample',
-				   starttime=100.0, endtime=300.0,
+				   tstime=20.0, tetime=50.0, method='resample',
+				   rstime=20.0, retime=50.0,
 				   domain='freq', fittype='cos',
 				   threshold=0.4, cut=10):
 		# msg = ('Aligning waveforms for doublet %s'%(self.ID))
@@ -917,136 +917,140 @@ class Doublet(object):
 		tphase = self.tphase
 		tmp_st1 = self.st1.copy()
 		tmp_st2 = self.st2.copy()
-		stime1 = self.arr1[tphase]['UTC'] - cstime
-		etime1 = self.arr1[tphase]['UTC'] + cetime
-		tmp_st1.trim(starttime=stime1, endtime=etime1)
-		if len(tmp_st1) == 0:
-			msg = ('Earthquake %s does not have waveform in %s period'%(self.ev1['TIME'], self.tphase))
-			gpar.log(__name__, msg, level='warning', pri=True)
+		arr1 = self.arr1[tphase]['UTC']
+		arr2 = self.arr2[tphase]['UTC']
+		data = cutWaveForm(tmp_st1, tmp_st2, delta,
+						   arr1, arr2, tstime, tetime,
+						   filt,threshold,method,domain,
+						   fittype,cut)
+		if data == None:
 			self._qual = False
-			return
-		stime2 = self.arr2[tphase]['UTC'] - cstime
-		etime2 = self.arr2[tphase]['UTC'] + cetime
-		tmp_st2.trim(starttime=stime2, endtime=etime2)
-		if len(tmp_st2) == 0:
-			msg = ('Earthquake %s does not have waveform in %s period'%(self.ev2['TIME'], self.tphase))
-			gpar.log(__name__, msg, level='warning', pri=True)
-			self._qual = False
-			return
-		for tr1, tr2 in zip_longest(tmp_st1, tmp_st2):
-			if tr1 is not None:
-				sta1.append(tr1.stats.network+'.'+tr1.stats.station+'..'+tr1.stats.channel)
-			if tr2 is not None:
-				sta2.append(tr2.stats.network+'.'+tr2.stats.station+'..'+tr2.stats.channel)
-		sta = list(set(sta1) & set(sta2))
-		sta.sort()
-		st1 = obspy.Stream()
-		st2 = obspy.Stream()
-		for s in sta:
-			_tr1 = self.st1.select(id=s).copy()[0]
-			_tr2 = self.st2.select(id=s).copy()[0]
-			st1.append(_tr1)
-			st2.append(_tr2)
-		# st1.sort(keys=['station'])
-		# st2.sort(keys=['station'])
-		st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
-		st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
-		tmp_st1 = st1.copy().trim(starttime=stime1, endtime=etime1)
-		tmp_st2 = st2.copy().trim(starttime=stime2, endtime=etime2)
-		if tmp_st1 == None or tmp_st2 == None:
-			msg = ('Data is empty for doublet %s'%self.ID)
-			gpar.log(__name__, msg, level='warning',pri=True)
-			self._qual = False
-			return
-		npts = int((cetime + cstime)/delta) + 1
-		tmp_st1, tmpe_st2 = self._resample(tmp_st1,tmp_st2,delta, method,npts)
-		Mptd1 = np.zeros([len(st1), npts])
-		Mptd2 = np.zeros([len(st2), npts])
-		inds = range(len(sta))
-		for ind, tr1, tr2 in zip_longest(inds, tmp_st1, tmp_st2):
+		else:
+			self.use_st1 = data[0]
+			self.use_st2 = data[1]
+			self.refTime = data[2]
+			self.align = data[3]
+			self._qual=True
+			rphase = self.rphase
 
-			if tr1.stats.station != tr2.stats.station:
-				msg = ('Orders of the traces are not right for Doublet %s'%self.ID)
-				gpar.log(__name__, msg, level='warning',pri=True)
-				self._qual = False
-				return
-			data1 = tr1.data
-			data2 = tr2.data
+			arr1 = self.arr1[rphase]['UTC']
+			arr2 = self.arr2[rphase]['UTC']
 
-			# if len(data1) > npts:
-			# 	data1 = data1[:npts]
-			# elif len(data1) < npts:
-			# 	data1 = np.pad(data1, (0,npts-len(data1)), 'edge')
+			rdata = cutWaveForm(tmp_st1, tmp_st2,delta,
+				arr1, arr2, rstime, retime,
+				filt,threshold, method, domain,
+				fittype, cut)
 
-			# if len(data2) > npts:
-			# 	data2 = data2[:npts]
-			# elif len(data2) < npts:
-			# 	data2 = np.pad(data2, (0,npts-len(data2)), 'edge')
+			if rdata != None:
+				self.ref_st1 = data[0]
+				self.ref_st2 = data[1]
+				self.ref_time = data[2]
+				self.ref_align = data[3]
+				self.ref_qual = True
+			else:
+				self.ref_qual = False
+		# stime1 = self.arr1[tphase]['UTC'] - cstime
+		# etime1 = self.arr1[tphase]['UTC'] + cetime
+		# tmp_st1.trim(starttime=stime1, endtime=etime1)
+		# if len(tmp_st1) == 0:
+		# 	msg = ('Earthquake %s does not have waveform in %s period'%(self.ev1['TIME'], self.tphase))
+		# 	gpar.log(__name__, msg, level='warning', pri=True)
+		# 	self._qual = False
+		# 	return
+		# stime2 = self.arr2[tphase]['UTC'] - cstime
+		# etime2 = self.arr2[tphase]['UTC'] + cetime
+		# tmp_st2.trim(starttime=stime2, endtime=etime2)
+		# if len(tmp_st2) == 0:
+		# 	msg = ('Earthquake %s does not have waveform in %s period'%(self.ev2['TIME'], self.tphase))
+		# 	gpar.log(__name__, msg, level='warning', pri=True)
+		# 	self._qual = False
+		# 	return
+		# for tr1, tr2 in zip_longest(tmp_st1, tmp_st2):
+		# 	if tr1 is not None:
+		# 		sta1.append(tr1.stats.network+'.'+tr1.stats.station+'..'+tr1.stats.channel)
+		# 	if tr2 is not None:
+		# 		sta2.append(tr2.stats.network+'.'+tr2.stats.station+'..'+tr2.stats.channel)
+		# sta = list(set(sta1) & set(sta2))
+		# sta.sort()
+		# st1 = obspy.Stream()
+		# st2 = obspy.Stream()
+		# for s in sta:
+		# 	_tr1 = self.st1.select(id=s).copy()[0]
+		# 	_tr2 = self.st2.select(id=s).copy()[0]
+		# 	st1.append(_tr1)
+		# 	st2.append(_tr2)
+		# # st1.sort(keys=['station'])
+		# # st2.sort(keys=['station'])
+		# st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
+		# st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
+		# tmp_st1 = st1.copy().trim(starttime=stime1, endtime=etime1)
+		# tmp_st2 = st2.copy().trim(starttime=stime2, endtime=etime2)
+		# if tmp_st1 == None or tmp_st2 == None:
+		# 	msg = ('Data is empty for doublet %s'%self.ID)
+		# 	gpar.log(__name__, msg, level='warning',pri=True)
+		# 	self._qual = False
+		# 	return
+		# npts = int((cetime + cstime)/delta) + 1
+		# tmp_st1, tmpe_st2 = self._resample(tmp_st1,tmp_st2,delta, method,npts)
+		# Mptd1 = np.zeros([len(st1), npts])
+		# Mptd2 = np.zeros([len(st2), npts])
+		# inds = range(len(sta))
+		# for ind, tr1, tr2 in zip_longest(inds, tmp_st1, tmp_st2):
 
-			Mptd1[ind,:] = data1
-			Mptd2[ind,:] = data2
+		# 	if tr1.stats.station != tr2.stats.station:
+		# 		msg = ('Orders of the traces are not right for Doublet %s'%self.ID)
+		# 		gpar.log(__name__, msg, level='warning',pri=True)
+		# 		self._qual = False
+		# 		return
+		# 	data1 = tr1.data
+		# 	data2 = tr2.data
 
-		taup, cc, _, _ = _getLag(Mptd1, Mptd2, delta, domain, fittype)
-		col = ['STA','TS','CC']
-		_df = pd.DataFrame(columns=col)
-		_df['STA'] = sta
-		_df['TS'] = taup
-		_df['CC'] = cc
-		_df = _df[_df.CC >= threshold]
-		if len(_df) < cut:
-			msg = ('Correlation for doublet %s is too bad, maybe due to SNR, dropping'%self.ID)
-			gpar.log(__name__, msg, level='info', pri=True)
-			self._qual=False
-			return
-		_df.sort_values('STA',inplace=True)
-		_df.reset_index(inplace=True)
-		self.align = _df
-		# selective trace
-		refTime = np.min(-starttime - _df.TS)
-		self.refTime = self.arr1[tphase]['UTC'] + refTime
-		use_st1 = obspy.Stream()
-		use_st2 = obspy.Stream()
-		npts = int((starttime + endtime)/delta) + 1
-		for ind, row in _df.iterrows():
-			sta = row.STA
-			_tr1 = st1.select(id=sta)[0].copy()
-			_tr2 = st2.select(id=sta)[0].copy()
-			_tr2.trim(starttime=self.arr2[tphase]['UTC']-starttime, endtime=self.arr2[tphase]['UTC']+endtime)
-			use_st2.append(_tr2)
-			thiftBT = -starttime - row.TS
-			stime = self.arr1[tphase]['UTC'] + thiftBT
-			_tr1.trim(starttime=stime, endtime=stime+starttime+endtime)
-			use_st1.append(_tr1)
-		use_st1, use_st2 = self._resample(use_st1, use_st2, delta, method, npts)
-		# refTime = self.arr2 - starttime
-		# st2.trim(starttime = self.arr2-starttime, endtime=self.arr2+endtime)
-		# for ind, tr in enumerate(st1):
-		# 	stime = self.arr1 + thiftBT[ind]
-		# 	tr.trim(starttime=stime, endtime=stime+starttime+endtime)
-			# tr.stats.starttime = refTime
-		use_st1.sort(keys=['station'])
-		use_st2.sort(keys=['station'])
-		self.use_st1 = use_st1
-		self.use_st2 = use_st2
-		self._qual = True
+		# 	Mptd1[ind,:] = data1
+		# 	Mptd2[ind,:] = data2
+
+		# taup, cc, _, _ = _getLag(Mptd1, Mptd2, delta, domain, fittype)
+		# col = ['STA','TS','CC']
+		# _df = pd.DataFrame(columns=col)
+		# _df['STA'] = sta
+		# _df['TS'] = taup
+		# _df['CC'] = cc
+		# _df = _df[_df.CC >= threshold]
+		# if len(_df) < cut:
+		# 	msg = ('Correlation for doublet %s is too bad, maybe due to SNR, dropping'%self.ID)
+		# 	gpar.log(__name__, msg, level='info', pri=True)
+		# 	self._qual=False
+		# 	return
+		# _df.sort_values('STA',inplace=True)
+		# _df.reset_index(inplace=True)
+		# self.align = _df
+		# # selective trace
+		# refTime = np.min(-starttime - _df.TS)
+		# self.refTime = self.arr1[tphase]['UTC'] + refTime
+		# use_st1 = obspy.Stream()
+		# use_st2 = obspy.Stream()
+		# npts = int((starttime + endtime)/delta) + 1
+		# for ind, row in _df.iterrows():
+		# 	sta = row.STA
+		# 	_tr1 = st1.select(id=sta)[0].copy()
+		# 	_tr2 = st2.select(id=sta)[0].copy()
+		# 	_tr2.trim(starttime=self.arr2[tphase]['UTC']-starttime, endtime=self.arr2[tphase]['UTC']+endtime)
+		# 	use_st2.append(_tr2)
+		# 	thiftBT = -starttime - row.TS
+		# 	stime = self.arr1[tphase]['UTC'] + thiftBT
+		# 	_tr1.trim(starttime=stime, endtime=stime+starttime+endtime)
+		# 	use_st1.append(_tr1)
+		# use_st1, use_st2 = self._resample(use_st1, use_st2, delta, method, npts)
+		# use_st1.sort(keys=['station'])
+		# use_st2.sort(keys=['station'])
+		# self.use_st1 = use_st1
+		# self.use_st2 = use_st2
+		# self._qual = True
 	def codaInter(self, delta=0.01,
 				  winlen=5, step=0.05,
-				  starttime=100.0,
-				  domain='freq',fittype='cos'):
-		# rrate = 1.0/resample
-
-		# if method == 'resample':
-		# 	self.st1.resample(sampling_rate=rrate)
-		# 	self.st2.resample(sampling_rate=rrate)
-		# elif method == 'interpolate':
-		# 	self.st1.interpolate(sampling_rate=rrate)
-		# 	self.st2.interpolate(sampling_rate=rrate)
-		# else:
-		# 	msg = ('Not a valid option for waveform resampling, choose from resample and interpolate')
-		# 	gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
-
-		# npts = int((endtime - starttime)/shift)
-		# stalist = self.geometry.STA.tolist()
+				  cstime=20.0,dv=0.02,
+				  nbtrial=401,rstime=20.0,
+				  domain='freq',fittype='cos',
+				  stret_method='resample'):
 		if not self._qual:
 			msg = ('Waveforms for this doublet %s have quality issure, stop calculating'%self.ID)
 			gpar.log(__name__, msg, level='warning', pri=True)
@@ -1072,10 +1076,12 @@ class Doublet(object):
 		for win_st1, win_st2 in zip_longest(st1.slide(winlen, step), st2.slide(winlen, step)):
 			# print('running %d'%_i)
 			# _i = _i + 1
-			_taup, _cc = codaInt(win_st1, win_st2, delta=delta, npts=npts,domain=domain,fittype=fittype)
+			_taup, _cc = codaInt(win_st1, win_st2, delta=delta, 
+								 npts=npts,domain=domain,
+								 fittype=fittype)
 			taup.append(_taup)
 			cc.append(_cc)
-			_dv = codaStr(st1, st2, delta, win_st1, win_st2, winlen)
+			_dv = codaStr(st1, st2, delta, win_st1, win_st2, winlen,dv,nbtrial, stret_method)
 			dv.append(_dv)
 
 		self.taup = taup
@@ -1083,94 +1089,138 @@ class Doublet(object):
 		self.dv = dv
 
 		tpts = len(taup)
-		ts = self.arr1[self.tphase]['TT'] + np.arange(tpts) * step - starttime
+		ts = self.arr1[self.tphase]['TT'] + np.arange(tpts) * step - cstime
 		self.ts = ts
 
-	def updateFilter(self, filt, starttime=100, endtime=300,
+		if not self.ref_qual:
+			msg = ('Waveforms for this doublet %s have quality issure, stop calculating'%self.ID)
+			gpar.log(__name__, msg, level='warning', pri=True)
+			self.ref_ts = None
+			self.ref_cc = None
+			self.ref_dv = None
+		
+		st1 = self.ref_st1.copy()
+		st2 = self.ref_st2.copy()
+		ref_taup = []
+		ref_cc = []
+		ref_dv = []
+
+		for win_st1, win_st2 in zip_longest(st1.slide(winlen, step), st2.slide(winlen, step)):
+			_taup, _cc = codaInt(win_st1, win_st2, delta=delta,
+								 npts=npts, domain=domain,
+								 fittype=fittype)
+			ref_taup.append(_taup)
+			ref_cc.append(_cc)
+			_dv = codaStr(st1, st2, delta, win_st1, win_st2, winlen,dv,nbtrial,stret_method)
+			ref_dv.append(_dv)
+
+		self.ref_taup = ref_taup
+		self.ref_cc = ref_cc
+		self.ref_dv = ref_dv
+
+		ts = self.arr1[self.rphase]['TT'] + np.arange(len(ref_taup))*step - rstime
+		self.ref_ts = ts
+
+	def updateFilter(self, filt, rstime=100, retime=300,
 					cstime=20.0, cetime=20.0,
 					winlen=None, step=None):
 		self._alignWave(filt=filt,delta=self.delta,
 						cstime=cstime,cetime=cetime,
-						starttime=starttime,endtime=endtime)
+						rstime=rstime,retime=retime)
 		self.codaInter(delta=None, winlen=winlen, step=step,starttime=starttime)
 
-	def plotCoda(self,tstart=20, tend=10,
+	def plotCoda(self,cstime=20, cetime=10,
 				 sta_id='CN.YKR9..SHZ',
-				 stime=100, etime=300,aphase='PKIKP',
-				 filt=[1.33, 2.67, 3, True],
+				 rstime=20, retime=50,aphase='PKIKP',
+				 filt=[1, 3, 3, True],
 				 savefig=True, show=True):
 		# fig = plt.figure()
 
-		fig, ax = plt.subplots(6,1,figsize=(6.4, 7.2), constrained_layout=True)
+		fig, ax = plt.subplots(4,2,figsize=(6.4, 7.2), sharey=True, constrained_layout=True)
 		# ax.subplot(5,1,1)
-
+		ax[0,0].set_title(self.tphase)
+		ax[0,1].set_title(self.rphase)
 		TTs = [self.arr2[self.tphase]['TT'], self.arr2[self.rphase]['TT']]
-		lim = [TTs[0]-stime-10, TTs[0]+etime-10]
+		# tlim = [TTs[0]-stime-, TTs[0]+etime-10]
+		tlim = [np.min(self.ts), np.max(self.ts)]
 		st1 = self.use_st1.copy()
 		st2 = self.use_st2.copy()
 		tr1 = st1.select(id=sta_id).copy()[0]
 		tr2 = st2.select(id=sta_id).copy()[0]
 		_ts = self.align[self.align.STA==sta_id].TS.iloc[0]
-		tr1.trim(starttime=self.arr1[self.tphase]['UTC']-tstart-_ts, endtime=self.arr1[self.tphase]['UTC']+tend-_ts)
+		tr1.trim(starttime=self.arr1[self.tphase]['UTC']-cstime-_ts, endtime=self.arr1[self.tphase]['UTC']+cetime-_ts)
 		tr2.trim(starttime=self.arr2[self.tphase]['UTC']-tstart, endtime=self.arr2[self.tphase]['UTC']+tend)
 		data1 = tr1.data / np.max(np.absolute(tr1.data))
 		data2 = tr2.data / np.max(np.absolute(tr2.data))
 		# t1 = self.tt1 - tstart + np.arange(len(data1)) * st1[0].stats.delta
-		t2 = TTs[0] - tstart + np.arange(len(data2)) * tr2.stats.delta
-		ax[0].plot(t2, data1, 'b', linewidth=0.5)
-		ax[0].plot(t2, data2, 'r-.', linewidth=0.5)
-		ax[0].axvline(TTs[0], c='r',linewidth=0.5)
+		t2 = TTs[0] - cstime + np.arange(len(data2)) * tr2.stats.delta
+		ax[0,0].plot(t2, data1, 'b', linewidth=0.5)
+		ax[0,0].plot(t2, data2, 'r-.', linewidth=0.5)
+		ax[0,0].axvline(TTs[0], c='r',linewidth=0.5)
 		if aphase != None and self.arr1.get(aphase) != None:
 			ax[0].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
 		# plt.xlabel('Time (s)')
-		ax[0].set_ylabel('Amp')
-		ax[0].set_ylim([-1,1])
-		ax[0].set_title('Doublet %s: \n%s-%s\nDistance: %.2f'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL']))
-
-		# plt.subplot(5,1,2)
-		tr1 = st1.select(id=sta_id).copy()[0]
-		tr2 = st2.select(id=sta_id).copy()[0]
-		# tr1.trim(starttime=self.arr1-stime-_ts, endtime=self.arr1+etime-_ts)
-		# tr2.trim(starttime=self.arr2-stime, endtime=self.arr2+etime)
-		t = self.ts.min() + np.arange(len(st1[0].data))*tr1.stats.delta
-		ax[1].plot(t, tr1.data, c='k', linewidth=0.5)
-		ax[1].axvline(TTs[0], c='r',linewidth=0.5)
-		ax[1].axvline(TTs[1], c='b',linewidth=0.5)
-		if aphase != None and self.arr1.get(aphase) != None:
-			ax[1].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
-		ax[1].set_ylabel('Eq. 1')
-		ax[1].set_xlim(lim)
-		# plt.subplot(5,1,3)
-		ax[2].plot(t,tr2.data, c='k', linewidth=0.5)
-		ax[2].axvline(TTs[0], c='r',linewidth=0.5)
-		ax[2].axvline(TTs[1], c='b',linewidth=0.5)
-		if aphase != None and self.arr1.get(aphase) != None:
-			ax[2].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
-		ax[2].set_xlim(lim)
-		ax[2].set_ylabel('Eq. 2')
+		ax[0,0].set_ylabel('Amp')
+		ax[0,0].set_ylim([-1,1])
+		ax[0,0].set_xlim(tlim)
+		# ax[0].set_title('Doublet %s: \n%s-%s\nDistance: %.2f'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL']))
 		# plt.subplot(5, 1, 4)
-		ax[3].plot(self.ts, self.cc,linewidth=0.5)
-		ax[3].axvline(TTs[0], c='r',linewidth=0.5, linestyle='-.')
-		ax[3].axvline(TTs[1], c='b',linewidth=0.5, linestyle='-.')
+		ax[0,1].plot(self.ts, self.cc,linewidth=0.5)
+		ax[0,1].axvline(TTs[0], c='r',linewidth=0.5, linestyle='-.')
+		# ax[0,1].axvline(TTs[1], c='b',linewidth=0.5, linestyle='-.')
 		if aphase != None and self.arr1.get(aphase) != None:
-			ax[3].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
-		ax[3].set_ylim([0, 1])
-		ax[3].set_xlim(lim)
-		ax[3].set_ylabel('CC')
+			ax[0,1].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
+		ax[0,1].set_ylim([0, 1])
+		ax[0,1].set_xlim(tlim)
+		ax[0,1].set_ylabel('CC')
 		# plt.subplot(5, 1, 5)
-		ax[4].plot(self.ts, self.taup,linewidth=0.5)
-		ax[4].axvline(TTs[0], c='r',linewidth=0.5, linestyle='-.')
-		ax[4].axvline(TTs[1], c='b',linewidth=0.5, linestyle='-.')
+		ax[0,2].plot(self.ts, self.taup,linewidth=0.5)
+		ax[0,2].axvline(TTs[0], c='r',linewidth=0.5, linestyle='-.')
+		# ax[0,2].axvline(TTs[1], c='b',linewidth=0.5, linestyle='-.')
 		if aphase != None and self.arr1.get(aphase) != None:
-			ax[4].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
-		ax[4].set_ylabel('Tau')
-		ax[4].set_ylim([-1,1])
-		ax[4].set_xlim(lim)
-		ax[5].set_xlabel('Time (s)')
-		ax[5].plot(self.ts, self.dv,linewidth=0.5)
-		ax[5].set_xlim(lim)
-		ax[5].set_ylim(-0.02,0.02)
-		# plt.tight_layout()
+			ax[0,2].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
+		ax[0,2].set_ylabel('Tau')
+		ax[0,2].set_ylim([-1,1])
+		ax[0,2].set_xlim(tlim)
+		ax[0,3].set_xlabel('Time (s)')
+		ax[0,3].plot(self.ts, self.dv,linewidth=0.5)
+		ax[0,3].set_xlim(tlim)
+		ax[0,3].set_ylim([-0.02,0.02])
+		ax[0,3].set_ylabel('dv/v')
+
+		if not self.ref_qual:
+			rlim = [np.min(self.ref_ts), np.max(self.ref_ts)]
+			st1 = self.use_st1.copy()
+			st2 = self.use_st2.copy()
+			tr1 = st1.select(id=sta_id).copy()[0]
+			tr2 = st2.select(id=sta_id).copy()[0]
+			_ts = self.ref_align[self.ref_align.STA==sta_id].TS.iloc[0]
+			tr1.trim(starttime=self.arr1[self.rphase]['UTC']-rstime-_ts, endtime=self.arr1[self.rphase]['UTC']+retime-_ts)
+			tr2.trim(starttime=self.arr2[self.rphase]['UTC']-cstime, endtime=self.arr2[self.rphase]['UTC']+cetime)
+			data1 = tr1.data / np.max(np.absolute(tr1.data))
+			data2 = tr2.data / np.max(np.absolute(tr2.data))
+			t2 = TTs[1] - rstime + np.arange(len(data2)) * tr2.stats.delta
+			ax[1,0].plot(t2, data1, 'b', linewidth=0.5)
+			ax[1,0].plot(t2, data2, 'r-.', linewidth=0.5)
+			ax[1,0].axvline(TTs[1], c='r', linewidth=0.5)
+			ax[1,0].set_ylim([-1,1])
+			ax[1,0].set_xlim(rlim)
+			ax[1,1].plot(self.ref_ts, self.ref_cc, linewidth=0.5)
+			ax[1,1].axvline(TTs[1],c='r',linewidth=0.5,linestyle='-.')
+			ax[1,1].set_ylim([0,1])
+			ax[1,1].set_xlim(rlim)
+			ax[1,2].plot(self.ref_ts, self.ref_taup, linewidth=0.5)
+			ax[1,2].axvline(TTs[1],c='r',linewidth=0.5,linestyle='-.')
+			ax[1,2].set_ylim([-1,1])
+			ax[1,2].set_xlim(rlim)
+			ax[1,3].plot(self.ref_ts, self.ref_dv, linewidth=0.5)
+			ax[1,3].axvline(TTs[1],c='r',linewidth=0.5,linestyle='-.')
+			ax[1,3].set_ylim([-0.02,0.02])
+			ax[1,3].set_xlim(rlim)
+			ax[1,3].set_xlabel('Time (s)')
+
+		fig.suptitle('Doublet %s: \n%s-%s\nDistance: %.2f'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL']))
+
 		if savefig:
 			savename = self.ID + '.' + sta_id + '.eps'
 			plt.savefig(savename)
@@ -1712,7 +1762,7 @@ def codaInt(st1, st2, delta, npts, domain='freq', fittype='cos'):
 
 	return [taup, cc]
 
-def codaStr(st1, st2, delta, win_st1, win_st2, winlen):
+def codaStr(st1, st2, delta, win_st1, win_st2, winlen,dv,nbtrial,method):
 
 	dvs = []
 	for tr1, tr2, win_tr1, win_tr2 in zip_longest(st1, st2, win_st1, win_st2):
@@ -1722,9 +1772,12 @@ def codaStr(st1, st2, delta, win_st1, win_st2, winlen):
 		t0_x = win_tr1.stats.starttime - tr1.stats.starttime
 		t0_y = win_tr2.stats.starttime - tr2.stats.starttime
 
-		s = stretching(tr1.data, tr2.data, time1, time1, delta, t0_x, t0_y, winlen)
+		s = stretching(tr1.data, tr2.data, 
+					   time1, time1, delta, 
+					   t0_x, t0_y, winlen,
+					   dv_range=dv,nbtrial=nbtrial)
 
-		dvs.append(1 - s)
+		dvs.append(s)
 
 	dv_mean = np.mean(dvs)
 
@@ -1916,10 +1969,154 @@ def getDT(st, DF, stalist, delta):
 
 	return tsDF
 
-def stretching(x,y,t_x,t_y,delta, t0_x,t0_y, win):
+def cutWaveForm(st1, st2,delta,
+				arr1, arr2, cstime, 
+				cetime,filt,threshold,
+				method, domain, fittype,
+				cut):
+
+	tmp_st1 = st1.copy()
+	tmp_st2 = st2.copy()
+	stime1 = arr1 - cstime
+	stime2 = arr2 - cstime
+	etime1 = arr1 + cetime
+	etime2 = arr2 + cetime
+
+	tmp_st1.trim(starttime=stime1, endtime=etime1)
+	if len(tmp_st1) == 0:
+		msg = ('Earthquake %s does not have waveform in %s period'%(self.ev1['TIME'], arr1))
+		gpar.log(__name__, msg, level='warning', pri=True)
+		return None
+
+	tmp_st2.trim(starttime=stime2, endtime=etime2)
+	if len(tmp_st2) == 0:
+		msg = ('Earthquake %s does not have waveform in %s period'%(self.ev2['TIME'], arr2))
+		gpar.log(__name__, msg, level='warning', pri=True)
+		return None
+
+	sta_id1 = []
+	sta_id2 = []
+
+	for tr1, tr2 in zip_longest(tmp_st1, tmp_st2):
+		if tr1 != None:
+			sta_id1.append(tr1.get_id())
+		if tr2 != None:
+			sta_id2.append(tr2.get_id())
+
+	sta_id = list(set(sta_id1) & set(sta_id2))
+	sta_id.sort()
+	nst1 = obspy.Stream()
+	nst2 = obspy.Stream()
+
+	for s in sta_id:
+		_tr1 = st1.select(id=s).copy()[0]
+		_tr2 = st2.select(id=s).copy()[0]
+		nst1.append(_tr1)
+		nst2.append(_tr2)
+
+	nst1.filter('bandpass', freqmin=filt[0], 
+				freqmax=filt[1], corners=filt[2], 
+				zerophase=filt[3])
+	nst2.filter('bandpass', freqmin=filt[0], 
+				freqmax=filt[1], corners=filt[2], 
+				zerophase=filt[3])
+
+	tmp_st1 = nst1.copy().trim(starttime=stime1, endtime=etime1)
+	tmp_st2 = nst2.copy().trim(starttime=stime2, endtime=etime2)
+	if tmp_st1 == None or tmp_st2 == None:
+		msg = ('Data is empty for doublet %s'%self.ID)
+		gpar.log(__name__, msg, level='warning',pri=True)
+		self._qual = False
+		return None
+
+	npts = int((cetime+cstime)/delta) + 1
+
+	tmp_st1, tmp_st2 = _resample(tmp_st1, tmp_st2, delta, method, npts)
+
+	Mptd1 = np.zeros([len(st1), npts])
+	Mptd2 = np.zeros([len(st2), npts])
+	inds = range(len(sta_id))
+
+	for in, tr1, tr2, in zip_longest(inds, tmp_st1, tmp_st2):
+		if tr1.stats.station != tr2.stats.station:
+			msg = ('Orders of the traces are not right for Doublet %s'%self.ID)
+			gpar.log(__name__, msg, level='warning',pri=True)
+			return None
+		data1 = tr1.data
+		data2 = tr2.data
+		Mptd1[ind, :] = data1
+		Mptd2[ind, :] = data2
+
+	taup, cc,_,_ = _getLag(Mptd1, Mptd2, delta, domain, fittype)
+	col = ['STA', 'TS', 'CC']
+	df = pd.DataFrame(columns=col)
+	df['STA'] = sta_id
+	df['TS'] = taup
+	df['CC'] = cc
+	df = _df[_df.CC >= threshold]
+	if len(_df) < cut:
+		msg = ('Correlation for doublet %s is too bad, maybe due to SNR, dropping'%self.ID)
+		gpar.log(__name__, msg, level='info', pri=True)
+		return None
+
+	df.sort_values("STA", inplace=True)
+	df.reset_index(inplace=True)
+
+	refTime = np.min(-cstime - _df.TS)
+	use_st1 = obspy.Stream()
+	use_st2 = obspy.Stream()
+
+	for ind, row in _df.iterrows():
+		_id = row.STA 
+		_tr1 = nst1.select(id=_id)[0].copy()
+		_tr2 = nst2.select(id=_id)[0].copy()
+		_tr2.trim(starttime=arr2-cstime, endtime=arr2+cetime)
+		use_st2.append(_tr2)
+		thiftBT = -cstime - row.TS
+		stime = arr1 + thiftBT
+		_tr1.trim(starttime=stime, endtime=stime+cstime+cetime)
+		use_st1.append(_tr1)
+
+	use_st1, use_st2 = _resample(use_st1, use_st2, delta, method, npts)
+	use_st1.sort(keys=['stations'])
+	use_st2,sort(keys=['stations'])
+	return [use_st1, use_st2, refTime, df]
+
+def _resample(st1, st2,resample, method, npts):
+	rrate = 1.0/resample
+	if method == 'resample':
+		st1.resample(sampling_rate=rrate)
+		st2.resample(sampling_rate=rrate)
+	elif method == 'interpolate':
+		st1.interpolate(sampling_rate=rrate)
+		st2.interpolate(sampling_rate=rrate)
+	else:
+		msg = ('Not a valid option for waveform resampling, choose from resample and interpolate')
+		gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
+	for _tr1, _tr2 in zip_longest(st1, st2):
+		data1 = _tr1.data
+		data2 = _tr2.data
+		if len(data1) > npts:
+			_tr1.data = data1[0:npts]
+		elif len(data1) < npts:
+			data1 = np.pad(data1, (0,npts-len(data1)), 'edge')
+			_tr1.data = data1
+		if len(data2) > npts:
+			_tr2.data = data2[0:npts]
+		elif len(data2) < npts:
+			data2 = np.pad(data2, (0,npts-len(data2)), 'edge')
+			_tr2.data = data2
+
+	return st1, st2
+
+
+
+
+def stretching(x,y,t_x,t_y,delta, t0_x,t0_y, win, dv_range=0.02,nbtrial=401):
 
 	# st=np.arange(0.5,4,0.1)
-	st = np.arange(0.98, 1.02001, 0.0001)
+
+	st = 1 + np.linspace(-np.abs(dv_range),np.abs(dv_range),nbtrial)
 	n=len(y)
 	sind = int((t0_x - t_x[0])/delta) + 1
 	npts = int(win/delta) + 1
@@ -1952,9 +2149,47 @@ def stretching(x,y,t_x,t_y,delta, t0_x,t0_y, win):
 	max_i = np.argmax(cc)
 
 	s = st[max_i]
+	dv = s - 1
 
-	return s
+	return dv
 
+def stretching_interp(ref, cur, delta, t0_x, t0_y, win,dv_range,nbtrial):
+
+	st = 1 + np.linspace(-np.abs(dv_range),np.abs(dv_range),nbtrial)
+	tvec = np.arange(t0_y, t0_y+win+delta, delta)
+	cof = np.zeros(st.shape,dtype=np.float32)
+
+	for ii in range(len(st)):
+		nt = tvec * st[ii]
+		s = np.interp(x=tvec, xp=nt, fp=cur)
+		waveform_ref = ref
+		waveform_cur = s
+		cof[ii] = np.corrcoef(waveform_ref, waveform_cur)[0,1]
+
+	cdp = np.corrcoef(cur, ref)[0,1]
+
+	imax = np.nanargmax(cof)
+
+	if imax >= len(st) - 2:
+		imax = imax - 2
+
+	if imax <= 2:
+		imax = imax + 2
+
+	dtfiner = np.linspace(st[imax-2], st[imax+2], 100)
+	ncof = np.zeros(dtfiner.shape, dtype=np.float32)
+
+	for ii in range(len(dtfiner)):
+		nt = tvec * dtfiner[ii]
+		s = np.interp(x=tvec, xp=nt, fp=cur)
+		waveform_ref = ref
+		waveform_cur = s
+		ncof[ii] = np.corrcoef(waveform_ref, waveform_cur)[0,1]
+
+	cc = np.max(ncof)
+	dv = dtfiner[np.argmax(ncof)] - 1
+
+	return dv, cc, cdp
 
 
 
