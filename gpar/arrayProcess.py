@@ -1859,6 +1859,8 @@ def _corr(Mptd1, Mptd2, domain):
 
 	t1, n = Mptd1.shape
 	t2, m = Mptd2.shape
+	print(t1)
+	print(t2)
 
 	if t1 != t2:
 		msg = ('Amounts of traces between events are not equal, please check')
@@ -2190,19 +2192,5 @@ def stretching_interp(ref, cur, delta, t0_x, t0_y, win,dv_range,nbtrial):
 	dv = dtfiner[np.argmax(ncof)] - 1
 
 	return dv, cc, cdp
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
