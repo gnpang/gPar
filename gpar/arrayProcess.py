@@ -928,7 +928,7 @@ class Doublet(object):
 		else:
 			self.use_st1 = data[0]
 			self.use_st2 = data[1]
-			self.refTime = data[2]
+			self.refTime = arr1 + data[2]
 			self.align = data[3]
 			self._qual=True
 			rphase = self.rphase
@@ -942,10 +942,10 @@ class Doublet(object):
 				fittype, cut)
 
 			if rdata != None:
-				self.ref_st1 = data[0]
-				self.ref_st2 = data[1]
-				self.ref_time = data[2]
-				self.ref_align = data[3]
+				self.ref_st1 = rdata[0]
+				self.ref_st2 = rdata[1]
+				self.ref_time = arr1+rdata[2]
+				self.ref_align = rdata[3]
 				self.ref_qual = True
 			else:
 				self.ref_qual = False
@@ -1098,6 +1098,7 @@ class Doublet(object):
 			self.ref_ts = None
 			self.ref_cc = None
 			self.ref_dv = None
+			return
 		
 		st1 = self.ref_st1.copy()
 		st2 = self.ref_st2.copy()
