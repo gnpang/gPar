@@ -2053,8 +2053,8 @@ def cutWaveForm(st1, st2,delta,
 	df['STA'] = sta_id
 	df['TS'] = taup
 	df['CC'] = cc
-	df = _df[_df.CC >= threshold]
-	if len(_df) < cut:
+	df = df[df.CC >= threshold]
+	if len(df) < cut:
 		msg = ('Correlation for doublet %s is too bad, maybe due to SNR, dropping'%self.ID)
 		gpar.log(__name__, msg, level='info', pri=True)
 		return None
