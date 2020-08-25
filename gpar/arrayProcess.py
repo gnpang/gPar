@@ -2062,11 +2062,11 @@ def cutWaveForm(st1, st2,delta,
 	df.sort_values("STA", inplace=True)
 	df.reset_index(inplace=True)
 
-	refTime = np.min(-cstime - _df.TS)
+	refTime = np.min(-cstime - df.TS)
 	use_st1 = obspy.Stream()
 	use_st2 = obspy.Stream()
 
-	for ind, row in _df.iterrows():
+	for ind, row in df.iterrows():
 		_id = row.STA 
 		_tr1 = nst1.select(id=_id)[0].copy()
 		_tr2 = nst2.select(id=_id)[0].copy()
