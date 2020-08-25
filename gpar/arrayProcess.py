@@ -593,7 +593,7 @@ class Doublet(object):
 				 filt=[1.33, 2.67,3,True],
 				 cstime=20.0, cetime=20.0,
 				 winlen=5, step=0.05,
-				 rstime=100.0, retime=300.0,
+				 rstime=20.0, retime=50.0,
 				 domain='freq', fittype='cos',
 				 tphase='PKIKP', rphase='PP',
 				 phase_list=['PKiKP','PKIKP','PKP','PP'],cut=10):
