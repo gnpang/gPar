@@ -2033,8 +2033,8 @@ def cutWaveForm(st1, st2,delta,
 
 	tmp_st1, tmp_st2 = _resample(tmp_st1, tmp_st2, delta, method, npts)
 
-	Mptd1 = np.zeros([len(st1), npts])
-	Mptd2 = np.zeros([len(st2), npts])
+	Mptd1 = np.zeros([len(nst1), npts])
+	Mptd2 = np.zeros([len(nst2), npts])
 	inds = range(len(sta_id))
 
 	for ind, tr1, tr2, in zip_longest(inds, tmp_st1, tmp_st2):
