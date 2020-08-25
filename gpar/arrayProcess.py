@@ -2078,8 +2078,8 @@ def cutWaveForm(st1, st2,delta,
 		use_st1.append(_tr1)
 
 	use_st1, use_st2 = _resample(use_st1, use_st2, delta, method, npts)
-	use_st1.sort(keys=['stations'])
-	use_st2,sort(keys=['stations'])
+	use_st1.sort(keys=['station'])
+	use_st2.sort(keys=['station'])
 	return [use_st1, use_st2, refTime, df]
 
 def _resample(st1, st2,resample, method, npts):
