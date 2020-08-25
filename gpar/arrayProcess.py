@@ -1157,8 +1157,8 @@ class Doublet(object):
 		ax[0,0].plot(t2, data1, 'b', linewidth=0.5)
 		ax[0,0].plot(t2, data2, 'r-.', linewidth=0.5)
 		ax[0,0].axvline(TTs[0], c='r',linewidth=0.5)
-		if aphase != None and self.arr1.get(aphase) != None:
-			ax[0].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
+		if aphase != None and self.arr2.get(aphase) != None:
+			ax[0].axvline(self.arr2[aphase]['TT'], c='g', linewidth=0.5)
 		# plt.xlabel('Time (s)')
 		ax[0,0].set_ylabel('Amp')
 		ax[0,0].set_ylim([-1,1])
@@ -1168,8 +1168,8 @@ class Doublet(object):
 		ax[0,1].plot(self.ts, self.cc,linewidth=0.5)
 		ax[0,1].axvline(TTs[0], c='r',linewidth=0.5, linestyle='-.')
 		# ax[0,1].axvline(TTs[1], c='b',linewidth=0.5, linestyle='-.')
-		if aphase != None and self.arr1.get(aphase) != None:
-			ax[0,1].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
+		if aphase != None and self.arr2.get(aphase) != None:
+			ax[0,1].axvline(self.arr2[aphase]['TT'], c='g', linewidth=0.5)
 		ax[0,1].set_ylim([0, 1])
 		ax[0,1].set_xlim(tlim)
 		ax[0,1].set_ylabel('CC')
@@ -1177,8 +1177,8 @@ class Doublet(object):
 		ax[0,2].plot(self.ts, self.taup,linewidth=0.5)
 		ax[0,2].axvline(TTs[0], c='r',linewidth=0.5, linestyle='-.')
 		# ax[0,2].axvline(TTs[1], c='b',linewidth=0.5, linestyle='-.')
-		if aphase != None and self.arr1.get(aphase) != None:
-			ax[0,2].axvline(self.arr1[aphase]['TT'], c='g', linewidth=0.5)
+		if aphase != None and self.arr2.get(aphase) != None:
+			ax[0,2].axvline(self.arr2[aphase]['TT'], c='g', linewidth=0.5)
 		ax[0,2].set_ylabel('Tau')
 		ax[0,2].set_ylim([-1,1])
 		ax[0,2].set_xlim(tlim)
@@ -2037,7 +2037,7 @@ def cutWaveForm(st1, st2,delta,
 	Mptd2 = np.zeros([len(st2), npts])
 	inds = range(len(sta_id))
 
-	for in, tr1, tr2, in zip_longest(inds, tmp_st1, tmp_st2):
+	for ind, tr1, tr2, in zip_longest(inds, tmp_st1, tmp_st2):
 		if tr1.stats.station != tr2.stats.station:
 			msg = ('Orders of the traces are not right for Doublet %s'%self.ID)
 			gpar.log(__name__, msg, level='warning',pri=True)
