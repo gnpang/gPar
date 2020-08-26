@@ -137,7 +137,7 @@ def createArray(arrayList='array.list',
 			array = gpar.arrayProcess.Array(row.NAME, refpoint, eqdf, stadf, coordsys, beamphase,phase_list=phase_list,
 											isDoublet=True,rstime=kwargs['rstime'],retime=kwargs['retime'],
 											cstime=kwargs['cstime'], cetime=kwargs['cetime'],rphase=kwargs['rphase'],
-											filt=kwargs['filt'],domain=kwargs['domain'],fittype=kwargs['fittype'])
+											filt=kwargs['filt'],domain=kwargs['domain'],fittype=kwargs['fittype'],threshold=kwargs['threshold'])
 		if save:
 			array.write()
 
