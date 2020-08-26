@@ -1064,7 +1064,7 @@ class Doublet(object):
 		ax[0,0].plot(t2, data2, 'r-.', linewidth=0.5)
 		ax[0,0].axvline(TTs[0], c='r',linewidth=0.5)
 		if aphase != None and self.arr2.get(aphase) != None:
-			ax[0].axvline(self.arr2[aphase]['TT'], c='g', linewidth=0.5)
+			ax[0,0].axvline(self.arr2[aphase]['TT'], c='g', linewidth=0.5)
 		# plt.xlabel('Time (s)')
 		ax[0,0].set_ylabel('Amp')
 		ax[0,0].set_ylim([-1,1])
