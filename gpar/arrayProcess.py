@@ -1058,9 +1058,9 @@ class Doublet(object):
 		tr2.trim(starttime=self.arr2[self.tphase]['UTC']-cstime, endtime=self.arr2[self.tphase]['UTC']+cetime)
 		data1 = tr1.data / np.max(np.absolute(tr1.data))
 		data2 = tr2.data / np.max(np.absolute(tr2.data))
-		# t1 = self.tt1 - tstart + np.arange(len(data1)) * st1[0].stats.delta
+		t1 = TTs[0] - cstime + np.arange(len(data1)) * tr1.stats.delta
 		t2 = TTs[0] - cstime + np.arange(len(data2)) * tr2.stats.delta
-		ax[0,0].plot(t2, data1, 'b', linewidth=0.5)
+		ax[0,0].plot(t1, data1, 'b', linewidth=0.5)
 		ax[0,0].plot(t2, data2, 'r-.', linewidth=0.5)
 		ax[0,0].axvline(TTs[0], c='r',linewidth=0.5)
 		if aphase != None and self.arr2.get(aphase) != None:
@@ -1105,8 +1105,9 @@ class Doublet(object):
 			tr2.trim(starttime=self.arr2[self.rphase]['UTC']-rstime, endtime=self.arr2[self.rphase]['UTC']+retime)
 			data1 = tr1.data / np.max(np.absolute(tr1.data))
 			data2 = tr2.data / np.max(np.absolute(tr2.data))
+			t1 = TTs[1] - rstime + np.arange(len(data1)) * tr1.stats.delta
 			t2 = TTs[1] - rstime + np.arange(len(data2)) * tr2.stats.delta
-			ax[0,1].plot(t2, data1, 'b', linewidth=0.5)
+			ax[0,1].plot(t1, data1, 'b', linewidth=0.5)
 			ax[0,1].plot(t2, data2, 'r-.', linewidth=0.5)
 			ax[0,1].axvline(TTs[1], c='r', linewidth=0.5)
 			ax[0,1].set_ylim([-1,1])
