@@ -1055,7 +1055,7 @@ class Doublet(object):
 		tr2 = st2.select(id=sta_id).copy()[0]
 		_ts = self.align[self.align.STA==sta_id].TS.iloc[0]
 		tr1.trim(starttime=self.arr1[self.tphase]['UTC']-cstime-_ts, endtime=self.arr1[self.tphase]['UTC']+cetime-_ts)
-		tr2.trim(starttime=self.arr2[self.tphase]['UTC']-tstart, endtime=self.arr2[self.tphase]['UTC']+tend)
+		tr2.trim(starttime=self.arr2[self.tphase]['UTC']-cstime, endtime=self.arr2[self.tphase]['UTC']+cetime)
 		data1 = tr1.data / np.max(np.absolute(tr1.data))
 		data2 = tr2.data / np.max(np.absolute(tr2.data))
 		# t1 = self.tt1 - tstart + np.arange(len(data1)) * st1[0].stats.delta
@@ -1102,7 +1102,7 @@ class Doublet(object):
 			tr2 = st2.select(id=sta_id).copy()[0]
 			_ts = self.ref_align[self.ref_align.STA==sta_id].TS.iloc[0]
 			tr1.trim(starttime=self.arr1[self.rphase]['UTC']-rstime-_ts, endtime=self.arr1[self.rphase]['UTC']+retime-_ts)
-			tr2.trim(starttime=self.arr2[self.rphase]['UTC']-cstime, endtime=self.arr2[self.rphase]['UTC']+cetime)
+			tr2.trim(starttime=self.arr2[self.rphase]['UTC']-rstime, endtime=self.arr2[self.rphase]['UTC']+retime)
 			data1 = tr1.data / np.max(np.absolute(tr1.data))
 			data2 = tr2.data / np.max(np.absolute(tr2.data))
 			t2 = TTs[1] - rstime + np.arange(len(data2)) * tr2.stats.delta
