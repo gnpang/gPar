@@ -596,7 +596,8 @@ class Doublet(object):
 				 rstime=20.0, retime=50.0,
 				 domain='freq', fittype='cos',
 				 tphase='PKIKP', rphase='PP',
-				 phase_list=['PKiKP','PKIKP','PKP','PP'],cut=10):
+				 phase_list=['PKiKP','PKIKP','PKP','PP'],
+				 threshold=0.4,cut=10):
 
 		self.ID = row.DoubleID
 		msg = ("Building %s: EV1: %s; EV2: %s"%(self.ID,row.TIME1, row.TIME2))
@@ -613,24 +614,20 @@ class Doublet(object):
 		self.delta = resample
 		self.winlen = winlen
 		self.step = step
+		self.threshold = threshold
+		self.cut = cut
 		self.st1 = row.ST1
 		self.st2 = row.ST2
 		self.st1.detrend('demean')
 		self.st2.detrend('demean')
 		self._checkInput()
-		# self._resample(resample,method)
 		self._getDel(array)
-		# if hasattr(row, 'TT1') and hasattr(row, 'TT2'):
-		# 	self.tt1 = row.TT1
-		# 	self.tt2 = row.TT2
-		# 	self.arr1 = self.ev1['TIME'] + row.TT1
-		# 	self.arr2 = self.ev2['TIME'] + row.TT2
-		# else:
+		
 		self.getArrival(array=array)
 		self._alignWave(filt=filt,delta=resample,cstime=cstime,cetime=cetime,
 						rstime=rstime,retime=retime,
 						domain=domain,fittype=fittype,
-						cut=cut)
+						threshold=threshold,cut=cut)
 
 	def _checkInput(self):
 		if not isinstance(self.st1, obspy.core.stream.Stream):
@@ -949,102 +946,7 @@ class Doublet(object):
 				self.ref_qual = True
 			else:
 				self.ref_qual = False
-		# stime1 = self.arr1[tphase]['UTC'] - cstime
-		# etime1 = self.arr1[tphase]['UTC'] + cetime
-		# tmp_st1.trim(starttime=stime1, endtime=etime1)
-		# if len(tmp_st1) == 0:
-		# 	msg = ('Earthquake %s does not have waveform in %s period'%(self.ev1['TIME'], self.tphase))
-		# 	gpar.log(__name__, msg, level='warning', pri=True)
-		# 	self._qual = False
-		# 	return
-		# stime2 = self.arr2[tphase]['UTC'] - cstime
-		# etime2 = self.arr2[tphase]['UTC'] + cetime
-		# tmp_st2.trim(starttime=stime2, endtime=etime2)
-		# if len(tmp_st2) == 0:
-		# 	msg = ('Earthquake %s does not have waveform in %s period'%(self.ev2['TIME'], self.tphase))
-		# 	gpar.log(__name__, msg, level='warning', pri=True)
-		# 	self._qual = False
-		# 	return
-		# for tr1, tr2 in zip_longest(tmp_st1, tmp_st2):
-		# 	if tr1 is not None:
-		# 		sta1.append(tr1.stats.network+'.'+tr1.stats.station+'..'+tr1.stats.channel)
-		# 	if tr2 is not None:
-		# 		sta2.append(tr2.stats.network+'.'+tr2.stats.station+'..'+tr2.stats.channel)
-		# sta = list(set(sta1) & set(sta2))
-		# sta.sort()
-		# st1 = obspy.Stream()
-		# st2 = obspy.Stream()
-		# for s in sta:
-		# 	_tr1 = self.st1.select(id=s).copy()[0]
-		# 	_tr2 = self.st2.select(id=s).copy()[0]
-		# 	st1.append(_tr1)
-		# 	st2.append(_tr2)
-		# # st1.sort(keys=['station'])
-		# # st2.sort(keys=['station'])
-		# st1.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
-		# st2.filter('bandpass', freqmin=filt[0], freqmax=filt[1], corners=filt[2], zerophase=filt[3])
-		# tmp_st1 = st1.copy().trim(starttime=stime1, endtime=etime1)
-		# tmp_st2 = st2.copy().trim(starttime=stime2, endtime=etime2)
-		# if tmp_st1 == None or tmp_st2 == None:
-		# 	msg = ('Data is empty for doublet %s'%self.ID)
-		# 	gpar.log(__name__, msg, level='warning',pri=True)
-		# 	self._qual = False
-		# 	return
-		# npts = int((cetime + cstime)/delta) + 1
-		# tmp_st1, tmpe_st2 = self._resample(tmp_st1,tmp_st2,delta, method,npts)
-		# Mptd1 = np.zeros([len(st1), npts])
-		# Mptd2 = np.zeros([len(st2), npts])
-		# inds = range(len(sta))
-		# for ind, tr1, tr2 in zip_longest(inds, tmp_st1, tmp_st2):
-
-		# 	if tr1.stats.station != tr2.stats.station:
-		# 		msg = ('Orders of the traces are not right for Doublet %s'%self.ID)
-		# 		gpar.log(__name__, msg, level='warning',pri=True)
-		# 		self._qual = False
-		# 		return
-		# 	data1 = tr1.data
-		# 	data2 = tr2.data
-
-		# 	Mptd1[ind,:] = data1
-		# 	Mptd2[ind,:] = data2
-
-		# taup, cc, _, _ = _getLag(Mptd1, Mptd2, delta, domain, fittype)
-		# col = ['STA','TS','CC']
-		# _df = pd.DataFrame(columns=col)
-		# _df['STA'] = sta
-		# _df['TS'] = taup
-		# _df['CC'] = cc
-		# _df = _df[_df.CC >= threshold]
-		# if len(_df) < cut:
-		# 	msg = ('Correlation for doublet %s is too bad, maybe due to SNR, dropping'%self.ID)
-		# 	gpar.log(__name__, msg, level='info', pri=True)
-		# 	self._qual=False
-		# 	return
-		# _df.sort_values('STA',inplace=True)
-		# _df.reset_index(inplace=True)
-		# self.align = _df
-		# # selective trace
-		# refTime = np.min(-starttime - _df.TS)
-		# self.refTime = self.arr1[tphase]['UTC'] + refTime
-		# use_st1 = obspy.Stream()
-		# use_st2 = obspy.Stream()
-		# npts = int((starttime + endtime)/delta) + 1
-		# for ind, row in _df.iterrows():
-		# 	sta = row.STA
-		# 	_tr1 = st1.select(id=sta)[0].copy()
-		# 	_tr2 = st2.select(id=sta)[0].copy()
-		# 	_tr2.trim(starttime=self.arr2[tphase]['UTC']-starttime, endtime=self.arr2[tphase]['UTC']+endtime)
-		# 	use_st2.append(_tr2)
-		# 	thiftBT = -starttime - row.TS
-		# 	stime = self.arr1[tphase]['UTC'] + thiftBT
-		# 	_tr1.trim(starttime=stime, endtime=stime+starttime+endtime)
-		# 	use_st1.append(_tr1)
-		# use_st1, use_st2 = self._resample(use_st1, use_st2, delta, method, npts)
-		# use_st1.sort(keys=['station'])
-		# use_st2.sort(keys=['station'])
-		# self.use_st1 = use_st1
-		# self.use_st2 = use_st2
-		# self._qual = True
+		
 	def codaInter(self, delta=0.01,
 				  winlen=5, step=0.05,
 				  cstime=20.0,dv=0.02,
@@ -1126,7 +1028,9 @@ class Doublet(object):
 					winlen=None, step=None):
 		self._alignWave(filt=filt,delta=self.delta,
 						cstime=cstime,cetime=cetime,
-						rstime=rstime,retime=retime)
+						rstime=rstime,retime=retime,
+						threshold=self.threshold,
+						cut=self.cut)
 		self.codaInter(delta=None, winlen=winlen, step=step,starttime=starttime)
 
 	def plotCoda(self,cstime=20, cetime=10,
