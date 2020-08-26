@@ -1094,7 +1094,7 @@ class Doublet(object):
 		ax[3,0].set_ylim([-0.02,0.02])
 		ax[3,0].set_ylabel('dv/v')
 
-		if not self.ref_qual:
+		if self.ref_qual:
 			rlim = [np.min(self.ref_ts), np.max(self.ref_ts)]
 			st1 = self.use_st1.copy()
 			st2 = self.use_st2.copy()
