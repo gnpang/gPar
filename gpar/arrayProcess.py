@@ -925,7 +925,7 @@ class Doublet(object):
 		else:
 			self.use_st1 = data[0]
 			self.use_st2 = data[1]
-			self.refTime = data[2]
+			self.refTime = arr1 + data[2]
 			self.align = data[3]
 			self._qual=True
 			rphase = self.rphase
@@ -939,10 +939,10 @@ class Doublet(object):
 				fittype, cut)
 
 			if rdata != None:
-				self.ref_st1 = data[0]
-				self.ref_st2 = data[1]
-				self.ref_time = data[2]
-				self.ref_align = data[3]
+				self.ref_st1 = rdata[0]
+				self.ref_st2 = rdata[1]
+				self.ref_time = arr1 + rdata[2]
+				self.ref_align = rdata[3]
 				self.ref_qual = True
 			else:
 				self.ref_qual = False
@@ -973,7 +973,7 @@ class Doublet(object):
 		npts = int(winlen / delta)
 		taup = []
 		cc = []
-		dv = []
+		dvs = []
 		# _i = 0
 		for win_st1, win_st2 in zip_longest(st1.slide(winlen, step), st2.slide(winlen, step)):
 			# print('running %d'%_i)
@@ -984,11 +984,11 @@ class Doublet(object):
 			taup.append(_taup)
 			cc.append(_cc)
 			_dv = codaStr(st1, st2, delta, win_st1, win_st2, winlen,dv,nbtrial, stret_method)
-			dv.append(_dv)
+			dvs.append(_dv)
 
 		self.taup = taup
 		self.cc = cc
-		self.dv = dv
+		self.dv = dvs
 
 		tpts = len(taup)
 		ts = self.arr1[self.tphase]['TT'] + np.arange(tpts) * step - cstime
@@ -1003,6 +1003,8 @@ class Doublet(object):
 		
 		st1 = self.ref_st1.copy()
 		st2 = self.ref_st2.copy()
+		for tr in st1:
+			tr.stats.starttime = self.ref_time
 		ref_taup = []
 		ref_cc = []
 		ref_dv = []
