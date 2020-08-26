@@ -936,7 +936,7 @@ class Doublet(object):
 			rdata = cutWaveForm(tmp_st1, tmp_st2,delta,
 				arr1, arr2, rstime, retime,
 				filt,threshold, method, domain,
-				fittype, cut)
+				fittype, cut,tshift)
 
 			if rdata != None:
 				self.ref_st1 = rdata[0]
