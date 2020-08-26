@@ -1037,6 +1037,7 @@ class Doublet(object):
 
 	def plotCoda(self,cstime=20, cetime=10,
 				 sta_id='CN.YKR9..SHZ',
+				 ref_sta_id='CN.YKR9..SHZ',
 				 rstime=20, retime=50,aphase='PKIKP',
 				 filt=[1, 3, 3, True],
 				 savefig=True, show=True):
@@ -1098,9 +1099,9 @@ class Doublet(object):
 			rlim = [np.min(self.ref_ts), np.max(self.ref_ts)]
 			st1 = self.ref_st1.copy()
 			st2 = self.ref_st2.copy()
-			tr1 = st1.select(id=sta_id).copy()[0]
-			tr2 = st2.select(id=sta_id).copy()[0]
-			_ts = self.ref_align[self.ref_align.STA==sta_id].TS.iloc[0]
+			tr1 = st1.select(id=ref_sta_id).copy()[0]
+			tr2 = st2.select(id=ref_sta_id).copy()[0]
+			_ts = self.ref_align[self.ref_align.STA==ref_sta_id].TS.iloc[0]
 			tr1.trim(starttime=self.arr1[self.rphase]['UTC']-rstime-_ts, endtime=self.arr1[self.rphase]['UTC']+retime-_ts)
 			tr2.trim(starttime=self.arr2[self.rphase]['UTC']-rstime, endtime=self.arr2[self.rphase]['UTC']+retime)
 			data1 = tr1.data / np.max(np.absolute(tr1.data))
