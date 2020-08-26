@@ -597,7 +597,7 @@ class Doublet(object):
 				 domain='freq', fittype='cos',
 				 tphase='PKIKP', rphase='PP',
 				 phase_list=['PKiKP','PKIKP','PKP','PP'],
-				 threshold=0.4,cut=10):
+				 threshold=0.4,cut=10,tshift=5):
 
 		self.ID = row.DoubleID
 		msg = ("Building %s: EV1: %s; EV2: %s"%(self.ID,row.TIME1, row.TIME2))
@@ -627,7 +627,7 @@ class Doublet(object):
 		self._alignWave(filt=filt,delta=resample,cstime=cstime,cetime=cetime,
 						rstime=rstime,retime=retime,
 						domain=domain,fittype=fittype,
-						threshold=threshold,cut=cut)
+						threshold=threshold,cut=cut,tshift=tshift)
 
 	def _checkInput(self):
 		if not isinstance(self.st1, obspy.core.stream.Stream):
@@ -906,7 +906,7 @@ class Doublet(object):
 				   cstime=20.0, cetime=50.0, method='resample',
 				   rstime=20.0, retime=50.0,
 				   domain='freq', fittype='cos',
-				   threshold=0.4, cut=10):
+				   threshold=0.4, cut=10,tshift=5):
 		# msg = ('Aligning waveforms for doublet %s'%(self.ID))
 		# gpar.log(__name__, msg, level='info', pri=True)
 		sta1 = []
@@ -919,7 +919,7 @@ class Doublet(object):
 		data = cutWaveForm(tmp_st1, tmp_st2, delta,
 						   arr1, arr2, cstime, cetime,
 						   filt,threshold,method,domain,
-						   fittype,cut)
+						   fittype,cut,tshift)
 		if data == None:
 			self._qual = False
 		else:
@@ -1026,13 +1026,13 @@ class Doublet(object):
 		self.ref_ts = ts
 
 	def updateFilter(self, filt, rstime=100, retime=300,
-					cstime=20.0, cetime=20.0,
+					cstime=20.0, cetime=20.0, tshift=5,
 					winlen=None, step=None):
 		self._alignWave(filt=filt,delta=self.delta,
 						cstime=cstime,cetime=cetime,
 						rstime=rstime,retime=retime,
 						threshold=self.threshold,
-						cut=self.cut)
+						cut=self.cut,tshift=tshift)
 		self.codaInter(delta=None, winlen=winlen, step=step,starttime=starttime)
 
 	def plotCoda(self,cstime=20, cetime=10,
@@ -1096,8 +1096,8 @@ class Doublet(object):
 
 		if self.ref_qual:
 			rlim = [np.min(self.ref_ts), np.max(self.ref_ts)]
-			st1 = self.use_st1.copy()
-			st2 = self.use_st2.copy()
+			st1 = self.ref_st1.copy()
+			st2 = self.ref_st2.copy()
 			tr1 = st1.select(id=sta_id).copy()[0]
 			tr2 = st2.select(id=sta_id).copy()[0]
 			_ts = self.ref_align[self.ref_align.STA==sta_id].TS.iloc[0]
@@ -1880,7 +1880,7 @@ def cutWaveForm(st1, st2,delta,
 				arr1, arr2, cstime, 
 				cetime,filt,threshold,
 				method, domain, fittype,
-				cut):
+				cut,tshift):
 
 	tmp_st1 = st1.copy()
 	tmp_st2 = st2.copy()
@@ -1961,7 +1961,7 @@ def cutWaveForm(st1, st2,delta,
 	df['TS'] = taup
 	df['CC'] = cc
 	df = df[df.CC >= threshold]
-	df = df[np.abs(df.TS)<=2.5]
+	df = df[np.abs(df.TS)<=tshift]
 	if len(df) < cut:
 		msg = ('Correlation for doublet %s-%s is too bad, maybe due to SNR, dropping'%(arr1,arr2))
 		gpar.log(__name__, msg, level='info', pri=True)

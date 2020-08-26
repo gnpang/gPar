@@ -66,6 +66,7 @@ def createArray(arrayList='array.list',
 				saveName=False,
 				mode='eq',
 				minlen=1500,
+				tshift=5,
 				phase_list=['P','PP','PcP','ScP','PKiKP','SP','ScS'],
 				verb=False,
 				**kwargs):
@@ -138,7 +139,7 @@ def createArray(arrayList='array.list',
 											isDoublet=True,rstime=kwargs['rstime'],retime=kwargs['retime'],
 											cstime=kwargs['cstime'], cetime=kwargs['cetime'],rphase=kwargs['rphase'],
 											filt=kwargs['filt'],domain=kwargs['domain'],fittype=kwargs['fittype'],
-											threshold=kwargs['threshold'], cut=kwargs['cut'])
+											threshold=kwargs['threshold'], cut=kwargs['cut'],tshift=tshift)
 		if save:
 			array.write()
 
