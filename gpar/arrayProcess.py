@@ -1043,7 +1043,7 @@ class Doublet(object):
 				 savefig=True, show=True):
 		# fig = plt.figure()
 
-		fig, ax = plt.subplots(4,2,figsize=(6.4, 7.2), sharey=True, constrained_layout=True)
+		fig, ax = plt.subplots(4,2,figsize=(6.4, 7.2), sharey='row', constrained_layout=True)
 		# ax.subplot(5,1,1)
 		ax[0,0].set_title(self.tphase)
 		ax[0,1].set_title(self.rphase)
