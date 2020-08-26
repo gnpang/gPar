@@ -595,7 +595,7 @@ class Doublet(object):
 				 winlen=5, step=0.05,
 				 rstime=20.0, retime=50.0,
 				 domain='freq', fittype='cos',
-				 tphase='PKIKP', rphase='PP',threshold=0.4,
+				 tphase='PKIKP', rphase='PP',
 				 phase_list=['PKiKP','PKIKP','PKP','PP'],cut=10):
 
 		self.ID = row.DoubleID
@@ -613,8 +613,6 @@ class Doublet(object):
 		self.delta = resample
 		self.winlen = winlen
 		self.step = step
-		self.threshold = threshold
-		self.cut = cut
 		self.st1 = row.ST1
 		self.st2 = row.ST2
 		self.st1.detrend('demean')
@@ -632,7 +630,7 @@ class Doublet(object):
 		self._alignWave(filt=filt,delta=resample,cstime=cstime,cetime=cetime,
 						rstime=rstime,retime=retime,
 						domain=domain,fittype=fittype,
-						threshold=threshold,cut=cut)
+						cut=cut)
 
 	def _checkInput(self):
 		if not isinstance(self.st1, obspy.core.stream.Stream):
@@ -930,7 +928,7 @@ class Doublet(object):
 		else:
 			self.use_st1 = data[0]
 			self.use_st2 = data[1]
-			self.refTime = arr1 + data[2]
+			self.refTime = data[2]
 			self.align = data[3]
 			self._qual=True
 			rphase = self.rphase
@@ -944,10 +942,10 @@ class Doublet(object):
 				fittype, cut)
 
 			if rdata != None:
-				self.ref_st1 = rdata[0]
-				self.ref_st2 = rdata[1]
-				self.ref_time = arr1+rdata[2]
-				self.ref_align = rdata[3]
+				self.ref_st1 = data[0]
+				self.ref_st2 = data[1]
+				self.ref_time = data[2]
+				self.ref_align = data[3]
 				self.ref_qual = True
 			else:
 				self.ref_qual = False
@@ -1073,7 +1071,7 @@ class Doublet(object):
 		npts = int(winlen / delta)
 		taup = []
 		cc = []
-		dvs = []
+		dv = []
 		# _i = 0
 		for win_st1, win_st2 in zip_longest(st1.slide(winlen, step), st2.slide(winlen, step)):
 			# print('running %d'%_i)
@@ -1084,11 +1082,11 @@ class Doublet(object):
 			taup.append(_taup)
 			cc.append(_cc)
 			_dv = codaStr(st1, st2, delta, win_st1, win_st2, winlen,dv,nbtrial, stret_method)
-			dvs.append(_dv)
+			dv.append(_dv)
 
 		self.taup = taup
 		self.cc = cc
-		self.dv = dvs
+		self.dv = dv
 
 		tpts = len(taup)
 		ts = self.arr1[self.tphase]['TT'] + np.arange(tpts) * step - cstime
@@ -1100,12 +1098,9 @@ class Doublet(object):
 			self.ref_ts = None
 			self.ref_cc = None
 			self.ref_dv = None
-			return
 		
 		st1 = self.ref_st1.copy()
 		st2 = self.ref_st2.copy()
-		for tr in st1:
-			tr.stats.starttime = self.ref_time
 		ref_taup = []
 		ref_cc = []
 		ref_dv = []
@@ -1131,8 +1126,7 @@ class Doublet(object):
 					winlen=None, step=None):
 		self._alignWave(filt=filt,delta=self.delta,
 						cstime=cstime,cetime=cetime,
-						rstime=rstime,retime=retime,
-						threshold=self.threshold, cut=self.cut)
+						rstime=rstime,retime=retime)
 		self.codaInter(delta=None, winlen=winlen, step=step,starttime=starttime)
 
 	def plotCoda(self,cstime=20, cetime=10,
@@ -2121,6 +2115,7 @@ def _resample(st1, st2,resample, method, npts):
 def stretching(x,y,t_x,t_y,delta, t0_x,t0_y, win, dv_range=0.02,nbtrial=401):
 
 	# st=np.arange(0.5,4,0.1)
+
 	st = 1 + np.linspace(-np.abs(dv_range),np.abs(dv_range),nbtrial)
 	n=len(y)
 	sind = int((t0_x - t_x[0])/delta) + 1
@@ -2195,5 +2190,19 @@ def stretching_interp(ref, cur, delta, t0_x, t0_y, win,dv_range,nbtrial):
 	dv = dtfiner[np.argmax(ncof)] - 1
 
 	return dv, cc, cdp
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
