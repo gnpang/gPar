@@ -834,6 +834,8 @@ class Doublet(object):
 		ttr2.trim(starttime=stime2, endtime=stime2 + cstime + cetime)
 		npts = int((cetime + cstime)/delta) + 1
 		tst1, tst2 = self._resample(tst1, tst2, delta, method, npts)
+		print(tst1[0].stats)
+		print(tst2[0].stats)
 
 		stime1 = self.arr1[rphase]['UTC'] + r_shift
 		stime2 = self.arr2[rphase]['UTC'] - rstime
