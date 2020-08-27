@@ -842,7 +842,10 @@ class Doublet(object):
 		# self.beamcc = cc
 		# self.ccmax = ccmax[0] 
 
-	def plotBeam(self,delta=0.01, tstart=20, tend=20, step=0.05, steplen=2, savefig=True):
+	def plotBeam(self,delta=0.01, 
+				 tstart=[20,20], tend=[20,60], 
+				 step=0.05, steplen=2, 
+				 savefig=True):
 
 		fig, ax = plt.subplots(3, 2, sharey='row', sharex='col',figsize=(6.4, 7.2),constrained_layout=True)
 		
@@ -855,7 +858,7 @@ class Doublet(object):
 		# plt.subplot(3,2,1)
 		taup = self.tshift 
 		# cc = self.beamcc
-		npts = int((tstart + tend)/delta) + 1
+		npts = int((tstart[ind] + tend[ind])/delta) + 1
 		# dt = (np.arange(len(cc)) - (npts -1)) * delta
 		st1 = self.beamSt1.copy()
 		st2 = self.beamSt2.copy()
@@ -864,24 +867,24 @@ class Doublet(object):
 		ccs = [self.tcc, self.rcc]
 		for ind in range(2):
 			tr1 = st1[ind].copy()
-			thiftBT = -tstart-taup[ind]
+			thiftBT = -tstart[ind]-taup[ind]
 			stime = self.arr1[phase[ind]]['UTC'] + thiftBT
-			tr1.trim(starttime=stime, endtime=stime+tstart+tend)
+			tr1.trim(starttime=stime, endtime=stime+tstart[ind]+tend[ind])
 			
 			tr2 = st2[ind].copy()
-			tr2.trim(starttime=self.arr2[phase[ind]]['UTC']-tstart, endtime=self.arr2[phase[ind]]['UTC']+tend)
+			tr2.trim(starttime=self.arr2[phase[ind]]['UTC']-tstart[ind], endtime=self.arr2[phase[ind]]['UTC']+tend[ind])
 			delta1 = tr1.stats.delta
 			delta2 = tr2.stats.delta
 			data1 = tr1.data/np.max(np.absolute(tr1.data))
 			data2 = tr2.data/np.max(np.absolute(tr2.data))
-			t1 = self.arr2[phase[ind]]['TT'] - tstart + np.arange(len(data1))*delta1
-			t2 = self.arr2[phase[ind]]['TT'] - tstart + np.arange(len(data2))*delta2
+			t1 = self.arr2[phase[ind]]['TT'] - tstart[ind] + np.arange(len(data1))*delta1
+			t2 = self.arr2[phase[ind]]['TT'] - tstart[ind] + np.arange(len(data2))*delta2
 			ax[0,ind].plot(t1, data1, 'b', linewidth=0.5)
 			ax[0,ind].plot(t2, data2, 'r-.', linewidth=0.5)
 			ax[0,ind].axvline(x=self.arr2[phase[ind]]['TT'], c='k')
 			ax[0,ind].set_xlim([np.min(t1), np.max(t1)-steplen])
 			# ttaup = taups[0]
-			ts = self.arr2[phase[ind]]['TT'] - tstart + np.arange(len(taups[ind])) * step
+			ts = self.arr2[phase[ind]]['TT'] - tstart[ind] + np.arange(len(taups[ind])) * step
 			ax[1,ind].plot(ts, taups[ind], linewidth=0.5)
 			ax[1,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
 			ax[1,ind].set_ylim([-2, 2])
