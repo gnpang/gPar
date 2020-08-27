@@ -847,8 +847,8 @@ class Doublet(object):
 		tst1.append(ttr1)
 		tst2.append(ttr2)
 
-		rst1.append(rst1)
-		rst2.append(rst2)
+		rst1.append(rtr1)
+		rst2.append(rtr2)
 		npts = int(steplen / delta)
 		target_ts = []
 		target_cc = []
