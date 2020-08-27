@@ -714,7 +714,8 @@ class Doublet(object):
 					filt=[1, 3, 4, True], stack='linear', unit='deg',
 					cstime=20, cetime=20,method='resample', delta=0.01,
 					channel='SHZ',retime=10,rstime=60,
-					step=0.05, steplen=2,
+					step=0.05, steplen=2,dv=0.02,nbtrial=401,
+					stret_method='resample'
 					**kwargs):
 		# if not hasattr(self, 'rap1') or not hasattr(self, 'rap2'):
 		# 	msg = "Ray parameters are not defined, calculating ray parameters"
@@ -778,76 +779,117 @@ class Doublet(object):
 		etime2 = self.arr2[tphase]['UTC'] + cetime
 		rstime2 = self.arr2[rphase]['UTC'] - rstime
 		retime2 = self.arr2[rphase]['UTC'] + retime
+		tst1 = obspy.core.stream.Stream()
+		tst2 = obspy.core.stream.Stream()
+		rst1 = obspy.core.stream.Stream()
+		rst2 = obspy.core.stream.Stream()
 		beamTr1.trim(starttime=stime1, endtime=etime1)
+		tst1.append(beamTr1)
 		beamRefTr1.trim(starttime=rstime1, endtime=retime1)
+		rst1.append(beamRefTr1)
 		beamTr2.trim(starttime=stime2, endtime=etime2)
+		tst2.append(beamTr2)
 		beamRefTr2.trim(starttime=rstime2, endtime=retime2)
-		bst1 = obspy.core.stream.Stream()
-		bst2 = obspy.core.stream.Stream()
-		bst1.append(beamTr1);bst1.append(beamRefTr1)
-		bst2.append(beamTr2);bst2.append(beamRefTr2)
+		rst2.append(beamRefTr2)
+		# bst1 = obspy.core.stream.Stream()
+		# bst2 = obspy.core.stream.Stream()
+		# bst1.append(beamTr1);bst1.append(beamRefTr1)
+		# bst2.append(beamTr2);bst2.append(beamRefTr2)
+
+		taups = []
 		npts = int((cetime + cstime)/delta) + 1
-		bst1, bst2 = self._resample(bst1, bst2, delta, method, npts)
-		Mptd1 = np.zeros([2, npts])
-		Mptd2 = np.zeros([2, npts])
-		Mptd1[0,:] = bst1[0].data;Mptd1[1,:] = bst1[1].data
-		Mptd2[0,:] = bst2[0].data;Mptd2[1,:] = bst2[1].data
+		tst1, tst2 = self._resample(tst1, tst2, delta, method, npts)
+		Mptd1 = np.zeros([1, npts])
+		Mptd2 = np.zeros([1, npts])
+		Mptd1[0,:] = tst1[0].data
+		Mptd2[0,:] = tst2[0].data
 		taup, ccmax, dt, cc = _getLag(Mptd1, Mptd2, delta, domain='freq', fittype='cos', getcc=True)
-		self.tshift = taup
+		taups.append(taup[0])
+		npts = int((retime + rstime)/delta) + 1
+		rst1, rst2 = self._resample(rst1, rst2, delta, method, npts)
+		Mptd1 = np.zeros([1, npts])
+		Mptd2 = np.zeros([1, npts])
+		Mptd1[0,:] = rst1[0].data
+		Mptd2[0,:] = rst2[0].data
+		taup, ccmax, dt, cc = _getLag(Mptd1, Mptd2, delta, domain='freq', fittype='cos', getcc=True)
+		taups.append(taup[0])
+		self.tshift = taups
+
 		use_st1 = self.beamSt1.copy()
 		use_st2 = self.beamSt2.copy()
 		inds = len(use_st1)
-		for ind, tr1, tr2 in zip_longest(range(inds),use_st1, use_st2):
-			thiftBT = -cstime - taup[ind]
-			if ind == 0:
-				stime1 = self.arr1[tphase]['UTC'] + thiftBT
-				stime2 = self.arr2[tphase]['UTC'] - cstime
-				tr1.trim(starttime=stime1, endtime=stime1+cstime+cetime)
-				tr2.trim(starttime=stime2, endtime=stime2+cstime+cetime)
-			elif ind == 1:
-				stime1 = self.arr1[rphase]['UTC'] + thiftBT
-				stime2 = self.arr2[rphase]['UTC'] - rstime
-				tr1.trim(starttime=stime1, endtime=stime1+rstime+retime)
-				tr2.trim(starttime=stime2, endtime=stime2+rstime+retime)
-		use_st1, use_st2 = self._resample(use_st1, use_st2, delta, method, npts)
-		Mptd1 = np.zeros([2, npts])
-		Mptd2 = np.zeros([2, npts])
-		Mptd1[0,:] = use_st1[0].data;Mptd1[1,:] = use_st1[1].data
-		Mptd2[0,:] = use_st2[0].data;Mptd2[1,:] = use_st2[1].data
+		ttr1 = use_st1[0]
+		ttr2 = use_st2[0]
 
+		rtr1 = use_st1[1]
+		rtr2 = use_st2[1]
+
+		t_shift = -cstime - taups[0]
+		r_shift = -rstime - taups[1]
+
+		stime1 = self.arr1[tphase]['UTC'] + t_shift
+		stime2 = self.arr2[tphase]['UTC'] - cstime 
+
+		ttr1.trim(starttime=stime1, endtime=stime1 + cstime + cetime)
+		ttr2.trim(starttime=stime2, endtime=stime2 + cstime + cetime)
+
+		stime1 = self.arr1[rphase]['UTC'] + r_shift
+		stime2 = self.arr2[rphase]['UTC'] - rstime
+
+		rtr1.trim(starttime=stime1, endtime=stime1 + cstime + cetime)
+		rtr2.trim(starttime=stime2, endtime=stime2 + cstime + cetime)
+
+		tst1 = obspy.core.stream.Stream()
+		tst2 = obspy.core.stream.Stream()
+		rst1 = obspy.core.stream.Stream()
+		rst2 = obspy.core.stream.Stream()
+		
+		tst1.append(ttr1)
+		tst2.append(ttr2)
+
+		rst1.append(rst1)
+		rst2.append(rst2)
+		npts = int(steplen / delta)
 		target_ts = []
 		target_cc = []
+		t_dvs = []
+		for win_st1, win_st2 in zip_longest(tst1.slide(steplen, step), tst2.slide(steplen, step)):
+			_taup, _cc = codaInt(win_st1, win_st2, delta=delta,
+								npts=npts, domain='freq',
+								fittype='cos')
+			target_cc.append(_cc)
+			target_ts.append(_taup)
+			_dv = codaStr(tst1, tst2, delta, win_st1, win_st2, steplen, dv,nbtrial,stret_method)
+			t_dvs.append(_dv)
+
+		
 		ref_ts = []
 		ref_cc = []
-		step_n = int(step/delta) 
-		win_npt = int(steplen/delta)
-		sind = 0
-		eind = sind + win_npt
-		err = True
-		while err:
-			tmp_td1 = Mptd1[:,sind : eind]
-			tmp_td2 = Mptd2[:, sind : eind]
-			ts, cc,_,_ = _getLag(tmp_td1, tmp_td2, delta, domain='freq', fittype='cos', getcc=True)
-			target_ts.append(ts[0]); target_cc.append(cc[0])
-			ref_ts.append(ts[1]); ref_cc.append(cc[1])
-			sind = sind + step_n
-			eind = sind + win_npt
-			if eind > npts:
-				err = False
+		r_dvs = []
+
+		for win_st1, win_st2 in zip_longest(rst1.slide(steplen, step), rst2.slide(steplen, step)):
+			_taup, _cc = codaInt(win_st1, win_st2, delta=delta,
+								npts=npts, domain='freq',
+								fittype='cos')
+			ref_cc.append(_cc)
+			ref_ts.append(_taup)
+			_dv = codaStr(rst1, rst2, delta, win_st1, win_st2, steplen, dv,nbtrial,stret_method)
+			r_dvs.append(_dv)
+
 		self.tcc=target_cc
 		self.ttaup=target_ts
 		self.rcc=ref_cc
 		self.rtaup=ref_ts
-
-		# self.beamcc = cc
-		# self.ccmax = ccmax[0] 
+		self.tdv = t_dvs
+		self.rdv = r_dvs
+	
 
 	def plotBeam(self,delta=0.01, 
 				 tstart=[20,20], tend=[20,60], 
 				 step=0.05, steplen=2, 
 				 savefig=True):
 
-		fig, ax = plt.subplots(3, 2, sharey='row', sharex='col',figsize=(6.4, 7.2),constrained_layout=True)
+		fig, ax = plt.subplots(4, 2, sharey='row', sharex='col',figsize=(6.4, 7.2),constrained_layout=True)
 		
 
 		ax[0,0].set_title(self.tphase)
@@ -865,6 +907,7 @@ class Doublet(object):
 		phase = [self.tphase, self.rphase]
 		taups = [self.ttaup, self.rtaup]
 		ccs = [self.tcc, self.rcc]
+		dvs = [self.tdv, self.rdv]
 		for ind in range(2):
 			tr1 = st1[ind].copy()
 			thiftBT = -tstart[ind]-taup[ind]
@@ -889,9 +932,13 @@ class Doublet(object):
 			ax[1,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
 			ax[1,ind].set_ylim([-2, 2])
 			# ax[1,0].set_ylabel('Taup')
-			ax[2,ind].plot(ts, self.tcc, linewidth=0.5)
+			ax[2,ind].plot(ts, ccs[ind], linewidth=0.5)
 			ax[2,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
 			ax[2,ind].set_ylim([0, 1])
+
+			ax[3,ind].plot(ts, dvs[ind], linewidth=0.5)
+			ax[3,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
+			ax[3,ind].set_ylim([0, 1])
 		# ax[2,0].set_ylabel('CC')
 
 		# plt.title('Doublet %s: \n%s-%s\nDistance: %.2f\nMax CC %.3f - TimeShift %.4f'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL'],self.ccmax, taup))
