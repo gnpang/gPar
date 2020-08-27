@@ -882,7 +882,7 @@ class Doublet(object):
 			ax[0,ind].plot(t1, data1, 'b', linewidth=0.5)
 			ax[0,ind].plot(t2, data2, 'r-.', linewidth=0.5)
 			ax[0,ind].axvline(x=self.arr2[phase[ind]]['TT'], c='k')
-			ax[0,ind].set_xlim([np.min(t1), np.max(t1)-steplen])
+			ax[0,ind].set_xlim([np.min(t1), np.max(t1)])
 			# ttaup = taups[0]
 			ts = self.arr2[phase[ind]]['TT'] - tstart[ind] + np.arange(len(taups[ind])) * step
 			ax[1,ind].plot(ts, taups[ind], linewidth=0.5)
