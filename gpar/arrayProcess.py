@@ -1000,6 +1000,7 @@ class Doublet(object):
 			self.ref_ts = None
 			self.ref_cc = None
 			self.ref_dv = None
+			return
 		
 		st1 = self.ref_st1.copy()
 		st2 = self.ref_st2.copy()
