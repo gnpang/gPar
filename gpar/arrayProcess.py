@@ -858,7 +858,7 @@ class Doublet(object):
 		# plt.subplot(3,2,1)
 		taup = self.tshift 
 		# cc = self.beamcc
-		npts = int((tstart[ind] + tend[ind])/delta) + 1
+		# npts = int((tstart[ind] + tend[ind])/delta) + 1
 		# dt = (np.arange(len(cc)) - (npts -1)) * delta
 		st1 = self.beamSt1.copy()
 		st2 = self.beamSt2.copy()
