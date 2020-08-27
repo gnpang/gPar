@@ -832,12 +832,16 @@ class Doublet(object):
 
 		ttr1.trim(starttime=stime1, endtime=stime1 + cstime + cetime)
 		ttr2.trim(starttime=stime2, endtime=stime2 + cstime + cetime)
+		npts = int((cetime + cstime)/delta) + 1
+		tst1, tst2 = self._resample(tst1, tst2, delta, method, npts)
 
 		stime1 = self.arr1[rphase]['UTC'] + r_shift
 		stime2 = self.arr2[rphase]['UTC'] - rstime
 
-		rtr1.trim(starttime=stime1, endtime=stime1 + cstime + cetime)
-		rtr2.trim(starttime=stime2, endtime=stime2 + cstime + cetime)
+		rtr1.trim(starttime=stime1, endtime=stime1 + rstime + retime)
+		rtr2.trim(starttime=stime2, endtime=stime2 + rstime + retime)
+		npts = int((retime + rstime)/delta) + 1
+		rst1, rst2 = self._resample(rst1, rst2, delta, method, npts)
 
 		tst1 = obspy.core.stream.Stream()
 		tst2 = obspy.core.stream.Stream()
