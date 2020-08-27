@@ -713,7 +713,7 @@ class Doublet(object):
 	def beamForming(self,geometry, starttime=0.0, winlen=1800.0,
 					filt=[1, 3, 4, True], stack='linear', unit='deg',
 					cstime=20, cetime=20,method='resample', delta=0.01,
-					channel='SHZ',
+					channel='SHZ',retime=10,rstime=60,
 					step=0.05, steplen=2,
 					**kwargs):
 		# if not hasattr(self, 'rap1') or not hasattr(self, 'rap2'):
@@ -772,12 +772,12 @@ class Doublet(object):
 		self.beamSt2.append(beamRefTr2.copy())
 		stime1 = self.arr1[tphase]['UTC'] - cstime
 		etime1 = self.arr1[tphase]['UTC'] + cetime
-		rstime1 = self.arr1[rphase]['UTC'] - cstime
-		retime1 = self.arr1[rphase]['UTC'] + cetime
+		rstime1 = self.arr1[rphase]['UTC'] - rstime
+		retime1 = self.arr1[rphase]['UTC'] + retime
 		stime2 = self.arr2[tphase]['UTC'] - cstime
 		etime2 = self.arr2[tphase]['UTC'] + cetime
-		rstime2 = self.arr2[rphase]['UTC'] - cstime
-		retime2 = self.arr2[rphase]['UTC'] + cetime
+		rstime2 = self.arr2[rphase]['UTC'] - rstime
+		retime2 = self.arr2[rphase]['UTC'] + retime
 		beamTr1.trim(starttime=stime1, endtime=etime1)
 		beamRefTr1.trim(starttime=rstime1, endtime=retime1)
 		beamTr2.trim(starttime=stime2, endtime=etime2)
@@ -802,11 +802,13 @@ class Doublet(object):
 			if ind == 0:
 				stime1 = self.arr1[tphase]['UTC'] + thiftBT
 				stime2 = self.arr2[tphase]['UTC'] - cstime
+				tr1.trim(starttime=stime1, endtime=stime1+cstime+cetime)
+				tr2.trim(starttime=stime2, endtime=stime2+cstime+cetime)
 			elif ind == 1:
 				stime1 = self.arr1[rphase]['UTC'] + thiftBT
-				stime2 = self.arr2[rphase]['UTC'] - cstime
-			tr1.trim(starttime=stime1, endtime=stime1+cstime+cetime)
-			tr2.trim(starttime=stime2, endtime=stime2+cstime+cetime)
+				stime2 = self.arr2[rphase]['UTC'] - rstime
+				tr1.trim(starttime=stime1, endtime=stime1+rstime+retime)
+				tr2.trim(starttime=stime2, endtime=stime2+rstime+retime)
 		use_st1, use_st2 = self._resample(use_st1, use_st2, delta, method, npts)
 		Mptd1 = np.zeros([2, npts])
 		Mptd2 = np.zeros([2, npts])
