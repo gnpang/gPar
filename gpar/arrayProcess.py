@@ -715,7 +715,7 @@ class Doublet(object):
 					cstime=20, cetime=20,method='resample', delta=0.01,
 					channel='SHZ',retime=10,rstime=60,
 					step=0.05, steplen=2,dv=0.02,nbtrial=401,
-					stret_method='resample'
+					stret_method='resample',
 					**kwargs):
 		# if not hasattr(self, 'rap1') or not hasattr(self, 'rap2'):
 		# 	msg = "Ray parameters are not defined, calculating ray parameters"
