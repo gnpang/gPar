@@ -2081,12 +2081,15 @@ def _resample(st1, st2,resample, method, npts):
 def stretching(x,y,t_x,t_y,delta, t0_x,t0_y, win, dv_range=0.02,nbtrial=401):
 
 	# st=np.arange(0.5,4,0.1)
-
+	print("-------")
+	print(len(x))
+	print(len(y))
 	st = 1 + np.linspace(-np.abs(dv_range),np.abs(dv_range),nbtrial)
 	n=len(y)
 	sind = int((t0_x - t_x[0])/delta) + 1
 	npts = int(win/delta) + 1
 	xi = x[sind: sind+npts]
+	print(len(xi))
 	xi = xi[np.newaxis,:].repeat(len(st), axis=0)
 
 	ks = np.arange(npts)
