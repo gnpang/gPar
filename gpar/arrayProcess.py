@@ -832,19 +832,13 @@ class Doublet(object):
 
 		ttr1.trim(starttime=stime1, endtime=stime1 + cstime + cetime)
 		ttr2.trim(starttime=stime2, endtime=stime2 + cstime + cetime)
-		npts = int((cetime + cstime)/delta) + 1
-		tst1, tst2 = self._resample(tst1, tst2, delta, method, npts)
-		print(tst1[0].stats)
-		print(tst2[0].stats)
 
 		stime1 = self.arr1[rphase]['UTC'] + r_shift
 		stime2 = self.arr2[rphase]['UTC'] - rstime
 
 		rtr1.trim(starttime=stime1, endtime=stime1 + rstime + retime)
 		rtr2.trim(starttime=stime2, endtime=stime2 + rstime + retime)
-		npts = int((retime + rstime)/delta) + 1
-		rst1, rst2 = self._resample(rst1, rst2, delta, method, npts)
-
+		
 		tst1 = obspy.core.stream.Stream()
 		tst2 = obspy.core.stream.Stream()
 		rst1 = obspy.core.stream.Stream()
@@ -852,9 +846,14 @@ class Doublet(object):
 		
 		tst1.append(ttr1)
 		tst2.append(ttr2)
+		npts = int((cetime + cstime)/delta) + 1
+		tst1, tst2 = self._resample(tst1, tst2, delta, method, npts)
 
 		rst1.append(rtr1)
 		rst2.append(rtr2)
+		npts = int((retime + rstime)/delta) + 1
+		rst1, rst2 = self._resample(rst1, rst2, delta, method, npts)
+
 		npts = int(steplen / delta)
 		target_ts = []
 		target_cc = []
@@ -930,12 +929,12 @@ class Doublet(object):
 			t2 = self.arr2[phase[ind]]['TT'] - tstart[ind] + np.arange(len(data2))*delta2
 			ax[0,ind].plot(t1, data1, 'b', linewidth=0.5)
 			ax[0,ind].plot(t2, data2, 'r-.', linewidth=0.5)
-			ax[0,ind].axvline(x=self.arr2[phase[ind]]['TT'], c='k')
+			# ax[0,ind].axvline(x=self.arr2[phase[ind]]['TT'], c='k')
 			ax[0,ind].set_xlim([np.min(t1), np.max(t1)])
 			# ttaup = taups[0]
 			ts = self.arr2[phase[ind]]['TT'] - tstart[ind] + np.arange(len(taups[ind])) * step
 			ax[1,ind].plot(ts, taups[ind], linewidth=0.5)
-			ax[1,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
+			# ax[1,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
 			ax[1,ind].set_ylim([-2, 2])
 			# ax[1,0].set_ylabel('Taup')
 			ax[2,ind].plot(ts, ccs[ind], linewidth=0.5)
@@ -943,8 +942,8 @@ class Doublet(object):
 			ax[2,ind].set_ylim([0, 1])
 
 			ax[3,ind].plot(ts, dvs[ind], linewidth=0.5)
-			ax[3,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
-			ax[3,ind].set_ylim([0, 1])
+			# ax[3,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
+			ax[3,ind].set_ylim([-0.02, 0.02])
 		# ax[2,0].set_ylabel('CC')
 
 		# plt.title('Doublet %s: \n%s-%s\nDistance: %.2f\nMax CC %.3f - TimeShift %.4f'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL'],self.ccmax, taup))
@@ -2083,15 +2082,11 @@ def _resample(st1, st2,resample, method, npts):
 def stretching(x,y,t_x,t_y,delta, t0_x,t0_y, win, dv_range=0.02,nbtrial=401):
 
 	# st=np.arange(0.5,4,0.1)
-	print("-------")
-	print(len(x))
-	print(len(y))
 	st = 1 + np.linspace(-np.abs(dv_range),np.abs(dv_range),nbtrial)
 	n=len(y)
 	sind = int((t0_x - t_x[0])/delta) + 1
 	npts = int(win/delta) + 1
 	xi = x[sind: sind+npts]
-	print(len(xi))
 	xi = xi[np.newaxis,:].repeat(len(st), axis=0)
 
 	ks = np.arange(npts)
