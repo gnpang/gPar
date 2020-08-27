@@ -938,12 +938,12 @@ class Doublet(object):
 			ax[1,ind].set_ylim([-2, 2])
 			# ax[1,0].set_ylabel('Taup')
 			ax[2,ind].plot(ts, ccs[ind], linewidth=0.5)
-			ax[2,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
+			# ax[2,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
 			ax[2,ind].set_ylim([0, 1])
 
 			ax[3,ind].plot(ts, dvs[ind], linewidth=0.5)
 			# ax[3,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
-			ax[3,ind].set_ylim([-0.02, 0.02])
+			ax[3,ind].set_ylim([-0.021, 0.021])
 		# ax[2,0].set_ylabel('CC')
 
 		# plt.title('Doublet %s: \n%s-%s\nDistance: %.2f\nMax CC %.3f - TimeShift %.4f'%(self.ID, self.ev1['TIME'], self.ev2['TIME'], self.dis['DEL'],self.ccmax, taup))
