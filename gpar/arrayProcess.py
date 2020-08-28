@@ -1048,7 +1048,7 @@ class Doublet(object):
 		self.dv = dvs
 
 		tpts = len(taup)
-		ts = self.arr1[self.tphase]['TT'] + np.arange(tpts) * step - cstime
+		ts = self.arr2[self.tphase]['TT'] + np.arange(tpts) * step - cstime
 		self.ts = ts
 
 		if not self.ref_qual:
@@ -1080,7 +1080,7 @@ class Doublet(object):
 		self.ref_cc = ref_cc
 		self.ref_dv = ref_dv
 
-		ts = self.arr1[self.rphase]['TT'] + np.arange(len(ref_taup))*step - rstime
+		ts = self.arr2[self.rphase]['TT'] + np.arange(len(ref_taup))*step - rstime
 		self.ref_ts = ts
 
 	def updateFilter(self, filt, rstime=100, retime=300,
