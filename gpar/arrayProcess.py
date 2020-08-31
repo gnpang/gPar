@@ -1085,13 +1085,14 @@ class Doublet(object):
 
 	def updateFilter(self, filt, rstime=100, retime=300,
 					cstime=20.0, cetime=20.0, tshift=5,
-					winlen=None, step=None):
+					winlen=None, step=None,dv=0.02, nbtrial=401):
 		self._alignWave(filt=filt,delta=self.delta,
 						cstime=cstime,cetime=cetime,
 						rstime=rstime,retime=retime,
 						threshold=self.threshold,
 						cut=self.cut,tshift=tshift)
-		self.codaInter(delta=None, winlen=winlen, step=step,starttime=starttime)
+		self.codaInter(delta=None, winlen=winlen, step=step,cstime=cstime,
+					   rstime=rstime,dv=dv,nbtrial=nbtrial)
 
 	def plotCoda(self,cstime=20, cetime=10,
 				 sta_id='CN.YKR9..SHZ',
