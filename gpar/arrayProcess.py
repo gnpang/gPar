@@ -1990,9 +1990,8 @@ def cutWaveForm(st1, st2,delta,
 	tmp_st1 = nst1.copy().trim(starttime=stime1, endtime=etime1)
 	tmp_st2 = nst2.copy().trim(starttime=stime2, endtime=etime2)
 	if tmp_st1 == None or tmp_st2 == None:
-		msg = ('Data is empty for doublet %s'%self.ID)
+		msg = ('Data is empty for doublet %s-%s'%(arr1,arr2))
 		gpar.log(__name__, msg, level='warning',pri=True)
-		self._qual = False
 		return None
 
 	npts = int((cetime+cstime)/delta) + 1
@@ -2005,7 +2004,7 @@ def cutWaveForm(st1, st2,delta,
 
 	for ind, tr1, tr2, in zip_longest(inds, tmp_st1, tmp_st2):
 		if tr1.stats.station != tr2.stats.station:
-			msg = ('Orders of the traces are not right for Doublet %s'%self.ID)
+			msg = ('Orders of the traces are not right for Doublet %s-%s'%,(arr1, arr2))
 			gpar.log(__name__, msg, level='warning',pri=True)
 			return None
 		data1 = tr1.data
