@@ -996,6 +996,7 @@ class Doublet(object):
 				fittype, cut,tshift)
 
 			if rdata != None:
+				print(rdata)
 				self.ref_st1 = rdata[0]
 				self.ref_st2 = rdata[1]
 				self.ref_time = arr1 + rdata[2]
