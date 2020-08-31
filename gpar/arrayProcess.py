@@ -2004,7 +2004,7 @@ def cutWaveForm(st1, st2,delta,
 
 	for ind, tr1, tr2, in zip_longest(inds, tmp_st1, tmp_st2):
 		if tr1.stats.station != tr2.stats.station:
-			msg = ('Orders of the traces are not right for Doublet %s-%s'%,(arr1, arr2))
+			msg = ('Orders of the traces are not right for Doublet %s-%s'%(arr1, arr2))
 			gpar.log(__name__, msg, level='warning',pri=True)
 			return None
 		data1 = tr1.data
