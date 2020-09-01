@@ -1951,13 +1951,13 @@ def cutWaveForm(st1, st2,delta,
 
 	tmp_st1.trim(starttime=stime1, endtime=etime1)
 	if len(tmp_st1) == 0:
-		msg = ('Earthquake %s does not have waveform in %s period'%(self.ev1['TIME'], arr1))
+		msg = ('Earthquake does not have waveform in %s period'%(arr1))
 		gpar.log(__name__, msg, level='warning', pri=True)
 		return None
 
 	tmp_st2.trim(starttime=stime2, endtime=etime2)
 	if len(tmp_st2) == 0:
-		msg = ('Earthquake %s does not have waveform in %s period'%(self.ev2['TIME'], arr2))
+		msg = ('Earthquake does not have waveform in %s period'%(arr2))
 		gpar.log(__name__, msg, level='warning', pri=True)
 		return None
 
