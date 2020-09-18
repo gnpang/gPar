@@ -911,20 +911,26 @@ class Doublet(object):
 		st2 = self.beamSt2.copy()
 		phase = [self.tphase, self.rphase]
 		taups = [self.ttaup, self.rtaup]
+		t_point = steplen/2
+		twin = len(self.ttaup) * step + t_point
+		rwin = len(self.rtaup) * step + t_point
+		win_len = [twin, rwin]
 		ccs = [self.tcc, self.rcc]
 		dvs = [self.tdv, self.rdv]
 		for ind in range(2):
 			tr1 = st1[ind].copy()
 			thiftBT = -tstart[ind]-taup[ind]
 			stime = self.arr1[phase[ind]]['UTC'] + thiftBT
-			tr1.trim(starttime=stime, endtime=stime+tstart[ind]+tend[ind])
-			
+			tr1.trim(starttime=stime, endtime=stime+win_len[ind])
 			tr2 = st2[ind].copy()
-			tr2.trim(starttime=self.arr2[phase[ind]]['UTC']-tstart[ind], endtime=self.arr2[phase[ind]]['UTC']+tend[ind])
+			stime2 = self.arr2[phase[ind]]['UTC']-tstart[ind]
+			tr2.trim(starttime=stime2, endtime=stime2+win_len[ind])
 			delta1 = tr1.stats.delta
+			n_ind1 = -int(1.0/delta1)
 			delta2 = tr2.stats.delta
-			data1 = tr1.data/np.max(np.absolute(tr1.data))
-			data2 = tr2.data/np.max(np.absolute(tr2.data))
+			n_ind2 = -int(1.0/delta2)
+			data1 = tr1.data/np.max(np.absolute(tr1.data[:n_ind1]))
+			data2 = tr2.data/np.max(np.absolute(tr2.data[:n_ind2]))
 			t1 = self.arr2[phase[ind]]['TT'] - tstart[ind] + np.arange(len(data1))*delta1
 			t2 = self.arr2[phase[ind]]['TT'] - tstart[ind] + np.arange(len(data2))*delta2
 			ax[0,ind].plot(t1, data1, 'b', linewidth=0.5)
@@ -932,7 +938,7 @@ class Doublet(object):
 			# ax[0,ind].axvline(x=self.arr2[phase[ind]]['TT'], c='k')
 			ax[0,ind].set_xlim([np.min(t1), np.max(t1)])
 			# ttaup = taups[0]
-			ts = self.arr2[phase[ind]]['TT'] - tstart[ind] + np.arange(len(taups[ind])) * step
+			ts = self.arr2[phase[ind]]['TT'] - tstart[ind] + np.arange(len(taups[ind])) * step + t_point
 			ax[1,ind].plot(ts, taups[ind], linewidth=0.5)
 			# ax[1,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
 			ax[1,ind].set_ylim([-2, 2])
