@@ -692,7 +692,10 @@ class Doublet(object):
 			times = {'UTC':self.ev1['TIME'] + a.time,
 					 'TT':a.time,
 					 'RP':a.ray_param_sec_degree}
-			pha1[pha] = times
+			if pha in pha1:
+				pha1[pha].append(times)
+			else:
+				pha1[pha] = [times]
 		self.arr1 = pha1
 		arr2 = model.get_travel_times_geo(source_depth_in_km=self.ev2['DEP'],source_latitude_in_deg=self.ev2['LAT'],
 										  source_longitude_in_deg=self.ev2['LON'],phase_list=phase,
@@ -704,7 +707,11 @@ class Doublet(object):
 			times = {'UTC':self.ev2['TIME'] + a.time,
 					 'TT':a.time,
 					 'RP':a.ray_param_sec_degree}
-			pha2[pha] = times
+
+			if pha in pha2:
+				pha2[pha].append(times)
+			else:
+				pha2[pha] = [times]
 		self.arr2 = pha2
 		# msg = ('Travel time for %s for earthquake %s in depth of %.2f in distance of %.2f is %s' % (phase, self.ID, self.dep, self.dis, self.arrival))
 
@@ -723,8 +730,8 @@ class Doublet(object):
 		# 	self.getArrival(array=kwargs['array'],phase=kwargs['beamphase'],model=kwargs['model'])
 		tphase = self.tphase
 		rphase = self.rphase
-		tRayp = self.arr1[tphase]['RP']
-		rRayp = self.arr1[rphase]['RP']
+		tRayp = self.arr1[tphase][0]['RP']
+		rRayp = self.arr1[rphase][0]['RP']
 		self.cstime = cstime
 		self.cetime = cetime 
 		self.rstime = rstime 
@@ -774,14 +781,14 @@ class Doublet(object):
 		self.beamSt2 = obspy.core.stream.Stream()
 		self.beamSt2.append(beamTr2.copy())
 		self.beamSt2.append(beamRefTr2.copy())
-		stime1 = self.arr1[tphase]['UTC'] - cstime
-		etime1 = self.arr1[tphase]['UTC'] + cetime
-		rstime1 = self.arr1[rphase]['UTC'] - rstime
-		retime1 = self.arr1[rphase]['UTC'] + retime
-		stime2 = self.arr2[tphase]['UTC'] - cstime
-		etime2 = self.arr2[tphase]['UTC'] + cetime
-		rstime2 = self.arr2[rphase]['UTC'] - rstime
-		retime2 = self.arr2[rphase]['UTC'] + retime
+		stime1 = self.arr1[tphase][0]['UTC'] - cstime
+		etime1 = self.arr1[tphase][0]['UTC'] + cetime
+		rstime1 = self.arr1[rphase][0]['UTC'] - rstime
+		retime1 = self.arr1[rphase][0]['UTC'] + retime
+		stime2 = self.arr2[tphase][0]['UTC'] - cstime
+		etime2 = self.arr2[tphase][0]['UTC'] + cetime
+		rstime2 = self.arr2[rphase][0]['UTC'] - rstime
+		retime2 = self.arr2[rphase][0]['UTC'] + retime
 		tst1 = obspy.core.stream.Stream()
 		tst2 = obspy.core.stream.Stream()
 		rst1 = obspy.core.stream.Stream()
@@ -830,14 +837,14 @@ class Doublet(object):
 		t_shift = -cstime - taups[0]
 		r_shift = -rstime - taups[1]
 
-		stime1 = self.arr1[tphase]['UTC'] + t_shift
-		stime2 = self.arr2[tphase]['UTC'] - cstime 
+		stime1 = self.arr1[tphase][0]['UTC'] + t_shift
+		stime2 = self.arr2[tphase][0]['UTC'] - cstime 
 
 		ttr1.trim(starttime=stime1, endtime=stime1 + cstime + cetime)
 		ttr2.trim(starttime=stime2, endtime=stime2 + cstime + cetime)
 
-		stime1 = self.arr1[rphase]['UTC'] + r_shift
-		stime2 = self.arr2[rphase]['UTC'] - rstime
+		stime1 = self.arr1[rphase][0]['UTC'] + r_shift
+		stime2 = self.arr2[rphase][0]['UTC'] - rstime
 
 		rtr1.trim(starttime=stime1, endtime=stime1 + rstime + retime)
 		rtr2.trim(starttime=stime2, endtime=stime2 + rstime + retime)
@@ -924,10 +931,10 @@ class Doublet(object):
 		for ind in range(2):
 			tr1 = st1[ind].copy()
 			thiftBT = -tstart[ind]-taup[ind]
-			stime = self.arr1[phase[ind]]['UTC'] + thiftBT
+			stime = self.arr1[phase[ind]][0]['UTC'] + thiftBT
 			tr1.trim(starttime=stime, endtime=stime+win_len[ind])
 			tr2 = st2[ind].copy()
-			stime2 = self.arr2[phase[ind]]['UTC']-tstart[ind]
+			stime2 = self.arr2[phase[ind]][0]['UTC']-tstart[ind]
 			tr2.trim(starttime=stime2, endtime=stime2+win_len[ind])
 			delta1 = tr1.stats.delta
 			n_ind1 = -int(1.0/delta1)
@@ -935,14 +942,14 @@ class Doublet(object):
 			n_ind2 = -int(1.0/delta2)
 			data1 = tr1.data/np.max(np.absolute(tr1.data[:n_ind1]))
 			data2 = tr2.data/np.max(np.absolute(tr2.data[:n_ind2]))
-			t1 = self.arr2[phase[ind]]['TT'] - tstart[ind] + np.arange(len(data1))*delta1
-			t2 = self.arr2[phase[ind]]['TT'] - tstart[ind] + np.arange(len(data2))*delta2
+			t1 = self.arr2[phase[ind]][0]['TT'] - tstart[ind] + np.arange(len(data1))*delta1
+			t2 = self.arr2[phase[ind]][0]['TT'] - tstart[ind] + np.arange(len(data2))*delta2
 			ax[0,ind].plot(t1, data1, 'b', linewidth=0.5)
 			ax[0,ind].plot(t2, data2, 'r-.', linewidth=0.5)
 			# ax[0,ind].axvline(x=self.arr2[phase[ind]]['TT'], c='k')
 			ax[0,ind].set_xlim([np.min(t1), np.max(t1)])
 			# ttaup = taups[0]
-			ts = self.arr2[phase[ind]]['TT'] - tstart[ind] + np.arange(len(taups[ind])) * step + t_point
+			ts = self.arr2[phase[ind]][0]['TT'] - tstart[ind] + np.arange(len(taups[ind])) * step + t_point
 			ax[1,ind].plot(ts, taups[ind], linewidth=0.5)
 			# ax[1,ind].axvline(x=self.arr2[phase[ind]]['TT'],c='k')
 			ax[1,ind].set_ylim([-2, 2])
@@ -981,8 +988,8 @@ class Doublet(object):
 		tphase = self.tphase
 		tmp_st1 = self.st1.copy()
 		tmp_st2 = self.st2.copy()
-		arr1 = self.arr1[tphase]['UTC']
-		arr2 = self.arr2[tphase]['UTC']
+		arr1 = self.arr1[tphase][0]['UTC']
+		arr2 = self.arr2[tphase][0]['UTC']
 		data = cutWaveForm(tmp_st1, tmp_st2, delta,
 						   arr1, arr2, cstime, cetime,
 						   filt,threshold,method,domain,
@@ -997,8 +1004,8 @@ class Doublet(object):
 			self._qual=True
 			rphase = self.rphase
 
-			arr1 = self.arr1[rphase]['UTC']
-			arr2 = self.arr2[rphase]['UTC']
+			arr1 = self.arr1[rphase][0]['UTC']
+			arr2 = self.arr2[rphase][0]['UTC']
 
 			rdata = cutWaveForm(tmp_st1, tmp_st2,delta,
 				arr1, arr2, rstime, retime,
@@ -1058,7 +1065,7 @@ class Doublet(object):
 		self.dv = dvs
 
 		tpts = len(taup)
-		ts = self.arr2[self.tphase]['TT'] + np.arange(tpts) * step - cstime
+		ts = self.arr2[self.tphase][0]['TT'] + np.arange(tpts) * step - cstime
 		self.ts = ts
 
 		if not self.ref_qual:
@@ -1090,7 +1097,7 @@ class Doublet(object):
 		self.ref_cc = ref_cc
 		self.ref_dv = ref_dv
 
-		ts = self.arr2[self.rphase]['TT'] + np.arange(len(ref_taup))*step - rstime
+		ts = self.arr2[self.rphase][0]['TT'] + np.arange(len(ref_taup))*step - rstime
 		self.ref_ts = ts
 
 	def updateFilter(self, filt, rstime=100, retime=300,
@@ -1116,7 +1123,7 @@ class Doublet(object):
 		# ax.subplot(5,1,1)
 		ax[0,0].set_title(self.tphase)
 		ax[0,1].set_title(self.rphase)
-		TTs = [self.arr2[self.tphase]['TT'], self.arr2[self.rphase]['TT']]
+		TTs = [self.arr2[self.tphase][0]['TT'], self.arr2[self.rphase][0]['TT']]
 		# tlim = [TTs[0]-stime-, TTs[0]+etime-10]
 		tlim = [np.min(self.ts), np.max(self.ts)]
 		st1 = self.use_st1.copy()
@@ -1124,8 +1131,8 @@ class Doublet(object):
 		tr1 = st1.select(id=sta_id).copy()[0]
 		tr2 = st2.select(id=sta_id).copy()[0]
 		_ts = self.align[self.align.STA==sta_id].TS.iloc[0]
-		tr1.trim(starttime=self.arr1[self.tphase]['UTC']-cstime-_ts, endtime=self.arr1[self.tphase]['UTC']+cetime-_ts)
-		tr2.trim(starttime=self.arr2[self.tphase]['UTC']-cstime, endtime=self.arr2[self.tphase]['UTC']+cetime)
+		tr1.trim(starttime=self.arr1[self.tphase][0]['UTC']-cstime-_ts, endtime=self.arr1[self.tphase][0]['UTC']+cetime-_ts)
+		tr2.trim(starttime=self.arr2[self.tphase][0]['UTC']-cstime, endtime=self.arr2[self.tphase][0]['UTC']+cetime)
 		data1 = tr1.data / np.max(np.absolute(tr1.data))
 		data2 = tr2.data / np.max(np.absolute(tr2.data))
 		t1 = TTs[0] - cstime + np.arange(len(data1)) * tr1.stats.delta
@@ -1134,7 +1141,7 @@ class Doublet(object):
 		ax[0,0].plot(t2, data2, 'r-.', linewidth=0.5)
 		ax[0,0].axvline(TTs[0], c='r',linewidth=0.5)
 		if aphase != None and self.arr2.get(aphase) != None:
-			ax[0,0].axvline(self.arr2[aphase]['TT'], c='g', linewidth=0.5)
+			ax[0,0].axvline(self.arr2[aphase][0]['TT'], c='g', linewidth=0.5)
 		# plt.xlabel('Time (s)')
 		ax[0,0].set_ylabel('Amp')
 		ax[0,0].set_ylim([-1,1])
@@ -1145,7 +1152,7 @@ class Doublet(object):
 		ax[1,0].axvline(TTs[0], c='r',linewidth=0.5, linestyle='-.')
 		# ax[0,1].axvline(TTs[1], c='b',linewidth=0.5, linestyle='-.')
 		if aphase != None and self.arr2.get(aphase) != None:
-			ax[1,0].axvline(self.arr2[aphase]['TT'], c='g', linewidth=0.5)
+			ax[1,0].axvline(self.arr2[aphase][0]['TT'], c='g', linewidth=0.5)
 		ax[1,0].set_ylim([0, 1])
 		ax[1,0].set_xlim(tlim)
 		ax[1,0].set_ylabel('CC')
@@ -1154,7 +1161,7 @@ class Doublet(object):
 		ax[2,0].axvline(TTs[0], c='r',linewidth=0.5, linestyle='-.')
 		# ax[0,2].axvline(TTs[1], c='b',linewidth=0.5, linestyle='-.')
 		if aphase != None and self.arr2.get(aphase) != None:
-			ax[2,0].axvline(self.arr2[aphase]['TT'], c='g', linewidth=0.5)
+			ax[2,0].axvline(self.arr2[aphase][0]['TT'], c='g', linewidth=0.5)
 		ax[2,0].set_ylabel('Tau')
 		ax[2,0].set_ylim([-1,1])
 		ax[2,0].set_xlim(tlim)
@@ -1171,8 +1178,8 @@ class Doublet(object):
 			tr1 = st1.select(id=ref_sta_id).copy()[0]
 			tr2 = st2.select(id=ref_sta_id).copy()[0]
 			_ts = self.ref_align[self.ref_align.STA==ref_sta_id].TS.iloc[0]
-			tr1.trim(starttime=self.arr1[self.rphase]['UTC']-rstime-_ts, endtime=self.arr1[self.rphase]['UTC']+retime-_ts)
-			tr2.trim(starttime=self.arr2[self.rphase]['UTC']-rstime, endtime=self.arr2[self.rphase]['UTC']+retime)
+			tr1.trim(starttime=self.arr1[self.rphase][0]['UTC']-rstime-_ts, endtime=self.arr1[self.rphase][0]['UTC']+retime-_ts)
+			tr2.trim(starttime=self.arr2[self.rphase][0]['UTC']-rstime, endtime=self.arr2[self.rphase][0]['UTC']+retime)
 			data1 = tr1.data / np.max(np.absolute(tr1.data))
 			data2 = tr2.data / np.max(np.absolute(tr2.data))
 			t1 = TTs[1] - rstime + np.arange(len(data1)) * tr1.stats.delta
