@@ -725,7 +725,10 @@ class Doublet(object):
 		rphase = self.rphase
 		tRayp = self.arr1[tphase]['RP']
 		rRayp = self.arr1[rphase]['RP']
-
+		self.cstime = cstime
+		self.cetime = cetime 
+		self.rstime = rstime 
+		self.retime = retime
 
 		tsDF = getTimeShift(tRayp, self.dis['bakAzi'], geometry, unit=unit)
 		refDF = getTimeShift(rRayp, self.dis['bakAzi'], geometry, unit=unit)
@@ -890,8 +893,7 @@ class Doublet(object):
 	
 
 	def plotBeam(self,delta=0.01, 
-				 tstart=[20,20], tend=[20,60], 
-				 step=0.05, steplen=2, 
+				 step=0.05, steplen=3, 
 				 savefig=True):
 
 		fig, ax = plt.subplots(4, 2, sharey='row', sharex='col',figsize=(6.4, 7.2),constrained_layout=True)
@@ -917,6 +919,8 @@ class Doublet(object):
 		win_len = [twin, rwin]
 		ccs = [self.tcc, self.rcc]
 		dvs = [self.tdv, self.rdv]
+		tstart = [self.cstime, self.rstime]
+		tend = [self.rstime, self.retime]
 		for ind in range(2):
 			tr1 = st1[ind].copy()
 			thiftBT = -tstart[ind]-taup[ind]
