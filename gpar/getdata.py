@@ -485,6 +485,7 @@ def _loadDirectoryData(arrayName, df, mode,minlen,verb,channel='Z'):
 	staDf = pd.DataFrame(columns=['STA', 'LAT', 'LON'])
 	if mode == 'eq':
 		stream = [''] * len(df)
+		numtr = [''] * len(df)
 	elif mode == 'db':
 		stream1 = [''] * len(df)
 		stream2 = [''] * len(df)
@@ -530,6 +531,10 @@ def _loadDirectoryData(arrayName, df, mode,minlen,verb,channel='Z'):
 				st = None
 			st = _checkData(st,minlen)
 			stream[ind] = st
+			if st == None:
+				numtr[ind] = 0
+			else:
+				numtr[ind] = len(st)
 		elif mode == 'db':
 			if verb:
 				print('loading data %s: %s'%(arrayName, eve.DoubleID))
@@ -563,6 +568,7 @@ def _loadDirectoryData(arrayName, df, mode,minlen,verb,channel='Z'):
 			stream2[ind] = st2
 	if mode == 'eq':
 		df['Stream'] = stream
+		df['NTR'] = numtr
 	elif mode == 'db':
 		df['ST1'] = stream1
 		df['ST2'] = stream2

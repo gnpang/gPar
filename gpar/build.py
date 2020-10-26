@@ -67,6 +67,7 @@ def createArray(arrayList='array.list',
 				mode='eq',
 				minlen=1500,
 				tshift=5,
+				cut=5,
 				phase_list=['P','PP','PcP','ScP','PKiKP','SP','ScS'],
 				verb=False,
 				**kwargs):
@@ -108,6 +109,8 @@ def createArray(arrayList='array.list',
 			gpar.log(__name__, msg, level='warning', pri=True)
 			continue
 		if mode == 'eq':
+			eqdf = eqdf[eqdf.NTR >= cut]
+			eqdf.reset_index(drop=True, inplace=True)
 			array = gpar.arrayProcess.Array(row.NAME,refpoint,eqdf, stadf, coordsys,beamphase, isDoublet=False,phase_list=phase_list)
 
 			if calTime:
@@ -139,7 +142,7 @@ def createArray(arrayList='array.list',
 											isDoublet=True,rstime=kwargs['rstime'],retime=kwargs['retime'],
 											cstime=kwargs['cstime'], cetime=kwargs['cetime'],rphase=kwargs['rphase'],
 											filt=kwargs['filt'],domain=kwargs['domain'],fittype=kwargs['fittype'],
-											threshold=kwargs['threshold'], cut=kwargs['cut'],tshift=tshift)
+											threshold=kwargs['threshold'], cut=cut,tshift=tshift)
 		if save:
 			array.write()
 
