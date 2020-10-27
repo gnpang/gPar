@@ -212,8 +212,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 
 		self.codacb.setMaximumWidth(100)
 		self.codacb.setMinimumWidth(80)
-		self.ampmin = QDoubleSpinBox(decimals=1, maximum=5, minimum=0, singleStep=.5, value=1)
-		self.ampmax = QDoubleSpinBox(decimals=1, maximum=5, minimum=0, singleStep=.5, value=3)
+		self.ampmin = QDoubleSpinBox(decimals=1, maximum=5, minimum=-2, singleStep=.5, value=1)
+		self.ampmax = QDoubleSpinBox(decimals=1, maximum=5, minimum=-2, singleStep=.5, value=3)
 		self.ampmin.valueChanged.connect(self._updatePlot)
 		self.ampmax.valueChanged.connect(self._updatePlot)
 		self.ampmin.setEnabled(False)
@@ -684,7 +684,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 					ax[_i, ind].set_xlim([np.min(time), np.max(time)])
 					if label == 'Amplitude':
 						peak = np.max(tr.data) + 1
-						ax[_i,ind].set_ylim([0, peak])
+						ax[_i,ind].set_ylim([-1, peak])
 					elif label == 'Slowness':
 						ax[_i,ind].set_ylim([0, 15])
 						rp = self._current_event.rayp
