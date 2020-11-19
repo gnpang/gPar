@@ -724,15 +724,15 @@ class glanceEQ(QtWidgets.QMainWindow):
 				# abspow = _row.POWER
 				name = _row.FILT
 				if self.vepcb.currentText() == 'log10':
-					abspow = np.log10(_row.POWER)
+					abspow = np.log10(np.abs(_row.POWER))
 				elif self.vepcb.currentText() == 'log':
-					abspow = np.log(_row.POWER)
+					abspow = np.log(np.abs(_row.POWER))
 				elif self.vepcb.currentText() == 'sqrt':
-					abspow = np.sqrt(_row.POWER)
+					abspow = np.sqrt(np.abs(_row.POWER))
 				else:
-					abspow = _row.POWER
+					abspow = np.abs(_row.POWER)
 				ax = self.fig.add_subplot(1, num, ind+1)
-				ax.imshow(abspow, extent=extent, aspect='auto', cmap='Reds', vmin=vmin, vmax=vmax)
+				ax.imshow(abspow, extent=extent, aspect='auto', cmap='Reds', vmin=vmin, vmax=vmax, origin='lower')
 				arrival = self._current_event.arrivals[self.beamphase]['TT']
 				ax.vlines(arrival, ax.get_ylim()[0],ax.get_ylim()[1],'k',label=self.beamphase)
 				rp = self._current_event.rayp
