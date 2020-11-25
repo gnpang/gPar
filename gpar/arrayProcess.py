@@ -840,14 +840,14 @@ class Doublet(object):
 		stime1 = self.arr1[tphase][0]['UTC'] + t_shift
 		stime2 = self.arr2[tphase][0]['UTC'] - cstime 
 
-		ttr1.trim(starttime=stime1, endtime=stime1 + cstime + cetime + steplen)
-		ttr2.trim(starttime=stime2, endtime=stime2 + cstime + cetime + steplen)
+		ttr1.trim(starttime=stime1, endtime=stime1 + cstime + cetime + steplen*2)
+		ttr2.trim(starttime=stime2, endtime=stime2 + cstime + cetime + steplen*2)
 
 		stime1 = self.arr1[rphase][0]['UTC'] + r_shift
 		stime2 = self.arr2[rphase][0]['UTC'] - rstime
 
-		rtr1.trim(starttime=stime1, endtime=stime1 + rstime + retime + steplen)
-		rtr2.trim(starttime=stime2, endtime=stime2 + rstime + retime + steplen)
+		rtr1.trim(starttime=stime1, endtime=stime1 + rstime + retime + steplen*2)
+		rtr2.trim(starttime=stime2, endtime=stime2 + rstime + retime + steplen*2)
 		
 		tst1 = obspy.core.stream.Stream()
 		tst2 = obspy.core.stream.Stream()
@@ -856,12 +856,12 @@ class Doublet(object):
 		
 		tst1.append(ttr1)
 		tst2.append(ttr2)
-		npts = int((cetime + cstime + steplen)/delta) + 1
+		npts = int((cetime + cstime + steplen*2)/delta) + 1
 		tst1, tst2 = self._resample(tst1, tst2, delta, method, npts)
 
 		rst1.append(rtr1)
 		rst2.append(rtr2)
-		npts = int((retime + rstime + steplen)/delta) + 1
+		npts = int((retime + rstime + steplen*2)/delta) + 1
 		rst1, rst2 = self._resample(rst1, rst2, delta, method, npts)
 
 		npts = int(steplen / delta)
@@ -936,9 +936,9 @@ class Doublet(object):
 			stime2 = self.arr2[phase[ind]][0]['UTC']-tstart[ind]
 			tr2.trim(starttime=stime2, endtime=stime2+win_len[ind])
 			delta1 = tr1.stats.delta
-			n_ind1 = -int(1.0/delta1)
+			n_ind1 = -int((1+steplen*2)/delta1)
 			delta2 = tr2.stats.delta
-			n_ind2 = -int(1.0/delta2)
+			n_ind2 = -int((1+steplen*2)/delta2)
 			data1 = tr1.data/np.max(np.absolute(tr1.data[:n_ind1]))
 			data2 = tr2.data/np.max(np.absolute(tr2.data[:n_ind2]))
 			t1 = self.arr2[phase[ind]][0]['TT'] - tstart[ind] + np.arange(len(data1))*delta1
