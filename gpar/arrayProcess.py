@@ -856,12 +856,12 @@ class Doublet(object):
 		
 		tst1.append(ttr1)
 		tst2.append(ttr2)
-		npts = int((cetime + cstime)/delta) + 1
+		npts = int((cetime + cstime + steplen)/delta) + 1
 		tst1, tst2 = self._resample(tst1, tst2, delta, method, npts)
 
 		rst1.append(rtr1)
 		rst2.append(rtr2)
-		npts = int((retime + rstime)/delta) + 1
+		npts = int((retime + rstime + steplen)/delta) + 1
 		rst1, rst2 = self._resample(rst1, rst2, delta, method, npts)
 
 		npts = int(steplen / delta)
