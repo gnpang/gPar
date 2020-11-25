@@ -721,7 +721,7 @@ class Doublet(object):
 					filt=[1, 3, 4, True], stack='linear', unit='deg',
 					cstime=20, cetime=20,method='resample', delta=0.01,
 					channel='SHZ',retime=10,rstime=60,
-					step=0.05, steplen=2,dv=0.02,nbtrial=401,
+					step=0.05, steplen=3,dv=0.02,nbtrial=401,
 					stret_method='resample',
 					**kwargs):
 		# if not hasattr(self, 'rap1') or not hasattr(self, 'rap2'):
@@ -840,14 +840,14 @@ class Doublet(object):
 		stime1 = self.arr1[tphase][0]['UTC'] + t_shift
 		stime2 = self.arr2[tphase][0]['UTC'] - cstime 
 
-		ttr1.trim(starttime=stime1, endtime=stime1 + cstime + cetime)
-		ttr2.trim(starttime=stime2, endtime=stime2 + cstime + cetime)
+		ttr1.trim(starttime=stime1, endtime=stime1 + cstime + cetime + steplen)
+		ttr2.trim(starttime=stime2, endtime=stime2 + cstime + cetime + steplen)
 
 		stime1 = self.arr1[rphase][0]['UTC'] + r_shift
 		stime2 = self.arr2[rphase][0]['UTC'] - rstime
 
-		rtr1.trim(starttime=stime1, endtime=stime1 + rstime + retime)
-		rtr2.trim(starttime=stime2, endtime=stime2 + rstime + retime)
+		rtr1.trim(starttime=stime1, endtime=stime1 + rstime + retime + steplen)
+		rtr2.trim(starttime=stime2, endtime=stime2 + rstime + retime + steplen)
 		
 		tst1 = obspy.core.stream.Stream()
 		tst2 = obspy.core.stream.Stream()
@@ -898,7 +898,6 @@ class Doublet(object):
 		self.tdv = t_dvs
 		self.rdv = r_dvs
 	
-
 	def plotBeam(self,delta=0.01, 
 				 step=0.05, steplen=3, 
 				 savefig=True):
@@ -975,6 +974,90 @@ class Doublet(object):
 			savename = self.ID + '.' + 'beam.eps'
 			plt.savefig(savename)
 			plt.close()
+
+	def slownessFK(self,geometry, grdpts_x=401, grdpts_y=401, 
+				   sll_x=-0.02, sll_y=-0.02, sl_s=0.0001,
+				   starttime=15, endtime=30, method=0, 
+				   prewhiten=0, freqmin=1, freqmax=3,
+				   unit='km', channel='SHZ',tphase='PKIKP'):
+		timeTable = getTimeTable(geometry, sll_x, sll_y, sl_s, grdpts_x, grdpts_x,unit=unit)
+		st1 = self.st1.copy()
+		st1 = st1.select(channel=channel)
+		st2 = self.st2.copy()
+		st2 = st2.select(channel=channel)
+		self.sll_x = sll_x
+		self.sll_y = sll_y
+		self.sl_s = sl_s
+		self.sphase = tphase
+		self.fk_stime = starttime
+		self.fk_etime = endtime 
+		ntr1 = len(st1)
+		ntr2 = len(st2)
+
+		win = starttime + endtime
+		arr1 = self.arr1[tphase][0]['UTC']
+		stime = arr1 - starttime 
+		etime = arr1 + endtime
+		st1.trim(starttime=stime, endtime=etime)
+		relpow1, abspow1 = fkslowness(st1, ntr1, timeTable, 
+									  sll_x=sll_x, sll_y=sll_y,
+									  sl_s=sl_s, grdpts_x=grdpts_x, grdpts_y=grdpts_y,
+									  freqmin=freqmin, freqmax=freqmax,
+									  starttime=0, endtime=win,
+									  prewhiten=prewhiten, method=method)
+		arr2 = self.arr2[tphase][0]['UTC']
+		stime = arr2 - starttime
+		etime = arr2 + endtime
+		st2.trim(starttime=stime, endtime=etime)
+		relpow2, abspow2 = fkslowness(st2, ntr2, timeTable, 
+									  sll_x=sll_x, sll_y=sll_y,
+									  sl_s=sl_s, grdpts_x=grdpts_x, grdpts_y=grdpts_y,
+									  freqmin=freqmin, freqmax=freqmax,
+									  starttime=0, endtime=win,
+									  prewhiten=prewhiten, method=method)
+		self.relpow1 = relpow1
+		self.relpow2 = relpow2
+		self.difpow = abspow1/abspow1.max() - abspow2/abspow2.max()
+		
+		self.abspow1 = abspow1
+		self.abspow2 = abspow2
+
+	def slantBeam(self, geometry, arrayName, grdpts=101, sll=-0.1, 
+				  filts={'filt_1':[1,2,3,True],'filt_2':[1,3,3,True]},
+				  stack='linear',sl_s=0.001,
+				  unit='km', starttime=15, 
+				  channel='SHZ', delta=0.01,
+				  endtime=30, tphase='PKIKP',**kwargs):
+
+		winlen = starttime + endtime 
+		st1 = self.st1.copy()
+		st2 = self.st2.copy()
+		st1 = st1.select(channel=channel)
+		st2 = st2.select(channel=channel)
+		st1.resample(sampling_rate=1.0/delta)
+		st2.resample(sampling_rate=1.0/delta)
+		winpts = int(winlen/delta) + 1
+		self.slantTime = delta * np.arange(winpts) - starttime
+		self.vstime = starttime
+		self.vetime = endtime
+		baz = self.dis['bakAzi']
+		arr1 = self.arr1[tphase][0]['UTC']
+		time1 = self.ev1['TIME']
+		stime = arr1 - starttime - time1
+		etime = arr1 + endtime  - time1
+		self.energy1 = slantBeam(st1, len(st1), delta,
+								 geometry, arrayName, grdpts,
+								 filts, stack, sl_s, 'slowness',
+								 sll, stime, etime, unit, bakAzimuth=baz)
+
+		arr2 = self.arr2[tphase][0]['UTC']
+		time2 = self.ev2['TIME']
+		stime = arr2 - starttime - time2
+		etime = arr2 + endtime  - time2
+		self.energy2 = slantBeam(st2, len(st2), delta,
+								 geometry, arrayName, grdpts,
+								 filts, stack, sl_s, 'slowness',
+								 sll, stime, etime, unit, bakAzimuth=baz)
 
 	def _alignWave(self,filt=[1, 3,4,True],delta=0.01,
 				   cstime=20.0, cetime=50.0, method='resample',
@@ -1239,7 +1322,7 @@ def getTimeShift(rayParameter,bakAzimuth,geometry,unit='deg'):
 		sy = sy/6370.0
 	else:
 		msg = ('Not valid input, must be one of deg, km or rad')
-		gapr.log(__name__,msg,level='error',pri=True,e=ValueError)
+		gpar.log(__name__,msg,level='error',pri=True,e=ValueError)
 
 
 	tsx = geometry.X * sx
@@ -1267,7 +1350,7 @@ def getTimeTable(geometry,sll_x=-15.0,sll_y=-15.0,sl_s=0.1,grdpts_x=301,grdpts_y
 		sy = sy/6370.0
 	else:
 		msg = ('Input not one of deg and rad, set unit as s/km')
-		gapr.log(__name__,msg,level='warning',pri=True)
+		gpar.log(__name__,msg,level='warning',pri=True)
 
 
 	mx = np.outer(geometry.X, sx)
@@ -1294,7 +1377,7 @@ def getSlantTime(geometry, grdpts=401, sl_s=0.1, sll_k=-20.0,vary='slowness',uni
 		rayParameter = kwargs['rayParameter']
 	else:
 		msg = ('Not valid input, must be one of slowness or theta\n')
-		gapr.log(__name__,msg,level='error',pri=True,e=ValueError)
+		gpar.log(__name__,msg,level='error',pri=True,e=ValueError)
 	if unit == 'deg':
 		sx = rayParameter * np.sin(bakAzimuth * deg2rad)
 		sx = sx/deg2km
@@ -1310,7 +1393,7 @@ def getSlantTime(geometry, grdpts=401, sl_s=0.1, sll_k=-20.0,vary='slowness',uni
 		sy = sy/6370.0
 	else:
 		msg = ('Not valid input, must be one of deg, km or rad')
-		gapr.log(__name__,msg,level='error',pri=True,e=ValueError)
+		gpar.log(__name__,msg,level='error',pri=True,e=ValueError)
 
 	tsx = np.outer(geometry.X, sx)
 	tsy = np.outer(geometry.Y, sy)
@@ -1541,6 +1624,71 @@ def fkBeam(stream, ntr, time_shift_table,
 	rel[3,:] = relpow
 
 	return rel
+
+def fkslowness(stream, ntr, time_shift_table,
+			   sll_x=-15, sll_y=-15, sl_s=0.1,
+			   grdpts_x=301, grdpts_y=301,
+			   freqmin=1, freqmax=3.0,
+			   starttime=1150, endtime=1200,
+			   prewhiten=0, method=0, **kwargs):
+	time_shift_table = time_shift_table.astype(np.float32)
+	res = []
+	spoint, _epoint = get_spoint(stream, starttime, endtime)
+	fs = stream[0].stats.sampling_rate
+	nsamp = int((endtime - starttime) * fs)
+	nfft = next_pow_2(nsamp)
+	deltaf = fs/float(nfft)
+	nlow = int(freqmin/deltaf + 0.5)
+	nhigh = int(freqmax/deltaf + 0.5)
+	nlow = max(1, nlow)
+	nhigh = min(nfft//2 - 1, nhigh)
+	nf = nhigh - nlow + 1
+	steer = np.empty((nf, grdpts_x, grdpts_y, ntr), dtype=np.complex128)
+	clibsignal.calcSteer(ntr, grdpts_x, grdpts_y, nf, nlow, deltaf, time_shift_table, steer)
+	_r = np.empty((nf, ntr, ntr), dtype=np.complex128)
+	ft = np.empty((ntr, nf), dtype=np.complex128)
+	tap = cosine_taper(nsamp, p=0.22)
+	abspow_map = np.empty((grdpts_x, grdpts_y), dtype=np.float64)
+	relpow_map = np.empty((grdpts_x, grdpts_y), dtype=np.float64)
+
+	try:
+		for i, tr in enumerate(stream):
+			dat = tr.data[spoint[i]: spoint[i]+nsamp]
+			dat = (dat - dat.mean()) * tap 
+			ft[i, :] = np.fft.rfft(dat,nfft)[nlow:nlow+nf]
+	except:
+		msg = 'Problem in existed data and can not do the DFFT'
+		gpar.log(__name__, msg, level='error', pri=True)
+
+	ft = np.ascontiguousarray(ft, np.complex128)
+	relpow_map.fill(0.)
+	abspow_map.fill(0.)
+
+	dpow = 0.0
+
+	for i in range(ntr):
+		for j in range(i, ntr):
+			_r[:, i, j] = ft[i,:] * ft[j,:].conj()
+			if method == 1:
+				_r[:, i, j] /= np.abs(_r[:, i, j].sum())
+			if i != j:
+				_r[:, j, i] = _r[:, i, j].conjugate()
+			else:
+				dpow += np.abs(_r[:, i, j].sum())
+	dpow *= ntr
+	if method == 1:
+		for n in range(nf):
+			_r[n, :, :] = np.linalg.pinv(_r[n, :, :], rcond=1e-6)
+	errcode = clibsignal.generalizedBeamformer(relpow_map, abspow_map, 
+													   steer, _r, ntr, prewhiten,
+            										   grdpts_x, grdpts_y, nf, dpow, method)
+
+	if errcode != 0:
+		msg = 'generalizedBeamforming exited with error %d'%(errcode)
+		gpar.log(__name__, msg, level='error', pri=True)
+
+	return relpow_map, abspow_map
+
 
 def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdpts_y=301,
 					filt=[1,2,4,True], sflag=1,stack='linear',
