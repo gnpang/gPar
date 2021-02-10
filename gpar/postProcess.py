@@ -1098,7 +1098,7 @@ class glanceEQ(QtWidgets.QMainWindow):
 		if formats not in ['png', 'pdf', 'ps', 'eps']:
 			formats = 'png'
 			filename += '.' +formats
-		self.fig.savefig(filename=filename, format=formats, dpi=72)
+		self.fig.savefig(filename)
 	def closeArray(self,event):
 
 		if len(self._stripDF) > 0 and self.savefile is None:
