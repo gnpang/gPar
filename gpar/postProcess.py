@@ -822,7 +822,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 						data = np.abs(scipy.signal.hilbert(self._current_beam[ind].data))[sind:sind+npts]
 						ax[0,ind].plot(time,np.log10(data),'k', label='beam')
 						data_coda = codaSt[ind].data
-						ax[0,ind].plot(time,np.log10(data_coda),'r', label='coda')
+						time_coda = stime + np.arange(len(data_coda)) * delta
+						ax[0,ind].plot(time_coda,np.log10(data_coda),'r', label='coda')
 						data_two = twoSt[ind].data
 						ax[0,ind].plot(data_time, data_two,'b', label='twoline')
 						ax[0,ind].set_xlim([stime, etime])
@@ -852,7 +853,8 @@ class glanceEQ(QtWidgets.QMainWindow):
 						data = np.abs(scipy.signal.hilbert(self._current_beam[ind].data))[sind:sind+npts]
 						ax[0,ind].plot(time,np.log10(data),'k', label='beam')
 						data_coda = codaSt[ind].data
-						ax[0,ind].plot(time,np.log10(data_coda),'r', label='coda')
+						time_coda = stime + np.arange(len(data_coda)) * delta
+						ax[0,ind].plot(time_coda,np.log10(data_coda),'r', label='coda')
 						ax[0,ind].set_xlim([stime, etime])
 						ax[0,ind].set_ylim([-1, 5])
 						ax[0,ind].set_xlabel('Seconds')
