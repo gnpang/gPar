@@ -617,8 +617,10 @@ def _checkData(st, minlen):
 			msg = ('Trace in station %s starting from %s is shrter than require, removing'%(stats.station, stats.starttime))
 			gpar.log(__name__, msg, level='info')
 			st.remove(tr)
-		if np.std(tr.data) < 0.1:
-			msg = ("Trace data for %s in station %s has std smaller than 0.1, removing" % (stats.starttime, tr.stats.station))
+		mdata = np.max(np.abs(tr.data))
+		tmp_data = tr.data / mdata
+		if np.std(tmp_data) < 0.000001:
+			msg = ("Trace data for %s in station %s has std near 0, removing" % (stats.starttime, tr.stats.station))
 			st.remove(tr)
 			gpar.log(__name__,msg,level='warning',e=ValueError)
 			continue
