@@ -90,7 +90,7 @@ def setupPackage():
 			'Intended Audience :: Geo-scientists',
 			'Topic :: Seismic array processing',
 			'License :: MIT License',
-			'Programming Language :: Python :: 2.7 :: C'],
+			'Programming Language :: Python :: 3.7 :: C'],
 		keywords = 'seismology array processing',
 		install_requires=['obspy >= 1.1.1', 'numpy', 'pandas >= 0.24.2',
 						  'matplotlib'],
