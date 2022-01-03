@@ -192,7 +192,7 @@ class Array(object):
 				  winlen=2.0,overlap=0.5,write=False, **kwargs):
 
 		for eq in self.events:
-			eq.slideBeam(geometry=self.geometry,timeTable=self.timeTable,arrayName=self.name,
+			eq.slideBeam(geometry=self.geometry,arrayName=self.name,
 						 grdpts_x=grdpts_x,grdpts_y=grdpts_y,
 						 filts=filts,
 						 sflag=sflag,stack=stack,
@@ -404,7 +404,7 @@ class Earthquake(object):
 		# etime = time.time()
 		# print(etime - stime)
 
-	def slideBeam(self,geometry,timeTable,arrayName,grdpts_x=301,grdpts_y=301,
+	def slideBeam(self,geometry,arrayName,grdpts_x=301,grdpts_y=301,
 					filts={'filt_1':[1,2,4,True],'filt_2':[2,4,4,True],'filt_3':[1,3,4,True]},
 					sflag=1,stack='linear',
 					sll_x=-15.0,sll_y=-15.0,sl_s=0.3,refine=True,
@@ -416,8 +416,6 @@ class Earthquake(object):
 		Parameters:
 		-------------------
 			geometry: DataFrame that contains geometry infromation for the array, as returns by getGeometry
-			timeTable: 3D numpy array that contain time shift for select slowness grids for all stations in the array,
-						created by getTimeTable
 			arrayName: str, name of array
 			sflag: int, options for calculating maximum value of the beamforming traces.
 					1: return the maximum amplitude of the traces
@@ -452,7 +450,7 @@ class Earthquake(object):
 			msg = ('Calculating slide beamforming for earthquake %s in array %s in filter %s - %s' % (self.ID, arrayName, name, filt))
 			gpar.log(__name__,msg,level='info',pri=True)
 			rel = slideBeam(self.stream, self.ntr, self.delta,
-							geometry,timeTable,arrayName,grdpts_x,grdpts_y,
+							geometry,arrayName,grdpts_x,grdpts_y,
 						filt, sflag,stack,sll_x,sll_y,sl_s,refine,
 						starttime,endtime, unit,
 						winlen,overlap,**kwargs)
@@ -981,11 +979,20 @@ class Doublet(object):
 				   starttime=15, endtime=30, method=0, 
 				   prewhiten=0, freqmin=1, freqmax=3,
 				   unit='km', channel='SHZ',tphase='PKIKP'):
-		timeTable = getTimeTable(geometry, sll_x, sll_y, sl_s, grdpts_x, grdpts_x,unit=unit)
 		st1 = self.st1.copy()
 		st1 = st1.select(channel=channel)
+		use_geometry_1 = pd.DataFrame()
+		for tr in st1:
+			sta = tr.stat.station
+			trow = geometry[geometry.STA == sta].iloc[0]
+			use_geometry_1 = use_geometry_1.append(trow, ignore_index=True)
 		st2 = self.st2.copy()
 		st2 = st2.select(channel=channel)
+		use_geometry_2 = pd.DataFrame()
+		for tr in st2:
+			sta = tr.stat.station
+			trow = geometry[geometry.STA == sta].iloc[0]
+			use_geometry_2 = use_geometry_2.append(trow, ignore_index=True)
 		self.sll_x = sll_x
 		self.sll_y = sll_y
 		self.sl_s = sl_s
@@ -1000,7 +1007,8 @@ class Doublet(object):
 		stime = arr1 - starttime 
 		etime = arr1 + endtime
 		st1.trim(starttime=stime, endtime=etime)
-		relpow1, abspow1 = fkslowness(st1, ntr1, timeTable, 
+		timeTable1 = getTimeTable(use_geometry_1, sll_x, sll_y, sl_s, grdpts_x, grdpts_x,unit=unit)
+		relpow1, abspow1 = fkslowness(st1, ntr1, timeTable1, 
 									  sll_x=sll_x, sll_y=sll_y,
 									  sl_s=sl_s, grdpts_x=grdpts_x, grdpts_y=grdpts_y,
 									  freqmin=freqmin, freqmax=freqmax,
@@ -1010,7 +1018,8 @@ class Doublet(object):
 		stime = arr2 - starttime
 		etime = arr2 + endtime
 		st2.trim(starttime=stime, endtime=etime)
-		relpow2, abspow2 = fkslowness(st2, ntr2, timeTable, 
+		timeTable2 = getTimeTable(use_geometry_2, sll_x, sll_y, sl_s, grdpts_x, grdpts_x,unit=unit)
+		relpow2, abspow2 = fkslowness(st2, ntr2, timeTable2, 
 									  sll_x=sll_x, sll_y=sll_y,
 									  sl_s=sl_s, grdpts_x=grdpts_x, grdpts_y=grdpts_y,
 									  freqmin=freqmin, freqmax=freqmax,
@@ -1691,7 +1700,7 @@ def fkslowness(stream, ntr, time_shift_table,
 	return relpow_map, abspow_map
 
 
-def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdpts_y=301,
+def slideBeam(stream, ntr, delta, geometry,arrayName,grdpts_x=301,grdpts_y=301,
 					filt=[1,2,4,True], sflag=1,stack='linear',
 					sll_x=-15.0,sll_y=-15.0,sl_s=0.1, refine=True,
 					starttime=400.0,endtime=1400.0, unit='deg',
@@ -1708,6 +1717,7 @@ def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdp
 	ndel = winlen*(1-overlap)
 	bnpts = int((endtime-starttime)/ndel)
 	hilbertTd = np.empty((ntr,npts),dtype=complex)
+	use_geometry = pd.DataFrame()
 	# stations = timeTable
 	for ind, tr in enumerate(st):
 		sta = tr.stats.station
@@ -1719,6 +1729,8 @@ def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdp
 			data = np.pad(data,(0,dn),'edge')
 		else:
 			data = tr.data
+		tmprow = geometry[geometry.STA == sta].iloc[0]
+		use_geometry = use_geometry.append(tmprow, ignore_index=True)
 		hilbertTd[ind,:] = scipy.signal.hilbert(data)
 	if stack == 'linear':
 		order = -1
@@ -1732,6 +1744,7 @@ def slideBeam(stream, ntr, delta, geometry,timeTable,arrayName,grdpts_x=301,grdp
 	else:
 		msg = 'Not available stack method, please choose form linaer, psw or root\n'
 		gpar.log(__name__,msg,level='error',pri=True)
+	timeTable = getTimeTable(use_geometry, slow_x, slow_y, sl_s, grdpts_x, grdpts_y,unit)
 	abspow = np.empty(bnpts)
 	cohere = np.empty(bnpts)
 	slow_h = np.empty(bnpts)
@@ -1804,13 +1817,13 @@ def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
 	winlen = endtime - starttime
 	winpts = int(winlen/delta) + 1
 	#times = starttime + np.arange(winpts) * delta
-	timeTable = getSlantTime(geometry,grdpts,sl_s,sll,vary,unit,**kwargs)
 	#k = sll + np.arange(grdpts)*sl_s
 	envel = pd.DataFrame(columns=['FILT','POWER'])
 	for name, filt in filts.items():
 		tmp_st = st.copy()
 		tmp_st.filter('bandpass',freqmin=filt[0],freqmax=filt[1],corners=filt[2],zerophase=filt[3])
 		hilbertTd = np.empty((ntr,npts),dtype=complex)
+		use_geometry = pd.DataFrame()
 		for ind, tr in enumerate(tmp_st):
 			sta = tr.stats.station
 			if len(tr.data) > npts:
@@ -1821,6 +1834,8 @@ def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
 				data = np.pad(data,(0,dn),'edge')
 			else:
 				data = tr.data
+			tmprow = geometry[geometry.STA == sta].iloc[0]
+			use_geometry = use_geometry.append(tmprow, ignore_index=True)
 			hilbertTd[ind,:] = scipy.signal.hilbert(data)
 		if stack == 'linear':
 			order = -1
@@ -1835,6 +1850,7 @@ def slantBeam(stream, ntr, delta, geometry,arrayName,grdpts=401,
 			msg = 'Not available stack method, please choose from linear, psw or root\n'
 			gpar.log(__name__,msg,level='error',e='ValueError',pri=True)
 
+		timeTable = getSlantTime(use_geometry,grdpts,sl_s,sll,vary,unit,**kwargs)
 		abspow = np.empty((grdpts,winpts))
 		errorcode = clibarray.slant(ntr,grdpts,
 					iflag,npts,delta,
@@ -2322,19 +2338,3 @@ def stretching_interp(ref, cur, delta, t0_x, t0_y, win,dv_range,nbtrial):
 	dv = dtfiner[np.argmax(ncof)] - 1
 
 	return dv, cc, cdp
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
