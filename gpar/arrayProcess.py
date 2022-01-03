@@ -1744,7 +1744,7 @@ def slideBeam(stream, ntr, delta, geometry,arrayName,grdpts_x=301,grdpts_y=301,
 	else:
 		msg = 'Not available stack method, please choose form linaer, psw or root\n'
 		gpar.log(__name__,msg,level='error',pri=True)
-	timeTable = getTimeTable(use_geometry, slow_x, slow_y, sl_s, grdpts_x, grdpts_y,unit)
+	timeTable = getTimeTable(use_geometry, sll_x, sll_y, sl_s, grdpts_x, grdpts_y,unit)
 	abspow = np.empty(bnpts)
 	cohere = np.empty(bnpts)
 	slow_h = np.empty(bnpts)
