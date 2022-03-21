@@ -1350,7 +1350,7 @@ def getTimeTable(geometry,sll_x=-15.0,sll_y=-15.0,sl_s=0.1,grdpts_x=301,grdpts_y
 
 	"""
 	sx = sll_x + np.arange(grdpts_x)*sl_s
-	sy = sll_y + np.arange(grdpts_x)*sl_s
+	sy = sll_y + np.arange(grdpts_y)*sl_s
 
 	if unit == 'deg':
 		sx = sx/deg2km
