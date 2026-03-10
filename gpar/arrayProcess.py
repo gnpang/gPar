@@ -2068,10 +2068,10 @@ def _getLag(Mptd1, Mptd2, delta, domain='freq', fittype='cos', getcc=False):
 	elif fittype == 'parabola':
 		xmax = []
 		ymax = []
-		for i in ntr:
+		for i in range(ntr):
 			_x, _y = polyfit(x[i,:], y[i,:])
-			xmax.append[_x]
-			ymax.append[_y]
+			xmax.append(_x)
+			ymax.append(_y)
 		xmax = np.array(xmax)
 		ymax = np.array(ymax)
 	else:
